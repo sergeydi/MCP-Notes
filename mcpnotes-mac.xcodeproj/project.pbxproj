@@ -6,6 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		E29098AA2FA7341600C4C0FD /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = E29098A92FA7341600C4C0FD /* MCP */; };
+		E29098B12FA7345500C4C0FD /* Embeddings in Frameworks */ = {isa = PBXBuildFile; productRef = E29098B02FA7345500C4C0FD /* Embeddings */; };
+		E29098B32FA7345500C4C0FD /* MLTensorUtils in Frameworks */ = {isa = PBXBuildFile; productRef = E29098B22FA7345500C4C0FD /* MLTensorUtils */; };
+		E29098B82FA734B000C4C0FD /* vector in Frameworks */ = {isa = PBXBuildFile; productRef = E29098B72FA734B000C4C0FD /* vector */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		E290988C2FA72B6E00C4C0FD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +59,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E29098B12FA7345500C4C0FD /* Embeddings in Frameworks */,
+				E29098B32FA7345500C4C0FD /* MLTensorUtils in Frameworks */,
+				E29098B82FA734B000C4C0FD /* vector in Frameworks */,
+				E29098AA2FA7341600C4C0FD /* MCP in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +123,10 @@
 			);
 			name = "mcpnotes-mac";
 			packageProductDependencies = (
+				E29098A92FA7341600C4C0FD /* MCP */,
+				E29098B02FA7345500C4C0FD /* Embeddings */,
+				E29098B22FA7345500C4C0FD /* MLTensorUtils */,
+				E29098B72FA734B000C4C0FD /* vector */,
 			);
 			productName = "mcpnotes-mac";
 			productReference = E290987E2FA72B6C00C4C0FD /* mcpnotes-mac.app */;
@@ -195,6 +210,11 @@
 			);
 			mainGroup = E29098752FA72B6C00C4C0FD;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				E29098A82FA7341600C4C0FD /* XCRemoteSwiftPackageReference "swift-sdk" */,
+				E29098AF2FA7345500C4C0FD /* XCRemoteSwiftPackageReference "swift-embeddings" */,
+				E29098B62FA734B000C4C0FD /* XCRemoteSwiftPackageReference "sqlite-vector" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E290987F2FA72B6C00C4C0FD /* Products */;
 			projectDirPath = "";
@@ -394,6 +414,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -403,14 +425,18 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "MCP Notes";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 26;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-mac";
+				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -426,6 +452,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -435,14 +463,18 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "MCP Notes";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 26;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-mac";
+				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -573,6 +605,56 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E29098A82FA7341600C4C0FD /* XCRemoteSwiftPackageReference "swift-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/modelcontextprotocol/swift-sdk";
+			requirement = {
+				kind = exactVersion;
+				version = 0.12.0;
+			};
+		};
+		E29098AF2FA7345500C4C0FD /* XCRemoteSwiftPackageReference "swift-embeddings" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jkrukowski/swift-embeddings";
+			requirement = {
+				kind = exactVersion;
+				version = 0.0.26;
+			};
+		};
+		E29098B62FA734B000C4C0FD /* XCRemoteSwiftPackageReference "sqlite-vector" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sqliteai/sqlite-vector";
+			requirement = {
+				kind = exactVersion;
+				version = 0.9.95;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E29098A92FA7341600C4C0FD /* MCP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E29098A82FA7341600C4C0FD /* XCRemoteSwiftPackageReference "swift-sdk" */;
+			productName = MCP;
+		};
+		E29098B02FA7345500C4C0FD /* Embeddings */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E29098AF2FA7345500C4C0FD /* XCRemoteSwiftPackageReference "swift-embeddings" */;
+			productName = Embeddings;
+		};
+		E29098B22FA7345500C4C0FD /* MLTensorUtils */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E29098AF2FA7345500C4C0FD /* XCRemoteSwiftPackageReference "swift-embeddings" */;
+			productName = MLTensorUtils;
+		};
+		E29098B72FA734B000C4C0FD /* vector */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E29098B62FA734B000C4C0FD /* XCRemoteSwiftPackageReference "sqlite-vector" */;
+			productName = vector;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E29098762FA72B6C00C4C0FD /* Project object */;
 }
