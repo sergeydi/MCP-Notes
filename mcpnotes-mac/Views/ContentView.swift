@@ -1,24 +1,30 @@
-//
-//  ContentView.swift
-//  mcpnotes-mac
-//
-//  Created by Sergey Didanov on 03.05.2026.
-//
-
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(NoteStore.self) private var store
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        NavigationSplitView {
+            SidebarView()
+        } detail: {
+            if let note = store.selectedNote {
+                NoteEditorView(note: note)
+                    .id(note.id)
+            } else {
+                ContentUnavailableView(
+                    "No Note Selected",
+                    systemImage: "note.text",
+                    description: Text("Select a note from the sidebar or create a new one.")
+                )
+            }
         }
-        .padding()
+        .task {
+            await store.load()
+        }
     }
 }
 
 #Preview {
     ContentView()
+        .environment(NoteStore())
 }
