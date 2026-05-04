@@ -64,3 +64,4 @@ fastlane/test_output
 # Claude
 .claude
 CLAUDE.md
+MCP_Notes_TechSpec.md
