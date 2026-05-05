@@ -17,12 +17,15 @@ actor NoteIndexer {
     // MARK: - State
 
     private var modelBundle: XLMRoberta.ModelBundle?
+    private var modelLoadTask: Task<XLMRoberta.ModelBundle, Error>?
     private let vectorIndex: USearchIndex
     private var uuidToKey: [UUID: UInt64] = [:]
     private var keyToUUID: [UInt64: UUID] = [:]
     private var nextKey: UInt64 = 1
     private var filenameToUUID: [String: UUID] = [:]
     private var noteLinks: [UUID: [UUID]] = [:]
+    private var vectorCache: [UUID: [Float]] = [:]
+    private var saveTask: Task<Void, Never>?
 
     // MARK: - Paths
 
@@ -54,6 +57,8 @@ actor NoteIndexer {
 
     /// Persist index and mapping to disk.
     func saveToDisk() {
+        saveTask?.cancel()
+        saveTask = nil
         vectorIndex.save(path: indexPath)
         saveMapping()
     }
@@ -74,7 +79,9 @@ actor NoteIndexer {
             vectorIndex.remove(key: key)
         }
         vectorIndex.add(key: key, vector: vector)
+        vectorCache[note.id] = vector
         noteLinks[note.id] = links.compactMap { filenameToUUID[$0.lowercased()] }
+        scheduleSave()
     }
 
     /// Remove a note from the index.
@@ -84,7 +91,9 @@ actor NoteIndexer {
         uuidToKey.removeValue(forKey: id)
         keyToUUID.removeValue(forKey: key)
         noteLinks.removeValue(forKey: id)
+        vectorCache.removeValue(forKey: id)
         filenameToUUID = filenameToUUID.filter { $0.value != id }
+        scheduleSave()
     }
 
     /// Bulk-index notes and save to disk. Re-indexes any note already in the index.
@@ -126,9 +135,7 @@ actor NoteIndexer {
         for uuid in Array(scores.keys) {
             guard let linked = noteLinks[uuid] else { continue }
             for linkedID in linked where scores[linkedID] == nil {
-                guard let key = uuidToKey[linkedID],
-                      let vecs: [[Float]] = vectorIndex.get(key: key),
-                      let vec = vecs.first else { continue }
+                guard let vec = vectorCache[linkedID] else { continue }
                 scores[linkedID] = zip(queryVector, vec).reduce(0) { $0 + $1.0 * $1.1 }
             }
         }
@@ -140,11 +147,18 @@ actor NoteIndexer {
 
     private func loadedModel() async throws -> XLMRoberta.ModelBundle {
         if let bundle = modelBundle { return bundle }
-        let bundle = try await XLMRoberta.loadModelBundle(
-            from: Self.modelID
-        )
-        modelBundle = bundle
-        return bundle
+        if let task = modelLoadTask { return try await task.value }
+        let task = Task { try await XLMRoberta.loadModelBundle(from: Self.modelID) }
+        modelLoadTask = task
+        do {
+            let bundle = try await task.value
+            modelBundle = bundle
+            modelLoadTask = nil
+            return bundle
+        } catch {
+            modelLoadTask = nil
+            throw error
+        }
     }
 
     /// Embed text using mean pooling + L2 normalization (E5 recipe).
@@ -208,6 +222,17 @@ actor NoteIndexer {
         return s
     }
 
+    // MARK: - Private: deferred save
+
+    private func scheduleSave() {
+        saveTask?.cancel()
+        saveTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            saveToDisk()
+        }
+    }
+
     // MARK: - Private: key mapping
 
     private func ensureKey(for id: UUID) -> UInt64 {
@@ -235,15 +260,19 @@ actor NoteIndexer {
         for entry in decoded.filenameMap ?? [] {
             filenameToUUID[entry.filename] = entry.uuid
         }
+        for entry in decoded.vectors ?? [] {
+            vectorCache[entry.uuid] = entry.vector
+        }
     }
 
     private func saveMapping() {
         let entries = uuidToKey.map { KeyMapping.Entry(uuid: $0.key, key: $0.value) }
         let links = noteLinks.map { KeyMapping.LinkEntry(sourceID: $0.key, targetIDs: $0.value) }
         let filenameEntries = filenameToUUID.map { KeyMapping.FilenameEntry(filename: $0.key, uuid: $0.value) }
-        let mapping = KeyMapping(nextKey: nextKey, entries: entries, links: links, filenameMap: filenameEntries)
+        let vectorEntries = vectorCache.map { KeyMapping.VectorEntry(uuid: $0.key, vector: $0.value) }
+        let mapping = KeyMapping(nextKey: nextKey, entries: entries, links: links, filenameMap: filenameEntries, vectors: vectorEntries)
         guard let data = try? JSONEncoder().encode(mapping) else { return }
-        try? data.write(to: mappingURL)
+        try? data.write(to: mappingURL, options: .atomic)
     }
 
     private struct KeyMapping: Codable {
@@ -251,6 +280,7 @@ actor NoteIndexer {
         let entries: [Entry]
         let links: [LinkEntry]?
         let filenameMap: [FilenameEntry]?
+        let vectors: [VectorEntry]?
 
         struct Entry: Codable {
             let uuid: UUID
@@ -265,6 +295,20 @@ actor NoteIndexer {
         struct FilenameEntry: Codable {
             let filename: String
             let uuid: UUID
+        }
+
+        struct VectorEntry: Codable {
+            let uuid: UUID
+            let data: Data
+
+            init(uuid: UUID, vector: [Float]) {
+                self.uuid = uuid
+                self.data = vector.withUnsafeBytes { Data($0) }
+            }
+
+            var vector: [Float] {
+                data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+            }
         }
     }
 }
