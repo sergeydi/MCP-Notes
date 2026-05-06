@@ -46,6 +46,7 @@ private struct GeneralSettingsView: View {
 // MARK: - RAG
 
 private struct RAGSettingsView: View {
+    @Environment(NoteStore.self) private var store
     @AppStorage("ragEnabled") private var ragEnabled = false
 
     var body: some View {
@@ -55,6 +56,10 @@ private struct RAGSettingsView: View {
                 Text("Semantic search indexes your notes locally and exposes them via MCP.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("Indexer Status") {
+                indexerStatusRow
             }
 
             if ragEnabled {
@@ -68,6 +73,28 @@ private struct RAGSettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    @ViewBuilder
+    private var indexerStatusRow: some View {
+        switch store.indexingState {
+        case .idle:
+            Label("Not started", systemImage: "clock")
+                .foregroundStyle(.secondary)
+        case .indexing(let indexed, let total):
+            HStack(spacing: 8) {
+                ProgressView()
+                    .scaleEffect(0.75)
+                Text("Indexing notes… \(indexed) / \(total)")
+                    .foregroundStyle(.secondary)
+            }
+        case .ready(let count):
+            Label("\(count) note\(count == 1 ? "" : "s") indexed", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .failed:
+            Label("Indexing failed", systemImage: "xmark.circle.fill")
+                .foregroundStyle(.red)
+        }
     }
 
     private var mcpConfigSnippet: String {

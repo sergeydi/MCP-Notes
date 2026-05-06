@@ -3,10 +3,19 @@ import Embeddings
 import Foundation
 import USearch
 
+protocol NoteIndexing {
+    func loadFromDisk() async
+    func indexedCount() async -> Int
+    func indexAll(_ notes: [Note]) async throws
+    func indexNote(_ note: Note) async throws
+    func removeNote(id: UUID) async
+    func search(query: String, limit: Int, expandLinks: Bool) async throws -> [UUID]
+}
+
 /// Manages on-device vector indexing and semantic search for notes.
 /// Uses multilingual-e5-small (XLM-RoBERTa) downloaded from HuggingFace Hub on first launch.
 /// All data lives in Application Support — never synced to iCloud.
-actor NoteIndexer {
+actor NoteIndexer: NoteIndexing {
 
     // MARK: - Constants
 
@@ -34,16 +43,25 @@ actor NoteIndexer {
 
     // MARK: - Init
 
-    init() {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory, in: .userDomainMask
-        ).first!
-        let dir = appSupport.appendingPathComponent("mcpnotes/rag", isDirectory: true)
+    init(storageDirectory: URL? = nil) {
+        let dir: URL
+        if let custom = storageDirectory {
+            dir = custom
+        } else {
+            let appSupport = FileManager.default.urls(
+                for: .applicationSupportDirectory, in: .userDomainMask
+            ).first!
+            dir = appSupport.appendingPathComponent("mcpnotes/rag", isDirectory: true)
+        }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         indexPath = dir.appendingPathComponent("notes.usearch").path
         mappingURL = dir.appendingPathComponent("notes-keys.json")
         vectorIndex = USearchIndex.make(metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32)
     }
+
+    // MARK: - NoteIndexing
+
+    func indexedCount() async -> Int { Int(vectorIndex.count) }
 
     // MARK: - Lifecycle
 
@@ -52,6 +70,10 @@ actor NoteIndexer {
         if FileManager.default.fileExists(atPath: indexPath) {
             vectorIndex.load(path: indexPath)
         }
+        // Reserve restores the runtime thread-slot structures that are not persisted to disk.
+        // Without this, vectorIndex.add() crashes (USearch thread_lock_ finds 0 slots).
+        let capacity = max(UInt32(vectorIndex.count) + 16, 64)
+        vectorIndex.reserve(capacity)
         loadMapping()
     }
 

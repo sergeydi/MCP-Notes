@@ -29,6 +29,7 @@ struct MCPNotesApp: App {
 
         Settings {
             SettingsView()
+                .environment(noteStore)
         }
     }
 }
