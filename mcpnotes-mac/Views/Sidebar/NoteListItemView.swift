@@ -2,12 +2,22 @@ import SwiftUI
 
 struct NoteListItemView: View {
     let note: Note
+    var score: Float? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(note.filename)
-                .font(.body)
-                .lineLimit(1)
+            HStack(alignment: .firstTextBaseline) {
+                Text(note.filename)
+                    .font(.body)
+                    .lineLimit(1)
+                if let score {
+                    Spacer()
+                    Text(String(format: "%.0f%%", score * 100))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .monospacedDigit()
+                }
+            }
 
             if !note.tags.isEmpty {
                 HStack(spacing: 4) {

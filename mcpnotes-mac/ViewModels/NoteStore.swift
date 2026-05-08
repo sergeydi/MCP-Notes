@@ -125,8 +125,12 @@ final class NoteStore {
 
     // MARK: - Search
 
-    func search(query: String, limit: Int = 10, expandLinks: Bool = true) async throws -> [UUID] {
-        try await indexer.search(query: query, limit: limit, expandLinks: expandLinks)
+    func search(query: String, limit: Int = 10) async throws -> [UUID] {
+        try await indexer.search(query: query, limit: limit)
+    }
+
+    func searchRanked(query: String, limit: Int = 10) async throws -> [(id: UUID, score: Float)] {
+        try await indexer.searchRanked(query: query, limit: limit)
     }
 
     // MARK: - Bookmarks

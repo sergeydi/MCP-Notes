@@ -9,7 +9,8 @@ protocol NoteIndexing {
     func indexAll(_ notes: [Note]) async throws
     func indexNote(_ note: Note) async throws
     func removeNote(id: UUID) async
-    func search(query: String, limit: Int, expandLinks: Bool) async throws -> [UUID]
+    func search(query: String, limit: Int) async throws -> [UUID]
+    func searchRanked(query: String, limit: Int) async throws -> [(id: UUID, score: Float)]
 }
 
 /// Manages on-device vector indexing and semantic search for notes.
@@ -22,18 +23,18 @@ actor NoteIndexer: NoteIndexing {
     private static let modelID = "intfloat/multilingual-e5-small"
     /// multilingual-e5-small hidden size.
     private static let dimensions: UInt32 = 384
+    /// Bump when the chunking strategy or index format changes to force a full re-index.
+    private static let currentIndexVersion = 6
 
     // MARK: - State
 
     private var modelBundle: XLMRoberta.ModelBundle?
     private var modelLoadTask: Task<XLMRoberta.ModelBundle, Error>?
     private let vectorIndex: USearchIndex
-    private var uuidToKey: [UUID: UInt64] = [:]
+    /// Maps each note UUID to the keys of all its indexed chunks.
+    private var uuidToKeys: [UUID: [UInt64]] = [:]
     private var keyToUUID: [UInt64: UUID] = [:]
     private var nextKey: UInt64 = 1
-    private var filenameToUUID: [String: UUID] = [:]
-    private var noteLinks: [UUID: [UUID]] = [:]
-    private var vectorCache: [UUID: [Float]] = [:]
     private var saveTask: Task<Void, Never>?
 
     // MARK: - Paths
@@ -61,15 +62,29 @@ actor NoteIndexer: NoteIndexing {
 
     // MARK: - NoteIndexing
 
-    func indexedCount() async -> Int { Int(vectorIndex.count) }
+    /// Returns the number of indexed notes (not chunk vectors).
+    func indexedCount() async -> Int { uuidToKeys.count }
 
     // MARK: - Lifecycle
 
     /// Load persisted index and key mapping. Call once on app launch after NoteStore.load().
     func loadFromDisk() {
-        if FileManager.default.fileExists(atPath: indexPath) {
-            vectorIndex.load(path: indexPath)
+        // Check version before loading vectors: if stale, skip loading the binary index
+        // so we start with an empty USearch state and avoid capacity/crash issues.
+        let mappingIsCurrentVersion: Bool = {
+            guard let data = try? Data(contentsOf: mappingURL),
+                  let decoded = try? JSONDecoder().decode(KeyMapping.self, from: data)
+            else { return false }
+            return decoded.indexVersion == Self.currentIndexVersion
+        }()
+
+        guard mappingIsCurrentVersion, FileManager.default.fileExists(atPath: indexPath) else {
+            // Fresh index — do NOT reserve here; indexAll will do the single reserve
+            // with the correct total capacity before any add() calls.
+            return
         }
+
+        vectorIndex.load(path: indexPath)
         // Reserve restores the runtime thread-slot structures that are not persisted to disk.
         // Without this, vectorIndex.add() crashes (USearch thread_lock_ finds 0 slots).
         let capacity = max(UInt32(vectorIndex.count) + 16, 64)
@@ -87,44 +102,54 @@ actor NoteIndexer: NoteIndexing {
 
     // MARK: - Indexing
 
-    /// Index or re-index a single note. Documents use the "passage: " E5 prefix.
+    /// Index or re-index a single note. The body is split into paragraphs; each paragraph
+    /// becomes a separate vector. Documents use the "passage: " E5 prefix.
     func indexNote(_ note: Note) async throws {
-        filenameToUUID[note.filename.lowercased()] = note.id
-        let tags = note.tags.isEmpty ? "" : "\(note.tags.joined(separator: " "))\n"
-        let links = wikilinks(in: note.body)
-        let linksText = links.isEmpty ? "" : "\(links.joined(separator: " "))\n"
-        let cleanBody = NoteIndexer.stripMarkdown(note.body)
-        let text = "passage: \(note.filename)\n\(tags)\(linksText)\(cleanBody)"
-        let vector = try await embed(text)
-        let key = ensureKey(for: note.id)
-        if vectorIndex.contains(key: key) {
-            vectorIndex.remove(key: key)
+        // Remove all existing chunk keys for this note before re-indexing.
+        if let oldKeys = uuidToKeys[note.id] {
+            for key in oldKeys {
+                vectorIndex.remove(key: key)
+                keyToUUID.removeValue(forKey: key)
+            }
         }
-        vectorIndex.add(key: key, vector: vector)
-        vectorCache[note.id] = vector
-        noteLinks[note.id] = links.compactMap { filenameToUUID[$0.lowercased()] }
+        uuidToKeys[note.id] = []
+
+        let tags = note.tags.isEmpty ? "" : note.tags.joined(separator: " ")
+        let cleanBody = NoteIndexer.stripMarkdown(note.body)
+
+        // Metadata as separate chunks: filename, tags (non-empty only).
+        let metaChunks = [note.filename, tags].filter { !$0.isEmpty }
+        let chunks = metaChunks + NoteIndexer.paragraphs(cleanBody)
+
+        for chunk in chunks {
+            let vector = try await embed("passage: \(chunk)")
+            let key = nextKey
+            nextKey += 1
+            uuidToKeys[note.id]!.append(key)
+            keyToUUID[key] = note.id
+            vectorIndex.add(key: key, vector: vector)
+        }
+
         scheduleSave()
     }
 
-    /// Remove a note from the index.
+    /// Remove a note and all its chunk vectors from the index.
     func removeNote(id: UUID) {
-        guard let key = uuidToKey[id] else { return }
-        vectorIndex.remove(key: key)
-        uuidToKey.removeValue(forKey: id)
-        keyToUUID.removeValue(forKey: key)
-        noteLinks.removeValue(forKey: id)
-        vectorCache.removeValue(forKey: id)
-        filenameToUUID = filenameToUUID.filter { $0.value != id }
+        guard let keys = uuidToKeys[id] else { return }
+        for key in keys {
+            vectorIndex.remove(key: key)
+            keyToUUID.removeValue(forKey: key)
+        }
+        uuidToKeys.removeValue(forKey: id)
         scheduleSave()
     }
 
     /// Bulk-index notes and save to disk. Re-indexes any note already in the index.
     func indexAll(_ notes: [Note]) async throws {
-        // Pre-populate filename map so forward wikilink references resolve correctly.
-        for note in notes {
-            filenameToUUID[note.filename.lowercased()] = note.id
-        }
-        vectorIndex.reserve(UInt32(notes.count))
+        // Single reserve before any add() calls. For a fresh index this is the only reserve;
+        // for a loaded index loadFromDisk already reserved. Use 10× headroom to be safe.
+        let needed = max(UInt32(vectorIndex.count) + UInt32(notes.count * 10), 64)
+        vectorIndex.reserve(needed)
         for note in notes {
             try await indexNote(note)
         }
@@ -134,35 +159,35 @@ actor NoteIndexer: NoteIndexing {
     // MARK: - Search
 
     /// Returns note UUIDs ranked by semantic similarity, closest first.
-    /// When `expandLinks` is true (default), notes linked from primary results are included
-    /// and the full result set is re-ranked by cosine similarity so graph-expanded notes
-    /// appear in the correct position relative to primary hits.
-    func search(query: String, limit: Int = 10, expandLinks: Bool = true) async throws -> [UUID] {
+    func search(query: String, limit: Int = 10) async throws -> [UUID] {
+        try await searchRanked(query: query, limit: limit).map(\.id)
+    }
+
+    /// Returns note UUIDs with their best-chunk cosine similarity scores (0–1), highest first.
+    func searchRanked(query: String, limit: Int = 10) async throws -> [(id: UUID, score: Float)] {
         guard vectorIndex.count > 0 else { return [] }
         let queryVector = try await embed("query: \(query)")
-        let (keys, distances) = vectorIndex.search(vector: queryVector, count: limit)
 
-        // USearch cosine metric returns distance = 1 − similarity; convert back.
-        var scores: [UUID: Float] = [:]
+        // Fetch extra chunk vectors to guarantee enough distinct notes after grouping.
+        let (keys, distances) = vectorIndex.search(vector: queryVector, count: limit * 5)
+
+        // Group by note UUID — keep best (highest) chunk score per note.
+        var rawScores: [UUID: Float] = [:]
         for (key, distance) in zip(keys, distances) {
             guard let uuid = keyToUUID[key] else { continue }
-            scores[uuid] = 1 - distance
-        }
-
-        guard expandLinks else {
-            return scores.sorted { $0.value > $1.value }.map(\.key)
-        }
-
-        // Score linked notes via dot product (valid because all vectors are L2-normalised).
-        for uuid in Array(scores.keys) {
-            guard let linked = noteLinks[uuid] else { continue }
-            for linkedID in linked where scores[linkedID] == nil {
-                guard let vec = vectorCache[linkedID] else { continue }
-                scores[linkedID] = zip(queryVector, vec).reduce(0) { $0 + $1.0 * $1.1 }
+            let score = 1 - distance
+            if (rawScores[uuid] ?? 0) < score {
+                rawScores[uuid] = score
             }
         }
 
-        return scores.sorted { $0.value > $1.value }.map(\.key)
+        // Trim to top `limit` notes.
+        var scores: [UUID: Float] = [:]
+        for (uuid, score) in rawScores.sorted(by: { $0.value > $1.value }).prefix(limit) {
+            scores[uuid] = score
+        }
+
+        return scores.sorted { $0.value > $1.value }.map { (id: $0.key, score: $0.value) }
     }
 
     // MARK: - Private: embedding
@@ -200,17 +225,18 @@ actor NoteIndexer: NoteIndexing {
         return vector
     }
 
-    // MARK: - Private: wikilinks
+    // MARK: - Private: chunking
 
-    private static let wikilinkRegex = /\[\[([^\[\]]+)\]\]/
-
-    private func wikilinks(in text: String) -> [String] {
-        text.matches(of: Self.wikilinkRegex).map { String($0.output.1) }
+    /// Split markdown-stripped body into non-empty paragraphs.
+    private nonisolated static func paragraphs(_ text: String) -> [String] {
+        text.components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 
     // MARK: - Private: markdown stripping
 
-    static func stripMarkdown(_ text: String) -> String {
+    nonisolated static func stripMarkdown(_ text: String) -> String {
         var s = text
         // Code fence markers — keep code content, remove ``` lines
         s = s.replacing(/(?m)^```[^\n]*$/, with: "")
@@ -257,79 +283,51 @@ actor NoteIndexer: NoteIndexing {
 
     // MARK: - Private: key mapping
 
-    private func ensureKey(for id: UUID) -> UInt64 {
-        if let key = uuidToKey[id] { return key }
-        let key = nextKey
-        nextKey += 1
-        uuidToKey[id] = key
-        keyToUUID[key] = id
-        return key
-    }
-
     private func loadMapping() {
         guard
             let data = try? Data(contentsOf: mappingURL),
             let decoded = try? JSONDecoder().decode(KeyMapping.self, from: data)
         else { return }
+        guard decoded.indexVersion == Self.currentIndexVersion else { return }
         nextKey = decoded.nextKey
         for entry in decoded.entries {
-            uuidToKey[entry.uuid] = entry.key
-            keyToUUID[entry.key] = entry.uuid
-        }
-        for entry in decoded.links ?? [] {
-            noteLinks[entry.sourceID] = entry.targetIDs
-        }
-        for entry in decoded.filenameMap ?? [] {
-            filenameToUUID[entry.filename] = entry.uuid
-        }
-        for entry in decoded.vectors ?? [] {
-            vectorCache[entry.uuid] = entry.vector
+            let keys = entry.allKeys
+            uuidToKeys[entry.uuid] = keys
+            for key in keys {
+                keyToUUID[key] = entry.uuid
+            }
         }
     }
 
     private func saveMapping() {
-        let entries = uuidToKey.map { KeyMapping.Entry(uuid: $0.key, key: $0.value) }
-        let links = noteLinks.map { KeyMapping.LinkEntry(sourceID: $0.key, targetIDs: $0.value) }
-        let filenameEntries = filenameToUUID.map { KeyMapping.FilenameEntry(filename: $0.key, uuid: $0.value) }
-        let vectorEntries = vectorCache.map { KeyMapping.VectorEntry(uuid: $0.key, vector: $0.value) }
-        let mapping = KeyMapping(nextKey: nextKey, entries: entries, links: links, filenameMap: filenameEntries, vectors: vectorEntries)
+        let entries = uuidToKeys.map { KeyMapping.Entry(uuid: $0.key, keys: $0.value) }
+        let mapping = KeyMapping(indexVersion: Self.currentIndexVersion, nextKey: nextKey, entries: entries)
         guard let data = try? JSONEncoder().encode(mapping) else { return }
         try? data.write(to: mappingURL, options: .atomic)
     }
 
     private struct KeyMapping: Codable {
+        let indexVersion: Int?
         let nextKey: UInt64
         let entries: [Entry]
-        let links: [LinkEntry]?
-        let filenameMap: [FilenameEntry]?
-        let vectors: [VectorEntry]?
 
         struct Entry: Codable {
             let uuid: UUID
-            let key: UInt64
-        }
+            /// New format: multiple chunk keys per note.
+            let keys: [UInt64]?
+            /// Legacy format: single key. Present only when reading old index files.
+            let key: UInt64?
 
-        struct LinkEntry: Codable {
-            let sourceID: UUID
-            let targetIDs: [UUID]
-        }
-
-        struct FilenameEntry: Codable {
-            let filename: String
-            let uuid: UUID
-        }
-
-        struct VectorEntry: Codable {
-            let uuid: UUID
-            let data: Data
-
-            init(uuid: UUID, vector: [Float]) {
+            init(uuid: UUID, keys: [UInt64]) {
                 self.uuid = uuid
-                self.data = vector.withUnsafeBytes { Data($0) }
+                self.keys = keys
+                self.key = nil
             }
 
-            var vector: [Float] {
-                data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+            var allKeys: [UInt64] {
+                if let keys = keys, !keys.isEmpty { return keys }
+                if let key = key { return [key] }
+                return []
             }
         }
     }

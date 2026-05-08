@@ -41,7 +41,8 @@ final class MockNoteIndexer: NoteIndexing {
     func indexAll(_ notes: [Note]) async throws { indexAllCalledWith = notes }
     func indexNote(_ note: Note) async throws { indexNoteCalledWith.append(note) }
     func removeNote(id: UUID) async { removeNoteCalledWith.append(id) }
-    func search(query: String, limit: Int, expandLinks: Bool) async throws -> [UUID] { [] }
+    func search(query: String, limit: Int) async throws -> [UUID] { [] }
+    func searchRanked(query: String, limit: Int) async throws -> [(id: UUID, score: Float)] { [] }
 }
 
 // MARK: - Shared fixture

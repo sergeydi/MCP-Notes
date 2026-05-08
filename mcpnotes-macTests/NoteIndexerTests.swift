@@ -210,234 +210,81 @@ struct NoteIndexerTests {
         #expect(results.first == id, "Re-indexed note should rank first after content update")
     }
 
-    // MARK: - Link graph expansion
+    // MARK: - Chunking
 
-    @Test("expand_links appends linked note after primary results")
-    func expandLinksAppendsLinkedNote() async throws {
+    @Test("chunking: note with relevant paragraph ranks above unrelated note")
+    func chunkingBoostsRelevantParagraph() async throws {
         let indexer = NoteIndexer()
 
-        let source = makeNote(
-            filename: "Daily Notes",
-            body: "Today I studied [[Swift Concurrency]]."
+        // Two paragraphs: one about hiking gear, one listing medicine names.
+        let medical = makeNote(
+            filename: "Аптечка для Хайкинга",
+            body: "Снаряжение для похода: палатки, спальники, треккинговые палки.\n\nЛекарства: Ибупрофен, Цетиризин, Лоперамид — основные таблетки в аптечке."
         )
-        let target = makeNote(
-            filename: "Swift Concurrency",
-            body: "Actors, async/await, and structured concurrency in Swift."
-        )
-        let unrelated = makeNote(
-            filename: "Shopping List",
-            body: "Buy milk and bread."
+        let todo = makeNote(
+            filename: "App ToDo",
+            body: "Задачи для приложения: добавить автодополнение тегов, увеличить размер шрифта."
         )
 
-        try await indexer.indexAll([source, target, unrelated])
+        try await indexer.indexAll([medical, todo])
 
-        // limit: 1 — only source is primary; target must arrive solely via expand_links
-        let results = try await indexer.search(query: "daily notes diary", limit: 1)
-
-        #expect(results.first == source.id, "Source note should be primary result")
-        #expect(results.contains(target.id), "Linked target should appear via expand_links")
-        #expect(results.contains(unrelated.id) == false, "Unrelated note should not appear")
+        let results = try await indexer.search(query: "таблетки лекарства", limit: 2)
+        #expect(results.first == medical.id, "Note with medicine paragraph should rank first")
     }
 
-    @Test("expand_links=false omits linked notes")
-    func expandLinksFalseOmitsLinkedNotes() async throws {
+    @Test("removeNote removes all chunk vectors from the index")
+    func removeNoteRemovesAllChunkVectors() async throws {
         let indexer = NoteIndexer()
 
-        let source = makeNote(
-            filename: "Daily Notes",
-            body: "Today I studied [[Swift Concurrency]]."
-        )
-        let target = makeNote(
-            filename: "Swift Concurrency",
-            body: "Actors, async/await, and structured concurrency."
-        )
-
-        try await indexer.indexAll([source, target])
-
-        let results = try await indexer.search(query: "daily notes diary", limit: 1, expandLinks: false)
-
-        #expect(results.count == 1, "Only primary result when expandLinks=false")
-        #expect(results.contains(target.id) == false, "Linked note must not appear when expandLinks=false")
-    }
-
-    @Test("expand_links returns all linked targets from a hub note")
-    func expandLinksAllTargetsFromHub() async throws {
-        let indexer = NoteIndexer()
-
-        let hub = makeNote(
-            filename: "Hub",
-            body: "Central note. See [[Topic A]] and [[Topic B]] for details."
-        )
-        let topicA = makeNote(filename: "Topic A", body: "Detailed content about topic A.")
-        let topicB = makeNote(filename: "Topic B", body: "Detailed content about topic B.")
-        let unrelated = makeNote(filename: "Gardening", body: "Water plants every morning.")
-
-        try await indexer.indexAll([hub, topicA, topicB, unrelated])
-
-        let results = try await indexer.search(query: "central hub details", limit: 1)
-
-        #expect(results.first == hub.id, "Hub should be primary")
-        #expect(results.contains(topicA.id), "Topic A should appear via expand_links")
-        #expect(results.contains(topicB.id), "Topic B should appear via expand_links")
-        #expect(!results.contains(unrelated.id), "Unrelated note must not appear")
-    }
-
-    @Test("expand_links tolerates unresolvable wikilinks")
-    func expandLinksToleratesUnresolvableLinks() async throws {
-        let indexer = NoteIndexer()
-
+        // Note with multiple paragraphs → multiple chunk vectors indexed.
         let note = makeNote(
+            filename: "Multi-paragraph Note",
+            body: "First paragraph about Swift programming.\n\nSecond paragraph about actor isolation.\n\nThird paragraph about structured concurrency."
+        )
+        let other = makeNote(filename: "Other", body: "Cooking recipes and fresh ingredients.")
+
+        try await indexer.indexAll([note, other])
+        await indexer.removeNote(id: note.id)
+
+        let results = try await indexer.search(query: "Swift concurrency actors", limit: 5)
+        #expect(!results.contains(note.id), "All chunks of removed note must be gone from index")
+    }
+
+    @Test("re-indexing a multi-paragraph note replaces all old chunks")
+    func reindexReplacesAllChunks() async throws {
+        let indexer = NoteIndexer()
+
+        let id = UUID()
+        let original = Note(
+            id: id,
             filename: "My Note",
-            body: "References [[Nonexistent Note]] which was never indexed."
+            tags: [],
+            body: "First cooking paragraph.\n\nSecond cooking paragraph with pasta recipes.",
+            fileURL: URL(fileURLWithPath: "/tmp/my-note.md"),
+            isBookmarked: false
         )
+        let updated = Note(
+            id: id,
+            filename: "My Note",
+            tags: [],
+            body: "Swift actors and concurrency.\n\nAsync/await structured tasks.",
+            fileURL: URL(fileURLWithPath: "/tmp/my-note.md"),
+            isBookmarked: false
+        )
+        let other = makeNote(filename: "Gardening", body: "Water plants and use compost as fertilizer.")
 
-        try await indexer.indexAll([note])
+        try await indexer.indexAll([original, other])
+        try await indexer.indexNote(updated)
 
-        let results = try await indexer.search(query: "references nonexistent", limit: 1)
+        // Old content (cooking) should no longer score this note highly.
+        let cookingResults = try await indexer.search(query: "pasta cooking recipes", limit: 2)
+        #expect(cookingResults.first != id, "Old cooking content must not dominate after re-index")
 
-        #expect(results.contains(note.id))
-        #expect(results.count == 1, "No phantom entries for unresolvable links")
+        // New content (Swift) should score this note first.
+        let swiftResults = try await indexer.search(query: "Swift concurrency actors", limit: 2)
+        #expect(swiftResults.first == id, "Re-indexed note should rank first for new content")
     }
 
-    @Test("expand_links is one-directional: backlinks are not expanded")
-    func expandLinksIsOneDirectional() async throws {
-        let indexer = NoteIndexer()
-
-        let diary = makeNote(
-            filename: "Diary",
-            body: "Today was a great day. See [[Machine Learning]] for study notes."
-        )
-        let ml = makeNote(
-            filename: "Machine Learning",
-            body: "Machine learning involves training models on data to make predictions."
-        )
-
-        try await indexer.indexAll([diary, ml])
-
-        // Query strongly matches ml; diary should not appear via backlink expansion
-        let results = try await indexer.search(query: "machine learning models predictions", limit: 1)
-
-        #expect(results.first == ml.id, "ML note should be primary")
-        #expect(results.contains(diary.id) == false, "Diary must not appear — backlinks are not tracked")
-    }
-
-    @Test("expand_links is shallow: linked notes' links are not recursively expanded")
-    func expandLinksIsShallow() async throws {
-        let indexer = NoteIndexer()
-
-        let a = makeNote(filename: "Start", body: "Start here. See [[Middle]].")
-        let b = makeNote(filename: "Middle", body: "Middle note. See [[Deep]].")
-        let c = makeNote(filename: "Deep", body: "Deep note about cooking and pasta recipes.")
-
-        try await indexer.indexAll([a, b, c])
-
-        // "start here" matches a; b should expand in; c is 2 hops away and must not appear
-        let results = try await indexer.search(query: "start here begin", limit: 1)
-
-        #expect(results.first == a.id, "Start note should be primary")
-        #expect(results.contains(b.id), "Middle should appear via expand_links (1 hop)")
-        #expect(results.contains(c.id) == false, "Deep must not appear (2 hops, not expanded)")
-    }
-
-    @Test("expand_links expands links from multiple primary results")
-    func expandLinksExpandsFromMultiplePrimary() async throws {
-        let indexer = NoteIndexer()
-
-        let a = makeNote(filename: "Overview Alpha", body: "Overview note alpha. See [[Detail X]].")
-        let b = makeNote(filename: "Overview Beta", body: "Overview note beta. See [[Detail Y]].")
-        let detailX = makeNote(filename: "Detail X", body: "Specifics about X topic.")
-        let detailY = makeNote(filename: "Detail Y", body: "Specifics about Y topic.")
-
-        try await indexer.indexAll([a, b, detailX, detailY])
-
-        // Both overview notes are primary; their respective details expand in
-        let results = try await indexer.search(query: "overview note", limit: 2)
-
-        #expect(results.contains(detailX.id), "Detail X should appear via expand_links from Alpha")
-        #expect(results.contains(detailY.id), "Detail Y should appear via expand_links from Beta")
-    }
-
-    @Test("expand_links does not duplicate already-found notes")
-    func expandLinksNoDuplicates() async throws {
-        let indexer = NoteIndexer()
-
-        let a = makeNote(
-            filename: "Note A",
-            body: "Swift concurrency is great. See also [[Note B]]."
-        )
-        let b = makeNote(
-            filename: "Note B",
-            body: "Swift actors enable safe concurrent state."
-        )
-
-        try await indexer.indexAll([a, b])
-
-        let results = try await indexer.search(query: "Swift concurrency actors", limit: 2)
-
-        let uniqueIDs = Set(results)
-        #expect(uniqueIDs.count == results.count, "No duplicate UUIDs in results")
-    }
-
-    @Test("expand_links skips notes removed from index")
-    func expandLinksSkipsRemovedNotes() async throws {
-        let indexer = NoteIndexer()
-
-        let source = makeNote(
-            filename: "Reference",
-            body: "See [[Deleted Note]] for details."
-        )
-        let deleted = makeNote(
-            filename: "Deleted Note",
-            body: "This note will be removed."
-        )
-
-        try await indexer.indexAll([source, deleted])
-        await indexer.removeNote(id: deleted.id)
-
-        let results = try await indexer.search(query: "reference details", limit: 2)
-
-        #expect(results.contains(deleted.id) == false, "Removed note must not appear via expand_links")
-    }
-
-    // MARK: - Wikilinks
-
-    @Test("wikilink target name boosts ranking")
-    func wikilinkBoostsRanking() async throws {
-        let indexer = NoteIndexer()
-
-        let linked = makeNote(
-            filename: "Daily Notes",
-            body: "Today I read about [[Swift Programming]] and took some notes."
-        )
-        let unrelated = makeNote(
-            filename: "Shopping List",
-            body: "Buy milk, eggs, and bread."
-        )
-
-        try await indexer.indexAll([linked, unrelated])
-
-        let results = try await indexer.search(query: "Swift Programming language", limit: 2)
-        #expect(results.first == linked.id, "Note with wikilink to Swift Programming should rank first")
-    }
-
-    @Test("multiple wikilinks are all indexed")
-    func multipleWikilinksAreIndexed() async throws {
-        let indexer = NoteIndexer()
-
-        let linked = makeNote(
-            filename: "Index",
-            body: "See also [[Actors]] and [[Async Await]] for concurrency topics."
-        )
-        let unrelated = makeNote(
-            filename: "Recipe",
-            body: "Chop vegetables and simmer in broth for 20 minutes."
-        )
-
-        try await indexer.indexAll([linked, unrelated])
-
-        let results = try await indexer.search(query: "actors async concurrency Swift", limit: 2)
-        #expect(results.first == linked.id, "Note with multiple concurrency wikilinks should rank first")
-    }
 }
 
 // MARK: - stripMarkdown unit tests

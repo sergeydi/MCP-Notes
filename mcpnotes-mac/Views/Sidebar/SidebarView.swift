@@ -7,12 +7,16 @@ struct SidebarView: View {
 
     @State private var mode: SidebarMode = .all
     @State private var searchText: String = ""
-    @State private var semanticNoteIDs: [UUID] = []
+    @State private var semanticResults: [(id: UUID, score: Float)] = []
     @State private var searchTask: Task<Void, Never>?
 
     private var isRAGReady: Bool {
         if case .ready = store.indexingState { return true }
         return false
+    }
+
+    private var semanticScores: [UUID: Float] {
+        Dictionary(uniqueKeysWithValues: semanticResults.map { ($0.id, $0.score) })
     }
 
     private var visibleNotes: [Note] {
@@ -25,8 +29,8 @@ struct SidebarView: View {
             return store.bookmarkedNotes
         case .search:
             guard !searchText.isEmpty else { return store.notes }
-            if ragEnabled && isRAGReady && !semanticNoteIDs.isEmpty {
-                return semanticNoteIDs.compactMap { id in store.notes.first { $0.id == id } }
+            if ragEnabled && isRAGReady && !semanticResults.isEmpty {
+                return semanticResults.compactMap { r in store.notes.first { $0.id == r.id } }
             }
             let q = searchText.lowercased()
             return store.notes.filter {
@@ -90,7 +94,7 @@ struct SidebarView: View {
         .onChange(of: mode) {
             if mode != .search {
                 searchText = ""
-                semanticNoteIDs = []
+                semanticResults = []
                 searchTask?.cancel()
             }
         }
@@ -102,14 +106,14 @@ struct SidebarView: View {
     private func triggerSemanticSearch() {
         searchTask?.cancel()
         guard ragEnabled && isRAGReady && !searchText.isEmpty else {
-            semanticNoteIDs = []
+            semanticResults = []
             return
         }
         let query = searchText
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
-            semanticNoteIDs = (try? await store.search(query: query, expandLinks: false)) ?? []
+            semanticResults = (try? await store.searchRanked(query: query)) ?? []
         }
     }
 
@@ -118,7 +122,7 @@ struct SidebarView: View {
     @ViewBuilder
     private var flatContent: some View {
         ForEach(visibleNotes) { note in
-            NoteListItemView(note: note)
+            NoteListItemView(note: note, score: mode == .search ? semanticScores[note.id] : nil)
                 .tag(note.id)
                 .contextMenu { contextMenu(for: note) }
         }
