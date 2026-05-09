@@ -11,6 +11,14 @@
 		E29098B12FA7345500C4C0FD /* Embeddings in Frameworks */ = {isa = PBXBuildFile; productRef = E29098B02FA7345500C4C0FD /* Embeddings */; };
 		E29098B32FA7345500C4C0FD /* MLTensorUtils in Frameworks */ = {isa = PBXBuildFile; productRef = E29098B22FA7345500C4C0FD /* MLTensorUtils */; };
 		E29098F92FA9BC7C00C4C0FD /* USearch in Frameworks */ = {isa = PBXBuildFile; productRef = E29098F82FA9BC7C00C4C0FD /* USearch */; };
+		E290A00B2FA72B6C00C4C0FD /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = E290A00A2FA72B6C00C4C0FD /* MCP */; };
+		E290C0042FA72B6C00C4C0FD /* Embeddings in Frameworks */ = {isa = PBXBuildFile; productRef = E290C0012FA72B6C00C4C0FD /* Embeddings */; };
+		E290E0022FA72B6C00C4C0FD /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = E290E0062FA72B6C00C4C0FD /* MCP */; };
+		E290E0032FA72B6C00C4C0FD /* Embeddings in Frameworks */ = {isa = PBXBuildFile; productRef = E290E0072FA72B6C00C4C0FD /* Embeddings */; };
+		E290E0042FA72B6C00C4C0FD /* MLTensorUtils in Frameworks */ = {isa = PBXBuildFile; productRef = E290E0082FA72B6C00C4C0FD /* MLTensorUtils */; };
+		E290E0052FA72B6C00C4C0FD /* USearch in Frameworks */ = {isa = PBXBuildFile; productRef = E290E0092FA72B6C00C4C0FD /* USearch */; };
+		E290C0052FA72B6C00C4C0FD /* MLTensorUtils in Frameworks */ = {isa = PBXBuildFile; productRef = E290C0022FA72B6C00C4C0FD /* MLTensorUtils */; };
+		E290C0062FA72B6C00C4C0FD /* USearch in Frameworks */ = {isa = PBXBuildFile; productRef = E290C0032FA72B6C00C4C0FD /* USearch */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -28,12 +36,21 @@
 			remoteGlobalIDString = E290987D2FA72B6C00C4C0FD;
 			remoteInfo = "mcpnotes-mac";
 		};
+		E290D00B2FA72B6C00C4C0FD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E29098762FA72B6C00C4C0FD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E290A0032FA72B6C00C4C0FD;
+			remoteInfo = MCPNotesServer;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		E290987E2FA72B6C00C4C0FD /* mcpnotes-mac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "mcpnotes-mac.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E290988B2FA72B6E00C4C0FD /* mcpnotes-macTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "mcpnotes-macTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E29098952FA72B6E00C4C0FD /* mcpnotes-macUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "mcpnotes-macUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E290A0012FA72B6C00C4C0FD /* MCPNotesServer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = MCPNotesServer; sourceTree = BUILT_PRODUCTS_DIR; };
+		E290D0012FA72B6C00C4C0FD /* MCPNotesServerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MCPNotesServerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -50,6 +67,26 @@
 		E29098982FA72B6E00C4C0FD /* mcpnotes-macUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "mcpnotes-macUITests";
+			sourceTree = "<group>";
+		};
+		E290A0022FA72B6C00C4C0FD /* MCPNotesServer */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E290E0012FA72B6C00C4C0FD /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+			);
+			path = MCPNotesServer;
+			sourceTree = "<group>";
+		};
+		E290E0012FA72B6C00C4C0FD = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				MCPNotesServer.swift,
+			);
+			target = E290D0032FA72B6C00C4C0FD /* MCPNotesServerTests */;
+		};
+		E290D0022FA72B6C00C4C0FD /* MCPNotesServerTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MCPNotesServerTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -73,10 +110,32 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E290D0052FA72B6C00C4C0FD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E290E0022FA72B6C00C4C0FD /* MCP in Frameworks */,
+				E290E0032FA72B6C00C4C0FD /* Embeddings in Frameworks */,
+				E290E0042FA72B6C00C4C0FD /* MLTensorUtils in Frameworks */,
+				E290E0052FA72B6C00C4C0FD /* USearch in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E29098922FA72B6E00C4C0FD /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E290A0052FA72B6C00C4C0FD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E290A00B2FA72B6C00C4C0FD /* MCP in Frameworks */,
+				E290C0042FA72B6C00C4C0FD /* Embeddings in Frameworks */,
+				E290C0052FA72B6C00C4C0FD /* MLTensorUtils in Frameworks */,
+				E290C0062FA72B6C00C4C0FD /* USearch in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -87,8 +146,10 @@
 			isa = PBXGroup;
 			children = (
 				E29098802FA72B6C00C4C0FD /* mcpnotes-mac */,
+				E290A0022FA72B6C00C4C0FD /* MCPNotesServer */,
 				E290988E2FA72B6E00C4C0FD /* mcpnotes-macTests */,
 				E29098982FA72B6E00C4C0FD /* mcpnotes-macUITests */,
+				E290D0022FA72B6C00C4C0FD /* MCPNotesServerTests */,
 				E29098F42FA9BA6A00C4C0FD /* Frameworks */,
 				E290987F2FA72B6C00C4C0FD /* Products */,
 			);
@@ -98,6 +159,8 @@
 			isa = PBXGroup;
 			children = (
 				E290987E2FA72B6C00C4C0FD /* mcpnotes-mac.app */,
+				E290A0012FA72B6C00C4C0FD /* MCPNotesServer */,
+				E290D0012FA72B6C00C4C0FD /* MCPNotesServerTests.xctest */,
 				E290988B2FA72B6E00C4C0FD /* mcpnotes-macTests.xctest */,
 				E29098952FA72B6E00C4C0FD /* mcpnotes-macUITests.xctest */,
 			);
@@ -186,6 +249,60 @@
 			productReference = E29098952FA72B6E00C4C0FD /* mcpnotes-macUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		E290D0032FA72B6C00C4C0FD /* MCPNotesServerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E290D0092FA72B6C00C4C0FD /* Build configuration list for PBXNativeTarget "MCPNotesServerTests" */;
+			buildPhases = (
+				E290D0042FA72B6C00C4C0FD /* Sources */,
+				E290D0052FA72B6C00C4C0FD /* Frameworks */,
+				E290D0062FA72B6C00C4C0FD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E290D00A2FA72B6C00C4C0FD /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				E290A0022FA72B6C00C4C0FD /* MCPNotesServer */,
+				E290D0022FA72B6C00C4C0FD /* MCPNotesServerTests */,
+			);
+			name = MCPNotesServerTests;
+			packageProductDependencies = (
+				E290E0062FA72B6C00C4C0FD /* MCP */,
+				E290E0072FA72B6C00C4C0FD /* Embeddings */,
+				E290E0082FA72B6C00C4C0FD /* MLTensorUtils */,
+				E290E0092FA72B6C00C4C0FD /* USearch */,
+			);
+			productName = MCPNotesServerTests;
+			productReference = E290D0012FA72B6C00C4C0FD /* MCPNotesServerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		E290A0032FA72B6C00C4C0FD /* MCPNotesServer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E290A0092FA72B6C00C4C0FD /* Build configuration list for PBXNativeTarget "MCPNotesServer" */;
+			buildPhases = (
+				E290A0042FA72B6C00C4C0FD /* Sources */,
+				E290A0052FA72B6C00C4C0FD /* Frameworks */,
+				E290A0062FA72B6C00C4C0FD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				E290A0022FA72B6C00C4C0FD /* MCPNotesServer */,
+			);
+			name = MCPNotesServer;
+			packageProductDependencies = (
+				E290A00A2FA72B6C00C4C0FD /* MCP */,
+				E290C0012FA72B6C00C4C0FD /* Embeddings */,
+				E290C0022FA72B6C00C4C0FD /* MLTensorUtils */,
+				E290C0032FA72B6C00C4C0FD /* USearch */,
+			);
+			productName = MCPNotesServer;
+			productReference = E290A0012FA72B6C00C4C0FD /* MCPNotesServer */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -206,6 +323,13 @@
 					E29098942FA72B6E00C4C0FD = {
 						CreatedOnToolsVersion = 26.3;
 						TestTargetID = E290987D2FA72B6C00C4C0FD;
+					};
+					E290A0032FA72B6C00C4C0FD = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					E290D0032FA72B6C00C4C0FD = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = E290A0032FA72B6C00C4C0FD;
 					};
 				};
 			};
@@ -229,6 +353,8 @@
 			projectRoot = "";
 			targets = (
 				E290987D2FA72B6C00C4C0FD /* mcpnotes-mac */,
+				E290A0032FA72B6C00C4C0FD /* MCPNotesServer */,
+				E290D0032FA72B6C00C4C0FD /* MCPNotesServerTests */,
 				E290988A2FA72B6E00C4C0FD /* mcpnotes-macTests */,
 				E29098942FA72B6E00C4C0FD /* mcpnotes-macUITests */,
 			);
@@ -251,6 +377,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		E29098932FA72B6E00C4C0FD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E290A0062FA72B6C00C4C0FD /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -281,6 +414,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E290D0042FA72B6C00C4C0FD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E290D0062FA72B6C00C4C0FD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E290A0042FA72B6C00C4C0FD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -293,6 +447,11 @@
 			isa = PBXTargetDependency;
 			target = E290987D2FA72B6C00C4C0FD /* mcpnotes-mac */;
 			targetProxy = E29098962FA72B6E00C4C0FD /* PBXContainerItemProxy */;
+		};
+		E290D00A2FA72B6C00C4C0FD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E290A0032FA72B6C00C4C0FD /* MCPNotesServer */;
+			targetProxy = E290D00B2FA72B6C00C4C0FD /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -575,6 +734,80 @@
 			};
 			name = Release;
 		};
+		E290D0072FA72B6C00C4C0FD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 49MFG3MK9T;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.MCPNotesServerTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E290D0082FA72B6C00C4C0FD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 49MFG3MK9T;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.MCPNotesServerTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		E290A0072FA72B6C00C4C0FD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 49MFG3MK9T;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.MCPNotesServer";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E290A0082FA72B6C00C4C0FD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 49MFG3MK9T;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.MCPNotesServer";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -610,6 +843,24 @@
 			buildConfigurations = (
 				E29098A62FA72B6E00C4C0FD /* Debug */,
 				E29098A72FA72B6E00C4C0FD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E290D0092FA72B6C00C4C0FD /* Build configuration list for PBXNativeTarget "MCPNotesServerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E290D0072FA72B6C00C4C0FD /* Debug */,
+				E290D0082FA72B6C00C4C0FD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E290A0092FA72B6C00C4C0FD /* Build configuration list for PBXNativeTarget "MCPNotesServer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E290A0072FA72B6C00C4C0FD /* Debug */,
+				E290A0082FA72B6C00C4C0FD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -660,6 +911,46 @@
 			productName = MLTensorUtils;
 		};
 		E29098F82FA9BC7C00C4C0FD /* USearch */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E29098F72FA9BC7C00C4C0FD /* XCRemoteSwiftPackageReference "USearch" */;
+			productName = USearch;
+		};
+		E290A00A2FA72B6C00C4C0FD /* MCP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E29098A82FA7341600C4C0FD /* XCRemoteSwiftPackageReference "swift-sdk" */;
+			productName = MCP;
+		};
+		E290C0012FA72B6C00C4C0FD /* Embeddings */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E29098AF2FA7345500C4C0FD /* XCRemoteSwiftPackageReference "swift-embeddings" */;
+			productName = Embeddings;
+		};
+		E290C0022FA72B6C00C4C0FD /* MLTensorUtils */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E29098AF2FA7345500C4C0FD /* XCRemoteSwiftPackageReference "swift-embeddings" */;
+			productName = MLTensorUtils;
+		};
+		E290C0032FA72B6C00C4C0FD /* USearch */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E29098F72FA9BC7C00C4C0FD /* XCRemoteSwiftPackageReference "USearch" */;
+			productName = USearch;
+		};
+		E290E0062FA72B6C00C4C0FD /* MCP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E29098A82FA7341600C4C0FD /* XCRemoteSwiftPackageReference "swift-sdk" */;
+			productName = MCP;
+		};
+		E290E0072FA72B6C00C4C0FD /* Embeddings */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E29098AF2FA7345500C4C0FD /* XCRemoteSwiftPackageReference "swift-embeddings" */;
+			productName = Embeddings;
+		};
+		E290E0082FA72B6C00C4C0FD /* MLTensorUtils */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E29098AF2FA7345500C4C0FD /* XCRemoteSwiftPackageReference "swift-embeddings" */;
+			productName = MLTensorUtils;
+		};
+		E290E0092FA72B6C00C4C0FD /* USearch */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E29098F72FA9BC7C00C4C0FD /* XCRemoteSwiftPackageReference "USearch" */;
 			productName = USearch;

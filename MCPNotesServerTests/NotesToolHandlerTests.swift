@@ -1,0 +1,341 @@
+import Foundation
+import MCP
+import Testing
+
+// MARK: - Helpers
+
+extension Tool.Content {
+    var textValue: String? {
+        if case .text(let t, _, _) = self { return t }
+        return nil
+    }
+}
+
+extension CallTool.Result {
+    var firstText: String? { content.first?.textValue }
+}
+
+// MARK: - Test infrastructure
+
+private struct Fixture {
+    let dir: URL
+    let service: NotesService
+
+    init() throws {
+        dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        service = NotesService(directory: dir)
+    }
+
+    @discardableResult
+    func add(filename: String, tags: [String] = [], body: String = "") throws -> UUID {
+        let uid = UUID()
+        let content = FrontmatterParser.serialize(uid: uid, tags: tags, body: body)
+        try content.write(
+            to: dir.appendingPathComponent("\(filename).md"),
+            atomically: true, encoding: .utf8
+        )
+        return uid
+    }
+
+    func cleanup() { try? FileManager.default.removeItem(at: dir) }
+}
+
+private actor MockRAGSearcher: RAGSearching {
+    private(set) var ready = false
+    private(set) var stubbedResults: [(uuid: UUID, score: Float)] = []
+
+    var isReady: Bool { ready }
+
+    func searchRanked(query: String, limit: Int) async throws -> [(uuid: UUID, score: Float)] {
+        Array(stubbedResults.prefix(limit))
+    }
+
+    func setReady() { ready = true }
+    func setResults(_ r: [(uuid: UUID, score: Float)]) { ready = true; stubbedResults = r }
+}
+
+private func call(
+    _ name: String,
+    args: [String: Value] = [:],
+    fixture: Fixture,
+    rag: MockRAGSearcher = MockRAGSearcher()
+) async throws -> CallTool.Result {
+    let params = CallTool.Parameters(name: name, arguments: args)
+    return try await NotesToolHandler.call(params, service: fixture.service, searcher: rag)
+}
+
+// MARK: - list_tags
+
+@Suite("list_tags") struct ListTagsTests {
+    @Test func empty() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let result = try await call("list_tags", fixture: f)
+        #expect(result.firstText == "No tags found.")
+        #expect(result.isError != true)
+    }
+
+    @Test func countsAndSort() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        try f.add(filename: "A", tags: ["swift", "ios"])
+        try f.add(filename: "B", tags: ["swift"])
+        try f.add(filename: "C", tags: ["ios"])
+        let text = try #require(try await call("list_tags", fixture: f).firstText)
+        #expect(text.contains("ios (2)"))
+        #expect(text.contains("swift (2)"))
+        let lines = text.components(separatedBy: "\n")
+        let iosIdx = lines.firstIndex(where: { $0.hasPrefix("ios") }) ?? 0
+        let swiftIdx = lines.firstIndex(where: { $0.hasPrefix("swift") }) ?? 1
+        #expect(iosIdx < swiftIdx)
+    }
+}
+
+// MARK: - list_notes_by_tag
+
+@Suite("list_notes_by_tag") struct ListNotesByTagTests {
+    @Test func match() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let uid = try f.add(filename: "Tagged", tags: ["work"])
+        try f.add(filename: "Other", tags: ["personal"])
+        let text = try #require(try await call("list_notes_by_tag", args: ["tag": .string("work")], fixture: f).firstText)
+        #expect(text.contains(uid.uuidString))
+        #expect(text.contains("Other") == false)
+    }
+
+    @Test(arguments: zip(["swift", "ios-dev"], ["missing", "ios"]))
+    func noMatchReturnsMessage(noteTag: String, searchTag: String) async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        try f.add(filename: "Note", tags: [noteTag])
+        let result = try await call("list_notes_by_tag", args: ["tag": .string(searchTag)], fixture: f)
+        let text = try #require(result.firstText)
+        #expect(text.contains("No notes found"))
+    }
+
+    @Test func missingArg() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let result = try await call("list_notes_by_tag", fixture: f)
+        #expect(result.isError == true)
+    }
+}
+
+// MARK: - list_notes
+
+@Suite("list_notes") struct ListNotesTests {
+    @Test func empty() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let result = try await call("list_notes", fixture: f)
+        #expect(result.firstText == "No notes found.")
+    }
+
+    @Test func sortedByFilename() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        try f.add(filename: "Zebra")
+        try f.add(filename: "Alpha")
+        try f.add(filename: "Mango")
+        let text = try #require(try await call("list_notes", fixture: f).firstText)
+        let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
+        let names = lines.compactMap { $0.components(separatedBy: "  ").last }
+        #expect(names == ["Alpha", "Mango", "Zebra"])
+    }
+}
+
+// MARK: - search_notes
+
+@Suite("search_notes") struct SearchNotesTests {
+    @Test func byFilename() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let uid = try f.add(filename: "SwiftUI Tips")
+        try f.add(filename: "Unrelated")
+        let text = try #require(try await call("search_notes", args: ["query": .string("swiftui")], fixture: f).firstText)
+        #expect(text.contains(uid.uuidString))
+        #expect(text.contains("Unrelated") == false)
+    }
+
+    @Test func byBody() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let uid = try f.add(filename: "Note", body: "Today I learned about Combine framework")
+        try f.add(filename: "Other", body: "Something else entirely")
+        let text = try #require(try await call("search_notes", args: ["query": .string("combine")], fixture: f).firstText)
+        #expect(text.contains(uid.uuidString))
+    }
+
+    @Test func byTag() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let uid = try f.add(filename: "Note", tags: ["xcode"])
+        try f.add(filename: "Other", tags: ["vscode"])
+        let text = try #require(try await call("search_notes", args: ["query": .string("xcode")], fixture: f).firstText)
+        #expect(text.contains(uid.uuidString))
+    }
+
+    @Test func noMatch() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        try f.add(filename: "Note", body: "hello world")
+        let result = try await call("search_notes", args: ["query": .string("zzznomatch")], fixture: f)
+        let text = try #require(result.firstText)
+        #expect(text.contains("No notes found"))
+    }
+
+    @Test func limitRespected() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        for i in 1...5 { try f.add(filename: "Match \(i)", body: "keyword") }
+        let text = try #require(try await call("search_notes", args: ["query": .string("keyword"), "limit": 2], fixture: f).firstText)
+        let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
+        #expect(lines.count == 2)
+    }
+}
+
+// MARK: - get_note
+
+@Suite("get_note") struct GetNoteTests {
+    @Test func found() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let uid = try f.add(filename: "My Note", tags: ["tag1"], body: "Note body here")
+        let text = try #require(try await call("get_note", args: ["uid": .string(uid.uuidString)], fixture: f).firstText)
+        #expect(text.contains("My Note"))
+        #expect(text.contains(uid.uuidString))
+        #expect(text.contains("tag1"))
+        #expect(text.contains("Note body here"))
+    }
+
+    @Test(arguments: ["not-a-uuid", "00000000-0000-0000-0000-000000000000"])
+    func returnsErrorForBadUID(_ uid: String) async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let result = try await call("get_note", args: ["uid": .string(uid)], fixture: f)
+        #expect(result.isError == true)
+    }
+}
+
+// MARK: - update_note
+
+@Suite("update_note") struct UpdateNoteTests {
+    @Test func success() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let uid = try f.add(filename: "Editable", tags: ["keep"], body: "old body")
+        let result = try await call(
+            "update_note",
+            args: ["uid": .string(uid.uuidString), "body": .string("new body")],
+            fixture: f
+        )
+        #expect(result.isError != true)
+        let updated = f.service.note(uid: uid)
+        #expect(updated?.body == "new body")
+        #expect(updated?.tags == ["keep"])
+    }
+
+    @Test func notFound() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let result = try await call(
+            "update_note",
+            args: ["uid": .string(UUID().uuidString), "body": .string("x")],
+            fixture: f
+        )
+        #expect(result.isError == true)
+    }
+}
+
+// MARK: - find_note
+
+@Suite("find_note") struct FindNoteTests {
+    @Test func substringMatch() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let uid = try f.add(filename: "SwiftUI Best Practices")
+        try f.add(filename: "UIKit Legacy")
+        let text = try #require(try await call("find_note", args: ["title": .string("swiftui")], fixture: f).firstText)
+        #expect(text.contains(uid.uuidString))
+        #expect(text.contains("UIKit") == false)
+    }
+
+    @Test func caseInsensitive() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let uid = try f.add(filename: "Meeting Notes")
+        let text = try #require(try await call("find_note", args: ["title": .string("MEETING")], fixture: f).firstText)
+        #expect(text.contains(uid.uuidString))
+    }
+
+    @Test func noMatch() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        try f.add(filename: "Alpha")
+        let result = try await call("find_note", args: ["title": .string("zzz")], fixture: f)
+        let text = try #require(result.firstText)
+        #expect(text.contains("No notes found"))
+    }
+
+    @Test func missingArg() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let result = try await call("find_note", fixture: f)
+        #expect(result.isError == true)
+    }
+}
+
+// MARK: - rag_search
+
+@Suite("rag_search") struct RagSearchTests {
+    @Test func indexNotReady() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let rag = MockRAGSearcher()
+        let result = try await call("rag_search", args: ["query": .string("test")], fixture: f, rag: rag)
+        #expect(result.isError == true)
+        let text = try #require(result.firstText)
+        #expect(text.contains("not available"))
+    }
+
+    @Test func returnsRankedResults() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let uid1 = try f.add(filename: "Alpha Note")
+        let uid2 = try f.add(filename: "Beta Note")
+        let rag = MockRAGSearcher()
+        await rag.setResults([(uuid: uid1, score: 0.9), (uuid: uid2, score: 0.7)])
+        let text = try #require(try await call("rag_search", args: ["query": .string("test")], fixture: f, rag: rag).firstText)
+        #expect(text.contains(uid1.uuidString))
+        #expect(text.contains(uid2.uuidString))
+        #expect(text.contains("0.900"))
+    }
+
+    @Test func limitRespected() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        var results: [(uuid: UUID, score: Float)] = []
+        for i in 0..<5 {
+            let uid = try f.add(filename: "Note \(i)")
+            results.append((uuid: uid, score: Float(5 - i) / 5))
+        }
+        let rag = MockRAGSearcher()
+        await rag.setResults(results)
+        let text = try #require(try await call("rag_search", args: ["query": .string("x"), "limit": 2], fixture: f, rag: rag).firstText)
+        let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
+        #expect(lines.count == 2)
+    }
+
+    @Test func noResults() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let rag = MockRAGSearcher()
+        await rag.setReady()
+        let result = try await call("rag_search", args: ["query": .string("test")], fixture: f, rag: rag)
+        let text = try #require(result.firstText)
+        #expect(text.contains("No semantically similar"))
+    }
+}
