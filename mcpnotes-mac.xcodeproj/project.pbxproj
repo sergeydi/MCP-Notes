@@ -13,12 +13,12 @@
 		E29098F92FA9BC7C00C4C0FD /* USearch in Frameworks */ = {isa = PBXBuildFile; productRef = E29098F82FA9BC7C00C4C0FD /* USearch */; };
 		E290A00B2FA72B6C00C4C0FD /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = E290A00A2FA72B6C00C4C0FD /* MCP */; };
 		E290C0042FA72B6C00C4C0FD /* Embeddings in Frameworks */ = {isa = PBXBuildFile; productRef = E290C0012FA72B6C00C4C0FD /* Embeddings */; };
+		E290C0052FA72B6C00C4C0FD /* MLTensorUtils in Frameworks */ = {isa = PBXBuildFile; productRef = E290C0022FA72B6C00C4C0FD /* MLTensorUtils */; };
+		E290C0062FA72B6C00C4C0FD /* USearch in Frameworks */ = {isa = PBXBuildFile; productRef = E290C0032FA72B6C00C4C0FD /* USearch */; };
 		E290E0022FA72B6C00C4C0FD /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = E290E0062FA72B6C00C4C0FD /* MCP */; };
 		E290E0032FA72B6C00C4C0FD /* Embeddings in Frameworks */ = {isa = PBXBuildFile; productRef = E290E0072FA72B6C00C4C0FD /* Embeddings */; };
 		E290E0042FA72B6C00C4C0FD /* MLTensorUtils in Frameworks */ = {isa = PBXBuildFile; productRef = E290E0082FA72B6C00C4C0FD /* MLTensorUtils */; };
 		E290E0052FA72B6C00C4C0FD /* USearch in Frameworks */ = {isa = PBXBuildFile; productRef = E290E0092FA72B6C00C4C0FD /* USearch */; };
-		E290C0052FA72B6C00C4C0FD /* MLTensorUtils in Frameworks */ = {isa = PBXBuildFile; productRef = E290C0022FA72B6C00C4C0FD /* MLTensorUtils */; };
-		E290C0062FA72B6C00C4C0FD /* USearch in Frameworks */ = {isa = PBXBuildFile; productRef = E290C0032FA72B6C00C4C0FD /* USearch */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -53,6 +53,16 @@
 		E290D0012FA72B6C00C4C0FD /* MCPNotesServerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MCPNotesServerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		E290E0012FA72B6C00C4C0FD /* Exceptions for "MCPNotesServer" folder in "MCPNotesServerTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				MCPNotesServer.swift,
+			);
+			target = E290D0032FA72B6C00C4C0FD /* MCPNotesServerTests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		E29098802FA72B6C00C4C0FD /* mcpnotes-mac */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -72,17 +82,10 @@
 		E290A0022FA72B6C00C4C0FD /* MCPNotesServer */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				E290E0012FA72B6C00C4C0FD /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+				E290E0012FA72B6C00C4C0FD /* Exceptions for "MCPNotesServer" folder in "MCPNotesServerTests" target */,
 			);
 			path = MCPNotesServer;
 			sourceTree = "<group>";
-		};
-		E290E0012FA72B6C00C4C0FD = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				MCPNotesServer.swift,
-			);
-			target = E290D0032FA72B6C00C4C0FD /* MCPNotesServerTests */;
 		};
 		E290D0022FA72B6C00C4C0FD /* MCPNotesServerTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -110,17 +113,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		E290D0052FA72B6C00C4C0FD /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				E290E0022FA72B6C00C4C0FD /* MCP in Frameworks */,
-				E290E0032FA72B6C00C4C0FD /* Embeddings in Frameworks */,
-				E290E0042FA72B6C00C4C0FD /* MLTensorUtils in Frameworks */,
-				E290E0052FA72B6C00C4C0FD /* USearch in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		E29098922FA72B6E00C4C0FD /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -136,6 +128,17 @@
 				E290C0042FA72B6C00C4C0FD /* Embeddings in Frameworks */,
 				E290C0052FA72B6C00C4C0FD /* MLTensorUtils in Frameworks */,
 				E290C0062FA72B6C00C4C0FD /* USearch in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E290D0052FA72B6C00C4C0FD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E290E0022FA72B6C00C4C0FD /* MCP in Frameworks */,
+				E290E0032FA72B6C00C4C0FD /* Embeddings in Frameworks */,
+				E290E0042FA72B6C00C4C0FD /* MLTensorUtils in Frameworks */,
+				E290E0052FA72B6C00C4C0FD /* USearch in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -249,6 +252,32 @@
 			productReference = E29098952FA72B6E00C4C0FD /* mcpnotes-macUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		E290A0032FA72B6C00C4C0FD /* MCPNotesServer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E290A0092FA72B6C00C4C0FD /* Build configuration list for PBXNativeTarget "MCPNotesServer" */;
+			buildPhases = (
+				E290A0042FA72B6C00C4C0FD /* Sources */,
+				E290A0052FA72B6C00C4C0FD /* Frameworks */,
+				E290A0062FA72B6C00C4C0FD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				E290A0022FA72B6C00C4C0FD /* MCPNotesServer */,
+			);
+			name = MCPNotesServer;
+			packageProductDependencies = (
+				E290A00A2FA72B6C00C4C0FD /* MCP */,
+				E290C0012FA72B6C00C4C0FD /* Embeddings */,
+				E290C0022FA72B6C00C4C0FD /* MLTensorUtils */,
+				E290C0032FA72B6C00C4C0FD /* USearch */,
+			);
+			productName = MCPNotesServer;
+			productReference = E290A0012FA72B6C00C4C0FD /* MCPNotesServer */;
+			productType = "com.apple.product-type.tool";
+		};
 		E290D0032FA72B6C00C4C0FD /* MCPNotesServerTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = E290D0092FA72B6C00C4C0FD /* Build configuration list for PBXNativeTarget "MCPNotesServerTests" */;
@@ -276,32 +305,6 @@
 			productName = MCPNotesServerTests;
 			productReference = E290D0012FA72B6C00C4C0FD /* MCPNotesServerTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
-		};
-		E290A0032FA72B6C00C4C0FD /* MCPNotesServer */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = E290A0092FA72B6C00C4C0FD /* Build configuration list for PBXNativeTarget "MCPNotesServer" */;
-			buildPhases = (
-				E290A0042FA72B6C00C4C0FD /* Sources */,
-				E290A0052FA72B6C00C4C0FD /* Frameworks */,
-				E290A0062FA72B6C00C4C0FD /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				E290A0022FA72B6C00C4C0FD /* MCPNotesServer */,
-			);
-			name = MCPNotesServer;
-			packageProductDependencies = (
-				E290A00A2FA72B6C00C4C0FD /* MCP */,
-				E290C0012FA72B6C00C4C0FD /* Embeddings */,
-				E290C0022FA72B6C00C4C0FD /* MLTensorUtils */,
-				E290C0032FA72B6C00C4C0FD /* USearch */,
-			);
-			productName = MCPNotesServer;
-			productReference = E290A0012FA72B6C00C4C0FD /* MCPNotesServer */;
-			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
@@ -390,6 +393,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E290D0062FA72B6C00C4C0FD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -414,21 +424,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		E290D0042FA72B6C00C4C0FD /* Sources */ = {
+		E290A0042FA72B6C00C4C0FD /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		E290D0062FA72B6C00C4C0FD /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		E290A0042FA72B6C00C4C0FD /* Sources */ = {
+		E290D0042FA72B6C00C4C0FD /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -734,6 +737,42 @@
 			};
 			name = Release;
 		};
+		E290A0072FA72B6C00C4C0FD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 49MFG3MK9T;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.MCPNotesServer";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E290A0082FA72B6C00C4C0FD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 49MFG3MK9T;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.MCPNotesServer";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		E290D0072FA72B6C00C4C0FD /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -767,42 +806,6 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
-		E290A0072FA72B6C00C4C0FD /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 49MFG3MK9T;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.MCPNotesServer";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Debug;
-		};
-		E290A0082FA72B6C00C4C0FD /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 49MFG3MK9T;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.MCPNotesServer";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -847,20 +850,20 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E290D0092FA72B6C00C4C0FD /* Build configuration list for PBXNativeTarget "MCPNotesServerTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				E290D0072FA72B6C00C4C0FD /* Debug */,
-				E290D0082FA72B6C00C4C0FD /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		E290A0092FA72B6C00C4C0FD /* Build configuration list for PBXNativeTarget "MCPNotesServer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E290A0072FA72B6C00C4C0FD /* Debug */,
 				E290A0082FA72B6C00C4C0FD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E290D0092FA72B6C00C4C0FD /* Build configuration list for PBXNativeTarget "MCPNotesServerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E290D0072FA72B6C00C4C0FD /* Debug */,
+				E290D0082FA72B6C00C4C0FD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
