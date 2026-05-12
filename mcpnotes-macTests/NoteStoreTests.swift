@@ -35,12 +35,15 @@ final class MockNoteIndexer: NoteIndexing {
     private(set) var indexAllCalledWith: [Note]?
     private(set) var indexNoteCalledWith: [Note] = []
     private(set) var removeNoteCalledWith: [UUID] = []
+    private(set) var resetAndClearIndexCalled = false
 
     func loadFromDisk() async { loadFromDiskCalled = true }
     func indexedCount() async -> Int { stubbedCount }
     func indexAll(_ notes: [Note]) async throws { indexAllCalledWith = notes }
     func indexNote(_ note: Note) async throws { indexNoteCalledWith.append(note) }
     func removeNote(id: UUID) async { removeNoteCalledWith.append(id) }
+    func clearHashStore() async {}
+    func resetAndClearIndex() async { resetAndClearIndexCalled = true }
     func search(query: String, limit: Int) async throws -> [UUID] { [] }
     func searchRanked(query: String, limit: Int) async throws -> [(id: UUID, score: Float)] { [] }
 }
@@ -224,6 +227,10 @@ struct NoteStoreTests {
 
 // MARK: - File service wiring
 
+// NoteStore dispatches I/O via unstructured `Task { }`. Tests use `Task.yield()` to let those
+// tasks execute before asserting on side effects. This is reliable here because NoteStore,
+// MockFileService, and MockNoteIndexer all share @MainActor isolation — no real actor-hop occurs,
+// and one yield drains the pending work on the shared executor.
 @Suite("NoteStore – file service")
 @MainActor
 struct NoteStoreFileServiceTests {
@@ -322,15 +329,18 @@ struct NoteStoreIndexerTests {
         await store.load()
         await Task.yield()
         #expect(idx.indexAllCalledWith != nil)
+        #expect(idx.indexAllCalledWith?.count == fs.stubbedNotes.count)
     }
 
-    @Test func loadSkipsIndexAllWhenIndexIsFullyCovered() async {
+    @Test func loadAlwaysCallsIndexAllForIncrementalSync() async {
+        // indexAll is always called so NoteIndexer can do incremental hash-based sync internally.
         let notes = [makeNote(filename: "A"), makeNote(filename: "B")]
         fs.stubbedNotes = notes
         idx.stubbedCount = 2
         await store.load()
         await Task.yield()
-        #expect(idx.indexAllCalledWith == nil)
+        #expect(idx.indexAllCalledWith != nil)
+        #expect(idx.indexAllCalledWith?.count == fs.stubbedNotes.count)
     }
 
     @Test func loadReindexesWhenIndexIsPartial() async {
@@ -339,6 +349,7 @@ struct NoteStoreIndexerTests {
         await store.load()
         await Task.yield()
         #expect(idx.indexAllCalledWith != nil)
+        #expect(idx.indexAllCalledWith?.count == fs.stubbedNotes.count)
     }
 
     @Test func createNoteCallsIndexNote() async {
@@ -394,5 +405,27 @@ struct NoteStoreIndexerTests {
     @Test func searchDelegatesToIndexer() async throws {
         let results = try await store.search(query: "anything")
         #expect(results.isEmpty)
+    }
+
+    @Test func reindexAllDoesNothingWhenNotesEmpty() async {
+        await store.reindexAll()
+        await Task.yield()
+        #expect(!idx.resetAndClearIndexCalled)
+        #expect(idx.indexAllCalledWith == nil)
+    }
+
+    @Test func reindexAllCallsResetAndClearIndex() async {
+        store.notes = [makeNote()]
+        await store.reindexAll()
+        await Task.yield()
+        #expect(idx.resetAndClearIndexCalled)
+    }
+
+    @Test func reindexAllCallsIndexAll() async {
+        store.notes = [makeNote()]
+        await store.reindexAll()
+        await Task.yield()
+        #expect(idx.indexAllCalledWith != nil)
+        #expect(idx.indexAllCalledWith?.count == 1)
     }
 }

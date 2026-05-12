@@ -1,6 +1,8 @@
 import CoreML
+import CryptoKit
 import Embeddings
 import Foundation
+import SQLite3
 import USearch
 
 protocol NoteIndexing {
@@ -9,6 +11,8 @@ protocol NoteIndexing {
     func indexAll(_ notes: [Note]) async throws
     func indexNote(_ note: Note) async throws
     func removeNote(id: UUID) async
+    func clearHashStore() async
+    func resetAndClearIndex() async
     func search(query: String, limit: Int) async throws -> [UUID]
     func searchRanked(query: String, limit: Int) async throws -> [(id: UUID, score: Float)]
 }
@@ -20,17 +24,19 @@ actor NoteIndexer: NoteIndexing {
 
     // MARK: - Constants
 
-    private static let modelID = "intfloat/multilingual-e5-small"
+    private nonisolated static let modelID = "intfloat/multilingual-e5-small"
     /// multilingual-e5-small hidden size.
-    private static let dimensions: UInt32 = 384
+    private nonisolated static let dimensions: UInt32 = 384
     /// Bump when the chunking strategy or index format changes to force a full re-index.
-    private static let currentIndexVersion = 6
+    private nonisolated static let currentIndexVersion = 6
+    /// Upper bound on the number of chunk vectors produced per note (filename + tags + paragraphs).
+    private nonisolated static let maxChunksPerNote = 20
 
     // MARK: - State
 
     private var modelBundle: XLMRoberta.ModelBundle?
     private var modelLoadTask: Task<XLMRoberta.ModelBundle, Error>?
-    private let vectorIndex: USearchIndex
+    private var vectorIndex: USearchIndex
     /// Maps each note UUID to the keys of all its indexed chunks.
     private var uuidToKeys: [UUID: [UInt64]] = [:]
     private var keyToUUID: [UInt64: UUID] = [:]
@@ -40,7 +46,7 @@ actor NoteIndexer: NoteIndexing {
     // MARK: - Paths
 
     private let indexPath: String
-    private let mappingURL: URL
+    private let db: IndexDatabase
 
     // MARK: - Init
 
@@ -56,7 +62,7 @@ actor NoteIndexer: NoteIndexing {
         }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         indexPath = dir.appendingPathComponent("notes.usearch").path
-        mappingURL = dir.appendingPathComponent("notes-keys.json")
+        db = IndexDatabase(url: dir.appendingPathComponent("notes-index.db"))
         vectorIndex = USearchIndex.make(metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32)
     }
 
@@ -69,27 +75,38 @@ actor NoteIndexer: NoteIndexing {
 
     /// Load persisted index and key mapping. Call once on app launch after NoteStore.load().
     func loadFromDisk() {
-        // Check version before loading vectors: if stale, skip loading the binary index
-        // so we start with an empty USearch state and avoid capacity/crash issues.
-        let mappingIsCurrentVersion: Bool = {
-            guard let data = try? Data(contentsOf: mappingURL),
-                  let decoded = try? JSONDecoder().decode(KeyMapping.self, from: data)
-            else { return false }
-            return decoded.indexVersion == Self.currentIndexVersion
-        }()
+        // Try current SQLite format first.
+        if let storedVersion = db.intMeta("index_version"),
+           storedVersion == Self.currentIndexVersion,
+           FileManager.default.fileExists(atPath: indexPath) {
+            vectorIndex.load(path: indexPath)
+            let capacity = max(UInt32(vectorIndex.count) + 16, 64)
+            vectorIndex.reserve(capacity)
+            let storedNextKey = UInt64(db.intMeta("next_key") ?? 1)
 
-        guard mappingIsCurrentVersion, FileManager.default.fileExists(atPath: indexPath) else {
-            // Fresh index — do NOT reserve here; indexAll will do the single reserve
-            // with the correct total capacity before any add() calls.
+            // Detect inconsistency: note_chunks has keys beyond what notes.usearch contains.
+            // This happens when a previous session was interrupted mid-indexAll().
+            // Force a clean re-index by wiping the persisted state.
+            let maxChunkKey = db.maxChunkKey() ?? 0
+            if maxChunkKey >= storedNextKey {
+                vectorIndex = USearchIndex.make(
+                    metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32
+                )
+                db.clearAll()
+                return
+            }
+
+            nextKey = storedNextKey
+            for uuid in db.allUUIDs() {
+                let keys = db.chunkKeys(for: uuid)
+                uuidToKeys[uuid] = keys
+                for key in keys { keyToUUID[key] = uuid }
+            }
             return
         }
 
-        vectorIndex.load(path: indexPath)
-        // Reserve restores the runtime thread-slot structures that are not persisted to disk.
-        // Without this, vectorIndex.add() crashes (USearch thread_lock_ finds 0 slots).
-        let capacity = max(UInt32(vectorIndex.count) + 16, 64)
-        vectorIndex.reserve(capacity)
-        loadMapping()
+        // Fresh start — clear hashes so indexAll() re-indexes everything.
+        db.clearHashes()
     }
 
     /// Persist index and mapping to disk.
@@ -97,7 +114,8 @@ actor NoteIndexer: NoteIndexing {
         saveTask?.cancel()
         saveTask = nil
         vectorIndex.save(path: indexPath)
-        saveMapping()
+        db.setMeta("index_version", Self.currentIndexVersion)
+        db.setMeta("next_key", Int(nextKey))
     }
 
     // MARK: - Indexing
@@ -105,6 +123,12 @@ actor NoteIndexer: NoteIndexing {
     /// Index or re-index a single note. The body is split into paragraphs; each paragraph
     /// becomes a separate vector. Documents use the "passage: " E5 prefix.
     func indexNote(_ note: Note) async throws {
+        try await indexNoteCore(note)
+        scheduleSave()
+    }
+
+    // Core indexing without triggering a save — used by indexAll() to avoid mid-batch saves.
+    private func indexNoteCore(_ note: Note) async throws {
         // Remove all existing chunk keys for this note before re-indexing.
         if let oldKeys = uuidToKeys[note.id] {
             for key in oldKeys {
@@ -130,7 +154,8 @@ actor NoteIndexer: NoteIndexing {
             vectorIndex.add(key: key, vector: vector)
         }
 
-        scheduleSave()
+        db.setChunkKeys(uuidToKeys[note.id] ?? [], for: note.id)
+        db.setMD5(NoteIndexer.contentHash(for: note), for: note.id)
     }
 
     /// Remove a note and all its chunk vectors from the index.
@@ -141,19 +166,56 @@ actor NoteIndexer: NoteIndexing {
             keyToUUID.removeValue(forKey: key)
         }
         uuidToKeys.removeValue(forKey: id)
+        db.removeChunks(for: id)
+        db.removeMD5(for: id)
         scheduleSave()
     }
 
-    /// Bulk-index notes and save to disk. Re-indexes any note already in the index.
+    /// Incrementally sync the index: remove deleted notes, skip unchanged notes,
+    /// re-index only new or modified ones.
     func indexAll(_ notes: [Note]) async throws {
-        // Single reserve before any add() calls. For a fresh index this is the only reserve;
-        // for a loaded index loadFromDisk already reserved. Use 10× headroom to be safe.
-        let needed = max(UInt32(vectorIndex.count) + UInt32(notes.count * 10), 64)
+        // Remove notes that no longer exist on disk.
+        let incomingIDs = Set(notes.map(\.id))
+        let staleIDs = uuidToKeys.keys.filter { !incomingIDs.contains($0) }
+        for id in staleIDs { removeNote(id: id) }
+
+        // Filter to notes that need (re)indexing.
+        let toIndex = notes.filter { note in
+            let hash = NoteIndexer.contentHash(for: note)
+            // Migrated note: chunk keys exist in memory but MD5 not yet stored.
+            // Record the hash and skip re-indexing to preserve the HNSW graph.
+            if db.md5(for: note.id) == nil, uuidToKeys[note.id] != nil {
+                db.setMD5(hash, for: note.id)
+                return false
+            }
+            return db.md5(for: note.id) != hash
+        }
+        guard !toIndex.isEmpty else {
+            saveToDisk()
+            return
+        }
+
+        let needed = max(UInt32(vectorIndex.count) + UInt32(toIndex.count * Self.maxChunksPerNote), 64)
         vectorIndex.reserve(needed)
-        for note in notes {
-            try await indexNote(note)
+
+        for note in toIndex {
+            try await indexNoteCore(note)
         }
         saveToDisk()
+    }
+
+    /// Clear stored MD5 hashes so the next indexAll() re-indexes all notes.
+    func clearHashStore() {
+        db.clearHashes()
+    }
+
+    /// Wipe the entire index. Used before a manual full re-index from Settings.
+    func resetAndClearIndex() {
+        uuidToKeys = [:]
+        keyToUUID = [:]
+        nextKey = 1
+        vectorIndex = USearchIndex.make(metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32)
+        db.clearAll()
     }
 
     // MARK: - Search
@@ -281,54 +343,169 @@ actor NoteIndexer: NoteIndexing {
         }
     }
 
-    // MARK: - Private: key mapping
+    // MARK: - Private: content hash
 
-    private func loadMapping() {
-        guard
-            let data = try? Data(contentsOf: mappingURL),
-            let decoded = try? JSONDecoder().decode(KeyMapping.self, from: data)
-        else { return }
-        guard decoded.indexVersion == Self.currentIndexVersion else { return }
-        nextKey = decoded.nextKey
-        for entry in decoded.entries {
-            let keys = entry.allKeys
-            uuidToKeys[entry.uuid] = keys
+    private nonisolated static func contentHash(for note: Note) -> String {
+        let raw = note.body + note.tags.sorted().joined()
+        let digest = Insecure.MD5.hash(data: Data(raw.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+// MARK: - IndexDatabase
+
+/// SQLite-backed store for chunk-key mappings and per-note content hashes.
+/// Replaces notes-keys.json; lives alongside notes.usearch in Application Support.
+private final class IndexDatabase: @unchecked Sendable {
+    nonisolated(unsafe) private var db: OpaquePointer?
+    private nonisolated let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
+    init(url: URL) {
+        sqlite3_open_v2(url.path, &db,
+            SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil)
+        sqlite3_exec(db, """
+            CREATE TABLE IF NOT EXISTS meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS note_chunks (
+                uuid      TEXT    NOT NULL,
+                chunk_key INTEGER NOT NULL,
+                PRIMARY KEY (uuid, chunk_key)
+            );
+            CREATE TABLE IF NOT EXISTS file_hashes (
+                uuid TEXT PRIMARY KEY,
+                md5  TEXT NOT NULL
+            );
+            """, nil, nil, nil)
+    }
+
+    deinit { sqlite3_close(db) }
+
+    // MARK: meta
+
+    nonisolated func intMeta(_ key: String) -> Int? {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT value FROM meta WHERE key = ?", -1, &stmt, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, key, -1, transient)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    nonisolated func setMeta(_ key: String, _ value: Int) {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, key, -1, transient)
+        sqlite3_bind_int64(stmt, 2, Int64(value))
+        sqlite3_step(stmt)
+    }
+
+    // MARK: note_chunks
+
+    nonisolated func chunkKeys(for uuid: UUID) -> [UInt64] {
+        var stmt: OpaquePointer?
+        let uuidStr = uuid.uuidString
+        guard sqlite3_prepare_v2(db, "SELECT chunk_key FROM note_chunks WHERE uuid = ?", -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, uuidStr, -1, transient)
+        var keys: [UInt64] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            keys.append(UInt64(bitPattern: sqlite3_column_int64(stmt, 0)))
+        }
+        return keys
+    }
+
+    nonisolated func allUUIDs() -> Set<UUID> {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT DISTINCT uuid FROM note_chunks", -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        var uuids: Set<UUID> = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let cStr = sqlite3_column_text(stmt, 0),
+               let uuid = UUID(uuidString: String(cString: cStr)) {
+                uuids.insert(uuid)
+            }
+        }
+        return uuids
+    }
+
+    nonisolated func setChunkKeys(_ keys: [UInt64], for uuid: UUID) {
+        let uuidStr = uuid.uuidString
+        sqlite3_exec(db, "BEGIN", nil, nil, nil)
+        var delStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "DELETE FROM note_chunks WHERE uuid = ?", -1, &delStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(delStmt, 1, uuidStr, -1, transient)
+            sqlite3_step(delStmt)
+            sqlite3_finalize(delStmt)
+        }
+        var insStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "INSERT INTO note_chunks (uuid, chunk_key) VALUES (?, ?)", -1, &insStmt, nil) == SQLITE_OK {
             for key in keys {
-                keyToUUID[key] = entry.uuid
+                sqlite3_bind_text(insStmt, 1, uuidStr, -1, transient)
+                sqlite3_bind_int64(insStmt, 2, Int64(bitPattern: key))
+                sqlite3_step(insStmt)
+                sqlite3_reset(insStmt)
             }
+            sqlite3_finalize(insStmt)
         }
+        sqlite3_exec(db, "COMMIT", nil, nil, nil)
     }
 
-    private func saveMapping() {
-        let entries = uuidToKeys.map { KeyMapping.Entry(uuid: $0.key, keys: $0.value) }
-        let mapping = KeyMapping(indexVersion: Self.currentIndexVersion, nextKey: nextKey, entries: entries)
-        guard let data = try? JSONEncoder().encode(mapping) else { return }
-        try? data.write(to: mappingURL, options: .atomic)
+    nonisolated func removeChunks(for uuid: UUID) {
+        var stmt: OpaquePointer?
+        let uuidStr = uuid.uuidString
+        guard sqlite3_prepare_v2(db, "DELETE FROM note_chunks WHERE uuid = ?", -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, uuidStr, -1, transient)
+        sqlite3_step(stmt)
     }
 
-    private struct KeyMapping: Codable {
-        let indexVersion: Int?
-        let nextKey: UInt64
-        let entries: [Entry]
+    // MARK: file_hashes
 
-        struct Entry: Codable {
-            let uuid: UUID
-            /// New format: multiple chunk keys per note.
-            let keys: [UInt64]?
-            /// Legacy format: single key. Present only when reading old index files.
-            let key: UInt64?
+    nonisolated func md5(for uuid: UUID) -> String? {
+        var stmt: OpaquePointer?
+        let uuidStr = uuid.uuidString
+        guard sqlite3_prepare_v2(db, "SELECT md5 FROM file_hashes WHERE uuid = ?", -1, &stmt, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, uuidStr, -1, transient)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        guard let cStr = sqlite3_column_text(stmt, 0) else { return nil }
+        return String(cString: cStr)
+    }
 
-            init(uuid: UUID, keys: [UInt64]) {
-                self.uuid = uuid
-                self.keys = keys
-                self.key = nil
-            }
+    nonisolated func setMD5(_ md5: String, for uuid: UUID) {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO file_hashes (uuid, md5) VALUES (?, ?)", -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, uuid.uuidString, -1, transient)
+        sqlite3_bind_text(stmt, 2, md5, -1, transient)
+        sqlite3_step(stmt)
+    }
 
-            var allKeys: [UInt64] {
-                if let keys = keys, !keys.isEmpty { return keys }
-                if let key = key { return [key] }
-                return []
-            }
-        }
+    nonisolated func removeMD5(for uuid: UUID) {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "DELETE FROM file_hashes WHERE uuid = ?", -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, uuid.uuidString, -1, transient)
+        sqlite3_step(stmt)
+    }
+
+    nonisolated func clearHashes() {
+        sqlite3_exec(db, "DELETE FROM file_hashes", nil, nil, nil)
+    }
+
+    nonisolated func maxChunkKey() -> UInt64? {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT MAX(chunk_key) FROM note_chunks", -1, &stmt, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        let raw = sqlite3_column_int64(stmt, 0)
+        return raw == 0 ? nil : UInt64(bitPattern: raw)
+    }
+
+    nonisolated func clearAll() {
+        sqlite3_exec(db, "DELETE FROM note_chunks; DELETE FROM file_hashes; DELETE FROM meta", nil, nil, nil)
     }
 }

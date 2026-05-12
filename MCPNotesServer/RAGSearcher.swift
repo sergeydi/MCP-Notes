@@ -1,6 +1,7 @@
 import CoreML
 import Embeddings
 import Foundation
+import SQLite3
 import USearch
 
 protocol RAGSearching: Actor {
@@ -16,18 +17,39 @@ actor RAGSearcher: RAGSearching {
     private static let dimensions: UInt32 = 384
     private static let currentIndexVersion = 6
 
-    private let vectorIndex: USearchIndex
+    private var vectorIndex: USearchIndex
     private var keyToUUID: [UInt64: UUID] = [:]
     private var modelBundle: XLMRoberta.ModelBundle?
+    private let indexPath: String
+    private let dbURL: URL
+    private var indexModDate: Date?
 
     init() {
+        let dir = Self.ragDirectory
+        indexPath = dir.appendingPathComponent("notes.usearch").path
+        dbURL = dir.appendingPathComponent("notes-index.db")
         vectorIndex = USearchIndex.make(
             metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32
         )
-        loadFromDisk()
+        loadFromSQLite(dbURL: dbURL, indexPath: indexPath)
+        indexModDate = (try? FileManager.default.attributesOfItem(atPath: indexPath))?[.modificationDate] as? Date
     }
 
-    var isReady: Bool { vectorIndex.count > 0 }
+    /// Loads the index from a custom directory. Used in tests to avoid touching the app container.
+    init(storageDirectory: URL) {
+        indexPath = storageDirectory.appendingPathComponent("notes.usearch").path
+        dbURL = storageDirectory.appendingPathComponent("notes-index.db")
+        vectorIndex = USearchIndex.make(
+            metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32
+        )
+        loadFromSQLite(dbURL: dbURL, indexPath: indexPath)
+        indexModDate = (try? FileManager.default.attributesOfItem(atPath: indexPath))?[.modificationDate] as? Date
+    }
+
+    var isReady: Bool {
+        reloadIfNeeded()
+        return vectorIndex.count > 0
+    }
 
     func searchRanked(query: String, limit: Int) async throws -> [(uuid: UUID, score: Float)] {
         guard vectorIndex.count > 0 else { return [] }
@@ -48,27 +70,47 @@ actor RAGSearcher: RAGSearching {
 
     // MARK: - Private: disk loading
 
-    private func loadFromDisk() {
-        let dir = Self.ragDirectory
-        let indexPath = dir.appendingPathComponent("notes.usearch").path
-        let mappingURL = dir.appendingPathComponent("notes-keys.json")
+    private func reloadIfNeeded() {
+        let attrs = try? FileManager.default.attributesOfItem(atPath: indexPath)
+        let current = attrs?[.modificationDate] as? Date
+        guard current != indexModDate else { return }
+        indexModDate = current
+        keyToUUID = [:]
+        vectorIndex = USearchIndex.make(metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32)
+        loadFromSQLite(dbURL: dbURL, indexPath: indexPath)
+    }
 
-        guard
-            let data = try? Data(contentsOf: mappingURL),
-            let mapping = try? JSONDecoder().decode(KeyMapping.self, from: data),
-            mapping.indexVersion == Self.currentIndexVersion,
-            FileManager.default.fileExists(atPath: indexPath)
-        else { return }
+    @discardableResult
+    private func loadFromSQLite(dbURL: URL, indexPath: String) -> Bool {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbURL.path, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else { return false }
+        defer { sqlite3_close(db) }
 
+        // Verify index version
+        var vStmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT value FROM meta WHERE key = 'index_version'", -1, &vStmt, nil) == SQLITE_OK else { return false }
+        defer { sqlite3_finalize(vStmt) }
+        guard sqlite3_step(vStmt) == SQLITE_ROW,
+              Int(sqlite3_column_int64(vStmt, 0)) == Self.currentIndexVersion,
+              FileManager.default.fileExists(atPath: indexPath) else { return false }
+
+        // Load vector index from disk
         vectorIndex.load(path: indexPath)
         let capacity = max(UInt32(vectorIndex.count) + 16, 64)
         vectorIndex.reserve(capacity)
 
-        for entry in mapping.entries {
-            for key in entry.allKeys {
-                keyToUUID[key] = entry.uuid
+        // Populate chunk-key → UUID mapping
+        var cStmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT uuid, chunk_key FROM note_chunks", -1, &cStmt, nil) == SQLITE_OK else { return false }
+        defer { sqlite3_finalize(cStmt) }
+        while sqlite3_step(cStmt) == SQLITE_ROW {
+            if let cStr = sqlite3_column_text(cStmt, 0),
+               let uuid = UUID(uuidString: String(cString: cStr)) {
+                let key = UInt64(bitPattern: sqlite3_column_int64(cStmt, 1))
+                keyToUUID[key] = uuid
             }
         }
+        return true
     }
 
     private static var ragDirectory: URL {
@@ -107,23 +149,4 @@ actor RAGSearcher: RAGSearching {
         return vector
     }
 
-    // MARK: - Key mapping
-
-    private struct KeyMapping: Codable {
-        let indexVersion: Int?
-        let nextKey: UInt64
-        let entries: [Entry]
-
-        struct Entry: Codable {
-            let uuid: UUID
-            let keys: [UInt64]?
-            let key: UInt64?
-
-            var allKeys: [UInt64] {
-                if let keys, !keys.isEmpty { return keys }
-                if let key { return [key] }
-                return []
-            }
-        }
-    }
 }

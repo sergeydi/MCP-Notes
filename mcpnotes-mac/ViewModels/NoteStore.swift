@@ -6,6 +6,11 @@ enum IndexingState {
     case indexing(indexed: Int, total: Int)
     case ready(count: Int)
     case failed
+
+    var isIndexing: Bool {
+        if case .indexing = self { return true }
+        return false
+    }
 }
 
 /// Central data store for all notes. Injected as an environment object
@@ -48,12 +53,9 @@ final class NoteStore {
             // TODO: surface error to user
         }
         await indexer.loadFromDisk()
-        let currentCount = await indexer.indexedCount()
         let total = notes.count
-        if total > 0 && currentCount >= total {
-            indexingState = .ready(count: currentCount)
-        } else {
-            indexingState = .indexing(indexed: currentCount, total: total)
+        if total > 0 {
+            indexingState = .indexing(indexed: await indexer.indexedCount(), total: total)
             let snapshot = notes
             Task {
                 do {
@@ -64,12 +66,15 @@ final class NoteStore {
                 }
             }
             Task {
-                while case .indexing(_, let t) = indexingState {
+                while case .indexing = indexingState {
                     try? await Task.sleep(for: .milliseconds(500))
-                    guard case .indexing = indexingState else { break }
-                    indexingState = .indexing(indexed: await indexer.indexedCount(), total: t)
+                    let count = await indexer.indexedCount()
+                    guard case .indexing(_, let t) = indexingState else { break }
+                    indexingState = .indexing(indexed: count, total: t)
                 }
             }
+        } else {
+            indexingState = .ready(count: 0)
         }
     }
 
@@ -119,6 +124,29 @@ final class NoteStore {
                     sortNotes()
                 }
                 try? await indexer.indexNote(renamed)
+            }
+        }
+    }
+
+    func reindexAll() async {
+        guard !notes.isEmpty else { return }
+        await indexer.resetAndClearIndex()
+        let snapshot = notes
+        indexingState = .indexing(indexed: 0, total: snapshot.count)
+        Task {
+            do {
+                try await indexer.indexAll(snapshot)
+                indexingState = .ready(count: await indexer.indexedCount())
+            } catch {
+                indexingState = .failed
+            }
+        }
+        Task {
+            while case .indexing = indexingState {
+                try? await Task.sleep(for: .milliseconds(500))
+                let count = await indexer.indexedCount()
+                guard case .indexing(_, let t) = indexingState else { break }
+                indexingState = .indexing(indexed: count, total: t)
             }
         }
     }

@@ -9,17 +9,11 @@
           "fill" : {
             "solid" : "extended-gray:1.00000,1.00000"
           },
-          "image-name" : "pencil.and.list.clipboard 2.png",
-          "name" : "pencil.and.list.clipboard 2",
-          "position" : {
-            "scale" : 0.8,
-            "translation-in-points" : [
-              0.32187499999997726,
-              13.600000000000023
-            ]
-          }
+          "image-name" : "text.page.badge.magnifyingglass.png",
+          "name" : "text.page.badge.magnifyingglass"
         }
       ],
+      "name" : "Group",
       "shadow" : {
         "kind" : "neutral",
         "opacity" : 0.5

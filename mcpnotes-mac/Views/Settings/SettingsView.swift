@@ -60,6 +60,10 @@ private struct RAGSettingsView: View {
 
             Section("Indexer Status") {
                 indexerStatusRow
+                Button("Re-index All Notes") {
+                    Task { await store.reindexAll() }
+                }
+                .disabled(store.indexingState.isIndexing)
             }
 
             if ragEnabled {
