@@ -103,7 +103,7 @@ enum NotesToolHandler {
         ),
         Tool(
             name: "rag_search",
-            description: "Semantic (vector) search over notes using the pre-built RAG index. Returns notes ranked by relevance to the query meaning, not just keyword match.",
+            description: "Hybrid BM25+vector semantic search (evaluation mode). Results show vector rank (v:N) and BM25 rank (h:N) for comparison. Sorted by combined hybrid score.",
             inputSchema: [
                 "type": "object",
                 "properties": [
@@ -272,7 +272,7 @@ enum NotesToolHandler {
             return error("RAG index is not available. Enable RAG in the app and wait for indexing to complete.")
         }
         let limit = args["limit"].flatMap { Int($0) } ?? 5
-        let ranked = try await searcher.searchRanked(query: query, limit: limit)
+        let ranked = try await searcher.searchRankedHybrid(query: query, limit: limit)
         guard !ranked.isEmpty else {
             return text("No semantically similar notes found for '\(query)'.")
         }
@@ -280,9 +280,10 @@ enum NotesToolHandler {
         let noteMap = Dictionary(uniqueKeysWithValues: allNotes.map { ($0.id, $0) })
         let lines = ranked.compactMap { hit -> String? in
             guard let note = noteMap[hit.uuid] else { return nil }
-            let score = String(format: "%.3f", hit.score)
-            let tags = note.tags.isEmpty ? "" : " [tags: \(note.tags.joined(separator: ", "))]"
-            return "score:\(score)  uid:\(note.id.uuidString)  \(note.filename)\(tags)"
+            let score = String(format: "%.3f", hit.vectorScore)
+            let hRank = hit.bm25Rank.map { "h:\($0)" } ?? "h:-"
+            let tags = note.tags.isEmpty ? "" : "  [tags: \(note.tags.joined(separator: ", "))]"
+            return "v:\(hit.vectorRank) \(hRank)  score:\(score)  uid:\(note.id.uuidString)  \(note.filename)\(tags)"
         }
         guard !lines.isEmpty else {
             return text("No notes found matching RAG results.")

@@ -46,6 +46,7 @@ final class MockNoteIndexer: NoteIndexing {
     func resetAndClearIndex() async { resetAndClearIndexCalled = true }
     func search(query: String, limit: Int) async throws -> [UUID] { [] }
     func searchRanked(query: String, limit: Int) async throws -> [(id: UUID, score: Float)] { [] }
+    func searchBM25Ranked(query: String, limit: Int) -> [(id: UUID, rank: Int)] { [] }
 }
 
 // MARK: - Shared fixture

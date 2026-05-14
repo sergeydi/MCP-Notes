@@ -15,6 +15,7 @@ protocol NoteIndexing {
     func resetAndClearIndex() async
     func search(query: String, limit: Int) async throws -> [UUID]
     func searchRanked(query: String, limit: Int) async throws -> [(id: UUID, score: Float)]
+    func searchBM25Ranked(query: String, limit: Int) -> [(id: UUID, rank: Int)]
 }
 
 /// Manages on-device vector indexing and semantic search for notes.
@@ -28,7 +29,7 @@ actor NoteIndexer: NoteIndexing {
     /// multilingual-e5-small hidden size.
     private nonisolated static let dimensions: UInt32 = 384
     /// Bump when the chunking strategy or index format changes to force a full re-index.
-    private nonisolated static let currentIndexVersion = 6
+    private nonisolated static let currentIndexVersion = 7
     /// Upper bound on the number of chunk vectors produced per note (filename + tags + paragraphs).
     private nonisolated static let maxChunksPerNote = 20
 
@@ -156,6 +157,9 @@ actor NoteIndexer: NoteIndexing {
 
         db.setChunkKeys(uuidToKeys[note.id] ?? [], for: note.id)
         db.setMD5(NoteIndexer.contentHash(for: note), for: note.id)
+        let ftsContent = ([note.filename] + note.tags + [cleanBody])
+            .filter { !$0.isEmpty }.joined(separator: " ")
+        db.insertFTS(uuid: note.id, content: ftsContent)
     }
 
     /// Remove a note and all its chunk vectors from the index.
@@ -168,6 +172,7 @@ actor NoteIndexer: NoteIndexing {
         uuidToKeys.removeValue(forKey: id)
         db.removeChunks(for: id)
         db.removeMD5(for: id)
+        db.deleteFTS(uuid: id)
         scheduleSave()
     }
 
@@ -219,6 +224,12 @@ actor NoteIndexer: NoteIndexing {
     }
 
     // MARK: - Search
+
+    /// Returns notes ranked by BM25 keyword relevance (rank 1 = best match).
+    func searchBM25Ranked(query: String, limit: Int = 10) -> [(id: UUID, rank: Int)] {
+        db.searchFTS(query: query, limit: limit)
+            .enumerated().map { (id: $0.element.0, rank: $0.offset + 1) }
+    }
 
     /// Returns note UUIDs ranked by semantic similarity, closest first.
     func search(query: String, limit: Int = 10) async throws -> [UUID] {
@@ -336,11 +347,15 @@ actor NoteIndexer: NoteIndexing {
 
     private func scheduleSave() {
         saveTask?.cancel()
-        saveTask = Task {
+        saveTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled else { return }
-            saveToDisk()
+            await self?.performDeferredSave()
         }
+    }
+
+    private func performDeferredSave() async {
+        saveToDisk()
     }
 
     // MARK: - Private: content hash
@@ -376,6 +391,11 @@ private final class IndexDatabase: @unchecked Sendable {
             CREATE TABLE IF NOT EXISTS file_hashes (
                 uuid TEXT PRIMARY KEY,
                 md5  TEXT NOT NULL
+            );
+            CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+                uuid UNINDEXED,
+                content,
+                tokenize='unicode61 remove_diacritics 2'
             );
             """, nil, nil, nil)
     }
@@ -505,7 +525,71 @@ private final class IndexDatabase: @unchecked Sendable {
         return raw == 0 ? nil : UInt64(bitPattern: raw)
     }
 
+    // MARK: notes_fts
+
+    nonisolated func insertFTS(uuid: UUID, content: String) {
+        let uuidStr = uuid.uuidString
+        sqlite3_exec(db, "BEGIN", nil, nil, nil)
+        var delStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "DELETE FROM notes_fts WHERE uuid = ?", -1, &delStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(delStmt, 1, uuidStr, -1, transient)
+            sqlite3_step(delStmt)
+            sqlite3_finalize(delStmt)
+        }
+        var insStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "INSERT INTO notes_fts(uuid, content) VALUES (?, ?)", -1, &insStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(insStmt, 1, uuidStr, -1, transient)
+            sqlite3_bind_text(insStmt, 2, content, -1, transient)
+            sqlite3_step(insStmt)
+            sqlite3_finalize(insStmt)
+        }
+        sqlite3_exec(db, "COMMIT", nil, nil, nil)
+    }
+
+    nonisolated func deleteFTS(uuid: UUID) {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "DELETE FROM notes_fts WHERE uuid = ?", -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, uuid.uuidString, -1, transient)
+        sqlite3_step(stmt)
+    }
+
+    nonisolated func clearFTS() {
+        sqlite3_exec(db, "DELETE FROM notes_fts", nil, nil, nil)
+    }
+
+    nonisolated func searchFTS(query: String, limit: Int) -> [(UUID, Double)] {
+        let sanitized = sanitizeFTSQuery(query)
+        guard !sanitized.isEmpty else { return [] }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(
+            db,
+            "SELECT uuid, bm25(notes_fts) FROM notes_fts WHERE notes_fts MATCH ? ORDER BY bm25(notes_fts) LIMIT ?",
+            -1, &stmt, nil
+        ) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, sanitized, -1, transient)
+        sqlite3_bind_int64(stmt, 2, Int64(limit))
+        var results: [(UUID, Double)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let cStr = sqlite3_column_text(stmt, 0),
+                  let uuid = UUID(uuidString: String(cString: cStr)) else { continue }
+            results.append((uuid, sqlite3_column_double(stmt, 1)))
+        }
+        return results
+    }
+
+    private nonisolated func sanitizeFTSQuery(_ raw: String) -> String {
+        let stripped = raw.unicodeScalars.filter { !"\"*()-^:\\".contains(Character($0)) }
+        return String(String.UnicodeScalarView(stripped))
+            .components(separatedBy: .whitespaces)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
     nonisolated func clearAll() {
-        sqlite3_exec(db, "DELETE FROM note_chunks; DELETE FROM file_hashes; DELETE FROM meta", nil, nil, nil)
+        sqlite3_exec(db,
+            "DELETE FROM note_chunks; DELETE FROM file_hashes; DELETE FROM meta; DELETE FROM notes_fts",
+            nil, nil, nil)
     }
 }

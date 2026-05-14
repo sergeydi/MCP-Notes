@@ -4,9 +4,18 @@ import Foundation
 import SQLite3
 import USearch
 
+struct HybridSearchResult: Sendable {
+    let uuid: UUID
+    let vectorScore: Float
+    let vectorRank: Int
+    let bm25Rank: Int?      // nil = not in BM25 top-N
+    let hybridScore: Double
+}
+
 protocol RAGSearching: Actor {
     var isReady: Bool { get }
     func searchRanked(query: String, limit: Int) async throws -> [(uuid: UUID, score: Float)]
+    func searchRankedHybrid(query: String, limit: Int) async throws -> [HybridSearchResult]
 }
 
 /// Loads the vector index built by the main app and runs semantic search queries.
@@ -15,7 +24,7 @@ actor RAGSearcher: RAGSearching {
 
     private static let modelID = "intfloat/multilingual-e5-small"
     private static let dimensions: UInt32 = 384
-    private static let currentIndexVersion = 6
+    private static let currentIndexVersion = 7
 
     private var vectorIndex: USearchIndex
     private var keyToUUID: [UInt64: UUID] = [:]
@@ -66,6 +75,31 @@ actor RAGSearcher: RAGSearching {
         return best.sorted { $0.value > $1.value }
             .prefix(limit)
             .map { (uuid: $0.key, score: $0.value) }
+    }
+
+    func searchRankedHybrid(query: String, limit: Int) async throws -> [HybridSearchResult] {
+        guard vectorIndex.count > 0 else { return [] }
+        let vectorResults = try await searchRanked(query: query, limit: limit)
+        let vectorMap = Dictionary(uniqueKeysWithValues: vectorResults.enumerated()
+            .map { i, h in (h.uuid, (score: h.score, rank: i + 1)) })
+        let bm25Map = Dictionary(uniqueKeysWithValues:
+            bm25Ranked(query: query, limit: limit * 5).map { ($0.uuid, $0.rank) })
+        let k = 60.0
+        let penalty = limit * 10
+        return vectorMap.keys.compactMap { uuid -> HybridSearchResult? in
+            guard let v = vectorMap[uuid] else { return nil }
+            let b = bm25Map[uuid]
+            return HybridSearchResult(
+                uuid: uuid,
+                vectorScore: v.score,
+                vectorRank: v.rank,
+                bm25Rank: b,
+                hybridScore: 1.0 / (k + Double(v.rank)) + 1.0 / (k + Double(b ?? penalty))
+            )
+        }
+        .sorted { $0.hybridScore > $1.hybridScore }
+        .prefix(limit)
+        .map { $0 }
     }
 
     // MARK: - Private: disk loading
@@ -124,6 +158,41 @@ actor RAGSearcher: RAGSearching {
         let appSupport = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return appSupport.appendingPathComponent("mcpnotes/rag")
+    }
+
+    private func bm25Ranked(query: String, limit: Int) -> [(uuid: UUID, rank: Int)] {
+        let sanitized = sanitizeFTSQuery(query)
+        guard !sanitized.isEmpty else { return [] }
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbURL.path, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_close(db) }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(
+            db,
+            "SELECT uuid, bm25(notes_fts) FROM notes_fts WHERE notes_fts MATCH ? ORDER BY bm25(notes_fts) LIMIT ?",
+            -1, &stmt, nil
+        ) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        sqlite3_bind_text(stmt, 1, sanitized, -1, transient)
+        sqlite3_bind_int64(stmt, 2, Int64(limit))
+        var results: [(uuid: UUID, rank: Int)] = []
+        var rank = 1
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let cStr = sqlite3_column_text(stmt, 0),
+                  let uuid = UUID(uuidString: String(cString: cStr)) else { continue }
+            results.append((uuid: uuid, rank: rank))
+            rank += 1
+        }
+        return results
+    }
+
+    private func sanitizeFTSQuery(_ raw: String) -> String {
+        let stripped = raw.unicodeScalars.filter { !"\"*()-^:\\".contains(Character($0)) }
+        return String(String.UnicodeScalarView(stripped))
+            .components(separatedBy: .whitespaces)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 
     // MARK: - Private: embedding

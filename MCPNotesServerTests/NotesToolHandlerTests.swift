@@ -52,6 +52,18 @@ private actor MockRAGSearcher: RAGSearching {
         Array(stubbedResults.prefix(limit))
     }
 
+    func searchRankedHybrid(query: String, limit: Int) async throws -> [HybridSearchResult] {
+        stubbedResults.prefix(limit).enumerated().map { i, hit in
+            HybridSearchResult(
+                uuid: hit.uuid,
+                vectorScore: hit.score,
+                vectorRank: i + 1,
+                bm25Rank: i + 1,
+                hybridScore: Double(hit.score)
+            )
+        }
+    }
+
     func setReady() { ready = true }
     func setResults(_ r: [(uuid: UUID, score: Float)]) { ready = true; stubbedResults = r }
 }
@@ -337,5 +349,16 @@ private func call(
         let result = try await call("rag_search", args: ["query": .string("test")], fixture: f, rag: rag)
         let text = try #require(result.firstText)
         #expect(text.contains("No semantically similar"))
+    }
+
+    @Test func hybridOutputContainsVectorAndBM25Ranks() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let uid1 = try f.add(filename: "Alpha Note")
+        let rag = MockRAGSearcher()
+        await rag.setResults([(uuid: uid1, score: 0.9)])
+        let text = try #require(try await call("rag_search", args: ["query": .string("test")], fixture: f, rag: rag).firstText)
+        #expect(text.contains("v:1"))
+        #expect(text.contains("h:1"))
     }
 }
