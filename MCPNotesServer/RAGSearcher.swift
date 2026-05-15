@@ -28,20 +28,17 @@ actor RAGSearcher: RAGSearching {
     private static let dimensions: UInt32 = 384
     private static let currentIndexVersion = 8
 
-    private var vectorIndex: USearchIndex
-    private var keyToUUID: [UInt64: UUID] = [:]
+    nonisolated(unsafe) private var vectorIndex: USearchIndex = .make(metric: .cos, dimensions: 384, connectivity: 16, quantization: .F32)
+    nonisolated(unsafe) private var keyToUUID: [UInt64: UUID] = [:]
     private var modelBundle: XLMRoberta.ModelBundle?
     private let indexPath: String
     private let dbURL: URL
-    private var indexModDate: Date?
+    nonisolated(unsafe) private var indexModDate: Date?
 
     init() {
         let dir = Self.ragDirectory
         indexPath = dir.appendingPathComponent("notes.usearch").path
         dbURL = dir.appendingPathComponent("notes-index.db")
-        vectorIndex = USearchIndex.make(
-            metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32
-        )
         loadFromSQLite(dbURL: dbURL, indexPath: indexPath)
         indexModDate = (try? FileManager.default.attributesOfItem(atPath: indexPath))?[.modificationDate] as? Date
     }
@@ -50,9 +47,6 @@ actor RAGSearcher: RAGSearching {
     init(storageDirectory: URL) {
         indexPath = storageDirectory.appendingPathComponent("notes.usearch").path
         dbURL = storageDirectory.appendingPathComponent("notes-index.db")
-        vectorIndex = USearchIndex.make(
-            metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32
-        )
         loadFromSQLite(dbURL: dbURL, indexPath: indexPath)
         indexModDate = (try? FileManager.default.attributesOfItem(atPath: indexPath))?[.modificationDate] as? Date
     }
@@ -117,7 +111,7 @@ actor RAGSearcher: RAGSearching {
     }
 
     @discardableResult
-    private func loadFromSQLite(dbURL: URL, indexPath: String) -> Bool {
+    private nonisolated func loadFromSQLite(dbURL: URL, indexPath: String) -> Bool {
         var db: OpaquePointer?
         guard sqlite3_open_v2(dbURL.path, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else { return false }
         defer { sqlite3_close(db) }

@@ -15,7 +15,7 @@ protocol NoteIndexing {
     func resetAndClearIndex() async
     func search(query: String, limit: Int) async throws -> [UUID]
     func searchRanked(query: String, limit: Int) async throws -> [(id: UUID, score: Float)]
-    func searchBM25Ranked(query: String, limit: Int) -> [(id: UUID, rank: Int)]
+    func searchBM25Ranked(query: String, limit: Int) async -> [(id: UUID, rank: Int)]
 }
 
 /// Manages on-device vector indexing and semantic search for notes.
@@ -37,7 +37,7 @@ actor NoteIndexer: NoteIndexing {
 
     private var modelBundle: XLMRoberta.ModelBundle?
     private var modelLoadTask: Task<XLMRoberta.ModelBundle, Error>?
-    private var vectorIndex: USearchIndex
+    private var vectorIndex: USearchIndex = .make(metric: .cos, dimensions: 384, connectivity: 16, quantization: .F32)
     /// Maps each note UUID to the keys of all its indexed chunks.
     private var uuidToKeys: [UUID: [UInt64]] = [:]
     private var keyToUUID: [UInt64: UUID] = [:]
@@ -64,7 +64,6 @@ actor NoteIndexer: NoteIndexing {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         indexPath = dir.appendingPathComponent("notes.usearch").path
         db = IndexDatabase(url: dir.appendingPathComponent("notes-index.db"))
-        vectorIndex = USearchIndex.make(metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32)
     }
 
     // MARK: - NoteIndexing
