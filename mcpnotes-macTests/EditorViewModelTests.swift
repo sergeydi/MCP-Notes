@@ -71,7 +71,7 @@ struct EditorViewModelTests {
         var called = false
         vm.onSave = { _, _ in called = true }
         vm.scheduleAutosave()
-        #expect(!called)
+        #expect(called == false)
     }
 
     @Test func scheduleAutosaveCallsOnSaveAfterDelay() async throws {

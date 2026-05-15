@@ -29,7 +29,7 @@ actor NoteIndexer: NoteIndexing {
     /// multilingual-e5-small hidden size.
     private nonisolated static let dimensions: UInt32 = 384
     /// Bump when the chunking strategy or index format changes to force a full re-index.
-    private nonisolated static let currentIndexVersion = 7
+    private nonisolated static let currentIndexVersion = 8
     /// Upper bound on the number of chunk vectors produced per note (filename + tags + paragraphs).
     private nonisolated static let maxChunksPerNote = 20
 
@@ -160,6 +160,8 @@ actor NoteIndexer: NoteIndexing {
         let ftsContent = ([note.filename] + note.tags + [cleanBody])
             .filter { !$0.isEmpty }.joined(separator: " ")
         db.insertFTS(uuid: note.id, content: ftsContent)
+        db.upsertTags(note.tags, for: note.id)
+        db.upsertMeta(filename: note.filename, for: note.id)
     }
 
     /// Remove a note and all its chunk vectors from the index.
@@ -173,6 +175,8 @@ actor NoteIndexer: NoteIndexing {
         db.removeChunks(for: id)
         db.removeMD5(for: id)
         db.deleteFTS(uuid: id)
+        db.removeTags(for: id)
+        db.removeMeta(for: id)
         scheduleSave()
     }
 
@@ -397,6 +401,15 @@ private final class IndexDatabase: @unchecked Sendable {
                 content,
                 tokenize='unicode61 remove_diacritics 2'
             );
+            CREATE TABLE IF NOT EXISTS note_tags (
+                uuid TEXT NOT NULL,
+                tag  TEXT NOT NULL,
+                PRIMARY KEY (uuid, tag)
+            );
+            CREATE TABLE IF NOT EXISTS note_meta (
+                uuid     TEXT PRIMARY KEY,
+                filename TEXT NOT NULL
+            );
             """, nil, nil, nil)
     }
 
@@ -558,6 +571,57 @@ private final class IndexDatabase: @unchecked Sendable {
         sqlite3_exec(db, "DELETE FROM notes_fts", nil, nil, nil)
     }
 
+    // MARK: note_tags
+
+    nonisolated func upsertTags(_ tags: [String], for uuid: UUID) {
+        let uuidStr = uuid.uuidString
+        sqlite3_exec(db, "BEGIN", nil, nil, nil)
+        var delStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "DELETE FROM note_tags WHERE uuid = ?", -1, &delStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(delStmt, 1, uuidStr, -1, transient)
+            sqlite3_step(delStmt)
+            sqlite3_finalize(delStmt)
+        }
+        var insStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "INSERT INTO note_tags (uuid, tag) VALUES (?, ?)", -1, &insStmt, nil) == SQLITE_OK {
+            for tag in tags {
+                sqlite3_bind_text(insStmt, 1, uuidStr, -1, transient)
+                sqlite3_bind_text(insStmt, 2, tag, -1, transient)
+                sqlite3_step(insStmt)
+                sqlite3_reset(insStmt)
+            }
+            sqlite3_finalize(insStmt)
+        }
+        sqlite3_exec(db, "COMMIT", nil, nil, nil)
+    }
+
+    nonisolated func removeTags(for uuid: UUID) {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "DELETE FROM note_tags WHERE uuid = ?", -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, uuid.uuidString, -1, transient)
+        sqlite3_step(stmt)
+    }
+
+    // MARK: note_meta
+
+    nonisolated func upsertMeta(filename: String, for uuid: UUID) {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO note_meta (uuid, filename) VALUES (?, ?)", -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, uuid.uuidString, -1, transient)
+        sqlite3_bind_text(stmt, 2, filename, -1, transient)
+        sqlite3_step(stmt)
+    }
+
+    nonisolated func removeMeta(for uuid: UUID) {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "DELETE FROM note_meta WHERE uuid = ?", -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, uuid.uuidString, -1, transient)
+        sqlite3_step(stmt)
+    }
+
     nonisolated func searchFTS(query: String, limit: Int) -> [(UUID, Double)] {
         let sanitized = sanitizeFTSQuery(query)
         guard !sanitized.isEmpty else { return [] }
@@ -589,7 +653,7 @@ private final class IndexDatabase: @unchecked Sendable {
 
     nonisolated func clearAll() {
         sqlite3_exec(db,
-            "DELETE FROM note_chunks; DELETE FROM file_hashes; DELETE FROM meta; DELETE FROM notes_fts",
+            "DELETE FROM note_chunks; DELETE FROM file_hashes; DELETE FROM meta; DELETE FROM notes_fts; DELETE FROM note_tags; DELETE FROM note_meta",
             nil, nil, nil)
     }
 }

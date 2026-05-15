@@ -86,13 +86,46 @@ struct FrontmatterParserTests {
         #expect(FrontmatterParser.parse(content) == nil)
     }
 
-    @Test func returnsNilWhenMissingClosingDelimiter() {
+    @Test func parsesLegacyFormatWithoutClosingDelimiter() {
         let content = """
         ---
         uid: 12345678-1234-1234-1234-123456789ABC
         tags: []
         """
-        #expect(FrontmatterParser.parse(content) == nil)
+        let result = FrontmatterParser.parse(content)
+        #expect(result?.uid == sampleUID)
+        #expect(result?.tags == [])
+        #expect(result?.body == "")
+    }
+
+    @Test func parsesLegacyBlockSequenceTags() {
+        let content = """
+        ---
+        uid: 12345678-1234-1234-1234-123456789ABC
+        tags:
+          - swift
+          - macOS
+        ---
+
+        Body here
+        """
+        let result = FrontmatterParser.parse(content)
+        #expect(result?.tags == ["swift", "macOS"])
+        #expect(result?.body == "Body here")
+    }
+
+    @Test func parsesLegacyBlockTagsWithoutClosingDelimiter() {
+        let content = """
+        ---
+        tags:
+        - remote-ide
+        - claude
+        uid: 12345678-1234-1234-1234-123456789ABC
+        """
+        let result = FrontmatterParser.parse(content)
+        #expect(result?.uid == sampleUID)
+        #expect(result?.tags == ["remote-ide", "claude"])
+        #expect(result?.body == "")
     }
 
     @Test func returnsNilWhenUIDMissing() {

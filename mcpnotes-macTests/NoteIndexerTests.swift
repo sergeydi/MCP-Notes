@@ -4,7 +4,8 @@ import Testing
 
 /// Integration tests — download multilingual-e5-small (~115 MB) on first run.
 /// Model is cached in ~/Library/Caches/huggingface after that.
-@Suite("NoteIndexer – integration", .timeLimit(.minutes(5)), .serialized)
+// .serialized has no effect on non-parameterized tests; actual serialization comes from @MainActor.
+@Suite("NoteIndexer – integration", .timeLimit(.minutes(5)))
 @MainActor
 struct NoteIndexerTests {
 
@@ -85,7 +86,7 @@ struct NoteIndexerTests {
 
         let results = try await indexer.search(query: "neural network deep learning", limit: 2)
 
-        #expect(results.contains(ai.id) == false, "Removed note must not appear in results")
+        #expect(results.contains(ai.id) == false, "Removed note must not appear in results after removeNote")
     }
 
     @Test("tags boost ranking for matching queries")
@@ -247,7 +248,7 @@ struct NoteIndexerTests {
         await indexer.removeNote(id: note.id)
 
         let results = try await indexer.search(query: "Swift concurrency actors", limit: 5)
-        #expect(!results.contains(note.id), "All chunks of removed note must be gone from index")
+        #expect(results.contains(note.id) == false, "All chunks of removed note must be gone from index")
     }
 
     @Test("re-indexing a multi-paragraph note replaces all old chunks")
@@ -361,7 +362,7 @@ struct NoteIndexerIncrementalSyncTests {
         let count = await indexer.indexedCount()
         #expect(count == 1)
         let results = try await indexer.search(query: "Swift generics protocols", limit: 5)
-        #expect(!results.contains(removed.id), "Removed note must not appear in results")
+        #expect(results.contains(removed.id) == false, "Removed note must not appear in results")
     }
 
     @Test("resetAndClearIndex empties the vector index and makes search return empty")
@@ -460,14 +461,14 @@ struct NoteIndexerStripMarkdownTests {
         let result = NoteIndexer.stripMarkdown(input)
         #expect(result.contains("let x = 42"))
         #expect(result.contains("print(x)"))
-        #expect(!result.contains("```"))
+        #expect(result.contains("```") == false)
     }
 
     @Test("images removed entirely")
     func imagesRemoved() {
         let result = NoteIndexer.stripMarkdown("See ![diagram](diagram.png) for reference.")
-        #expect(!result.contains("!["))
-        #expect(!result.contains("diagram.png"))
+        #expect(result.contains("![") == false)
+        #expect(result.contains("diagram.png") == false)
         #expect(result.contains("See"))
         #expect(result.contains("for reference."))
     }
@@ -532,9 +533,9 @@ struct NoteIndexerStripMarkdownTests {
         #expect(result.contains("Remember to update"))
         #expect(result.contains("Architecture Decisions"))
         #expect(result.contains("WWDC talk"))
-        #expect(!result.contains("**"))
-        #expect(!result.contains("[["))
-        #expect(!result.contains("]("))
+        #expect(result.contains("**") == false)
+        #expect(result.contains("[[") == false)
+        #expect(result.contains("](") == false)
     }
 }
 
@@ -578,7 +579,7 @@ struct NoteIndexerLoadFromDiskTests {
         try await indexerB.indexNote(updated)
 
         let results = try await indexerB.search(query: "updated reload", limit: 1)
-        #expect(!results.isEmpty, "Note indexed after loadFromDisk should be searchable")
+        #expect(results.isEmpty == false, "Note indexed after loadFromDisk should be searchable")
     }
 }
 

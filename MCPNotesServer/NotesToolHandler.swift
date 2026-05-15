@@ -127,9 +127,9 @@ enum NotesToolHandler {
     static func call(_ params: CallTool.Parameters, service: NotesService, searcher: any RAGSearching) async throws -> CallTool.Result {
         switch params.name {
         case "list_tags":
-            return listTags(service: service)
+            return await listTags(service: service, searcher: searcher)
         case "list_notes_by_tag":
-            return listNotesByTag(params.arguments ?? [:], service: service)
+            return await listNotesByTag(params.arguments ?? [:], service: service, searcher: searcher)
         case "list_notes":
             return listNotes(service: service)
         case "search_notes":
@@ -149,7 +149,13 @@ enum NotesToolHandler {
 
     // MARK: - Tool implementations
 
-    private static func listTags(service: NotesService) -> CallTool.Result {
+    private static func listTags(service: NotesService, searcher: any RAGSearching) async -> CallTool.Result {
+        if await searcher.isReady {
+            let tags = await searcher.allTags()
+            guard !tags.isEmpty else { return text("No tags found.") }
+            let lines = tags.map { "\($0.tag) (\($0.count))" }
+            return text(lines.joined(separator: "\n"))
+        }
         let notes = service.loadAll()
         var counts: [String: Int] = [:]
         for note in notes {
@@ -161,9 +167,15 @@ enum NotesToolHandler {
         return text(lines.joined(separator: "\n"))
     }
 
-    private static func listNotesByTag(_ args: [String: Value], service: NotesService) -> CallTool.Result {
+    private static func listNotesByTag(_ args: [String: Value], service: NotesService, searcher: any RAGSearching) async -> CallTool.Result {
         guard let tag = args["tag"]?.stringValue else {
             return error("Missing required argument: tag")
+        }
+        if await searcher.isReady {
+            let matches = await searcher.notes(forTag: tag)
+            guard !matches.isEmpty else { return text("No notes found with tag '\(tag)'.") }
+            let lines = matches.map { "uid:\($0.uuid.uuidString)  \($0.filename)" }
+            return text(lines.joined(separator: "\n"))
         }
         let matches = service.loadAll()
             .filter { $0.tags.contains(tag) }

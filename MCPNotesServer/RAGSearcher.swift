@@ -16,6 +16,8 @@ protocol RAGSearching: Actor {
     var isReady: Bool { get }
     func searchRanked(query: String, limit: Int) async throws -> [(uuid: UUID, score: Float)]
     func searchRankedHybrid(query: String, limit: Int) async throws -> [HybridSearchResult]
+    func allTags() async -> [(tag: String, count: Int)]
+    func notes(forTag tag: String) async -> [(uuid: UUID, filename: String)]
 }
 
 /// Loads the vector index built by the main app and runs semantic search queries.
@@ -24,7 +26,7 @@ actor RAGSearcher: RAGSearching {
 
     private static let modelID = "intfloat/multilingual-e5-small"
     private static let dimensions: UInt32 = 384
-    private static let currentIndexVersion = 7
+    private static let currentIndexVersion = 8
 
     private var vectorIndex: USearchIndex
     private var keyToUUID: [UInt64: UUID] = [:]
@@ -183,6 +185,44 @@ actor RAGSearcher: RAGSearching {
                   let uuid = UUID(uuidString: String(cString: cStr)) else { continue }
             results.append((uuid: uuid, rank: rank))
             rank += 1
+        }
+        return results
+    }
+
+    func allTags() async -> [(tag: String, count: Int)] {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbURL.path, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_close(db) }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT tag, COUNT(*) FROM note_tags GROUP BY tag ORDER BY tag", -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        var results: [(tag: String, count: Int)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let cStr = sqlite3_column_text(stmt, 0) else { continue }
+            results.append((tag: String(cString: cStr), count: Int(sqlite3_column_int64(stmt, 1))))
+        }
+        return results
+    }
+
+    func notes(forTag tag: String) async -> [(uuid: UUID, filename: String)] {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbURL.path, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_close(db) }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(
+            db,
+            "SELECT nt.uuid, nm.filename FROM note_tags nt JOIN note_meta nm ON nt.uuid = nm.uuid WHERE nt.tag = ? ORDER BY nm.filename",
+            -1, &stmt, nil
+        ) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        sqlite3_bind_text(stmt, 1, tag, -1, transient)
+        var results: [(uuid: UUID, filename: String)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let uuidCStr = sqlite3_column_text(stmt, 0),
+                  let uuid = UUID(uuidString: String(cString: uuidCStr)),
+                  let filenameCStr = sqlite3_column_text(stmt, 1) else { continue }
+            results.append((uuid: uuid, filename: String(cString: filenameCStr)))
         }
         return results
     }

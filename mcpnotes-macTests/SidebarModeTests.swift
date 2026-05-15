@@ -15,10 +15,9 @@ struct SidebarModeTests {
         #expect(SidebarMode.search.symbolName == "magnifyingglass")
     }
 
-    @Test func allSymbolNamesAreNonEmpty() {
-        for mode in SidebarMode.allCases {
-            #expect(!mode.symbolName.isEmpty)
-        }
+    @Test(arguments: SidebarMode.allCases)
+    func symbolNameIsNonEmpty(mode: SidebarMode) {
+        #expect(mode.symbolName.isEmpty == false)
     }
 
     @Test func rawValuesAreDistinct() {

@@ -30,23 +30,45 @@ struct FrontmatterParser {
                 break
             }
         }
-        guard let end = closingIndex else { return nil }
 
-        let frontmatterLines = Array(lines[1..<end])
-        let bodyLines = lines[(end + 1)...]
-        let body = bodyLines.joined(separator: "\n")
-            .trimmingCharacters(in: .init(charactersIn: "\n"))
+        let frontmatterLines: [String]
+        let body: String
+        if let end = closingIndex {
+            frontmatterLines = Array(lines[1..<end])
+            let bodyLines = lines[(end + 1)...]
+            body = bodyLines.joined(separator: "\n")
+                .trimmingCharacters(in: .init(charactersIn: "\n"))
+        } else {
+            // No closing ---: treat entire remainder as frontmatter, body is empty.
+            frontmatterLines = Array(lines[1...])
+            body = ""
+        }
 
         var uid: UUID?
         var tags: [String] = []
+        var parsingBlockTags = false
 
         for line in frontmatterLines {
             if line.hasPrefix("uid:") {
+                parsingBlockTags = false
                 let value = line.dropFirst("uid:".count).trimmingCharacters(in: .whitespaces)
                 uid = UUID(uuidString: String(value))
             } else if line.hasPrefix("tags:") {
+                parsingBlockTags = false
                 let value = line.dropFirst("tags:".count).trimmingCharacters(in: .whitespaces)
-                tags = parseInlineArray(String(value))
+                if value.isEmpty {
+                    parsingBlockTags = true
+                } else {
+                    tags = parseInlineArray(String(value))
+                }
+            } else if parsingBlockTags {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.hasPrefix("- ") {
+                    let tag = String(trimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+                    if !tag.isEmpty { tags.append(tag) }
+                } else if !trimmed.isEmpty {
+                    parsingBlockTags = false
+                }
             }
         }
 

@@ -411,7 +411,7 @@ struct NoteStoreIndexerTests {
     @Test func reindexAllDoesNothingWhenNotesEmpty() async {
         await store.reindexAll()
         await Task.yield()
-        #expect(!idx.resetAndClearIndexCalled)
+        #expect(idx.resetAndClearIndexCalled == false)
         #expect(idx.indexAllCalledWith == nil)
     }
 

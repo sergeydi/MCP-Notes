@@ -45,6 +45,8 @@ private struct Fixture {
 private actor MockRAGSearcher: RAGSearching {
     private(set) var ready = false
     private(set) var stubbedResults: [(uuid: UUID, score: Float)] = []
+    private(set) var stubbedTags: [(tag: String, count: Int)] = []
+    private(set) var stubbedNotesByTag: [String: [(uuid: UUID, filename: String)]] = [:]
 
     var isReady: Bool { ready }
 
@@ -64,8 +66,17 @@ private actor MockRAGSearcher: RAGSearching {
         }
     }
 
+    func allTags() async -> [(tag: String, count: Int)] { stubbedTags }
+    func notes(forTag tag: String) async -> [(uuid: UUID, filename: String)] {
+        stubbedNotesByTag[tag] ?? []
+    }
+
     func setReady() { ready = true }
     func setResults(_ r: [(uuid: UUID, score: Float)]) { ready = true; stubbedResults = r }
+    func setTags(_ t: [(tag: String, count: Int)]) { ready = true; stubbedTags = t }
+    func setNotes(forTag tag: String, _ notes: [(uuid: UUID, filename: String)]) {
+        ready = true; stubbedNotesByTag[tag] = notes
+    }
 }
 
 private func call(
@@ -81,7 +92,10 @@ private func call(
 // MARK: - list_tags
 
 @Suite("list_tags") struct ListTagsTests {
-    @Test func empty() async throws {
+
+    // MARK: fallback path (index not ready)
+
+    @Test func fallbackEmptyWhenNoNotes() async throws {
         let f = try Fixture()
         defer { f.cleanup() }
         let result = try await call("list_tags", fixture: f)
@@ -89,7 +103,7 @@ private func call(
         #expect(result.isError != true)
     }
 
-    @Test func countsAndSort() async throws {
+    @Test func fallbackCountsAndSort() async throws {
         let f = try Fixture()
         defer { f.cleanup() }
         try f.add(filename: "A", tags: ["swift", "ios"])
@@ -103,12 +117,36 @@ private func call(
         let swiftIdx = lines.firstIndex(where: { $0.hasPrefix("swift") }) ?? 1
         #expect(iosIdx < swiftIdx)
     }
+
+    // MARK: index path (index ready)
+
+    @Test func indexPathReturnsTagsFromSearcher() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let rag = MockRAGSearcher()
+        await rag.setTags([("ios", 3), ("swift", 2)])
+        let text = try #require(try await call("list_tags", fixture: f, rag: rag).firstText)
+        #expect(text.contains("ios (3)"))
+        #expect(text.contains("swift (2)"))
+    }
+
+    @Test func indexPathEmptyReturnsNoTagsMessage() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let rag = MockRAGSearcher()
+        await rag.setTags([])
+        let result = try await call("list_tags", fixture: f, rag: rag)
+        #expect(result.firstText == "No tags found.")
+    }
 }
 
 // MARK: - list_notes_by_tag
 
 @Suite("list_notes_by_tag") struct ListNotesByTagTests {
-    @Test func match() async throws {
+
+    // MARK: fallback path (index not ready)
+
+    @Test func fallbackMatch() async throws {
         let f = try Fixture()
         defer { f.cleanup() }
         let uid = try f.add(filename: "Tagged", tags: ["work"])
@@ -119,7 +157,7 @@ private func call(
     }
 
     @Test(arguments: zip(["swift", "ios-dev"], ["missing", "ios"]))
-    func noMatchReturnsMessage(noteTag: String, searchTag: String) async throws {
+    func fallbackNoMatchReturnsMessage(noteTag: String, searchTag: String) async throws {
         let f = try Fixture()
         defer { f.cleanup() }
         try f.add(filename: "Note", tags: [noteTag])
@@ -133,6 +171,32 @@ private func call(
         defer { f.cleanup() }
         let result = try await call("list_notes_by_tag", fixture: f)
         #expect(result.isError == true)
+    }
+
+    // MARK: index path (index ready)
+
+    @Test func indexPathReturnsNotesFromSearcher() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let uid1 = UUID()
+        let uid2 = UUID()
+        let rag = MockRAGSearcher()
+        await rag.setNotes(forTag: "work", [(uuid: uid1, filename: "Alpha"), (uuid: uid2, filename: "Zebra")])
+        let text = try #require(try await call("list_notes_by_tag", args: ["tag": .string("work")], fixture: f, rag: rag).firstText)
+        #expect(text.contains(uid1.uuidString))
+        #expect(text.contains("Alpha"))
+        #expect(text.contains(uid2.uuidString))
+        #expect(text.contains("Zebra"))
+    }
+
+    @Test func indexPathNoMatchReturnsMessage() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        let rag = MockRAGSearcher()
+        await rag.setReady()
+        let result = try await call("list_notes_by_tag", args: ["tag": .string("nonexistent")], fixture: f, rag: rag)
+        let text = try #require(result.firstText)
+        #expect(text.contains("No notes found"))
     }
 }
 
