@@ -430,3 +430,119 @@ struct NoteStoreIndexerTests {
         #expect(idx.indexAllCalledWith?.count == 1)
     }
 }
+
+// MARK: - External change detection
+
+@Suite("NoteStore – external changes")
+@MainActor
+struct NoteStoreExternalChangesTests {
+    let store: NoteStore
+    let fs: MockFileService
+    let idx: MockNoteIndexer
+
+    init() {
+        fs = MockFileService()
+        idx = MockNoteIndexer()
+        store = NoteStore(fileService: fs, indexer: idx)
+    }
+
+    @Test func addsNoteAppearedOnDisk() async {
+        let existing = makeNote(filename: "A")
+        let added = makeNote(filename: "B")
+        store.notes = [existing]
+        fs.stubbedNotes = [existing, added]
+        await store.reloadExternalChanges()
+        #expect(store.notes.count == 2)
+        #expect(store.notes.contains { $0.id == added.id })
+    }
+
+    @Test func addsNoteCallsIndexNote() async {
+        let added = makeNote(filename: "B")
+        store.notes = []
+        fs.stubbedNotes = [added]
+        await store.reloadExternalChanges()
+        #expect(idx.indexNoteCalledWith.contains { $0.id == added.id })
+    }
+
+    @Test func removesNoteDeletedFromDisk() async {
+        let kept = makeNote(filename: "A")
+        let removed = makeNote(filename: "B")
+        store.notes = [kept, removed]
+        fs.stubbedNotes = [kept]
+        await store.reloadExternalChanges()
+        #expect(store.notes.count == 1)
+        #expect(store.notes.contains { $0.id == removed.id } == false)
+    }
+
+    @Test func removesNoteCallsRemoveNoteOnIndexer() async {
+        let kept = makeNote(filename: "A")
+        let removed = makeNote(filename: "B")
+        store.notes = [kept, removed]
+        fs.stubbedNotes = [kept]
+        await store.reloadExternalChanges()
+        #expect(idx.removeNoteCalledWith.contains(removed.id))
+    }
+
+    @Test func updatesChangedNoteBody() async throws {
+        let note = makeNote(filename: "A")
+        store.notes = [note]
+        var updated = note
+        updated.body = "new body"
+        fs.stubbedNotes = [updated]
+        await store.reloadExternalChanges()
+        let stored = try #require(store.notes.first { $0.id == note.id })
+        #expect(stored.body == "new body")
+    }
+
+    @Test func updatesChangedNoteCallsIndexNoteWithNewContent() async throws {
+        let note = makeNote(filename: "A")
+        store.notes = [note]
+        var updated = note
+        updated.body = "new body"
+        fs.stubbedNotes = [updated]
+        await store.reloadExternalChanges()
+        let indexed = try #require(idx.indexNoteCalledWith.first { $0.id == note.id })
+        #expect(indexed.body == "new body")
+    }
+
+    @Test func updatesChangedNoteTags() async throws {
+        let note = makeNote(filename: "A", tags: ["old"])
+        store.notes = [note]
+        var updated = note
+        updated.tags = ["new"]
+        fs.stubbedNotes = [updated]
+        await store.reloadExternalChanges()
+        let stored = try #require(store.notes.first { $0.id == note.id })
+        #expect(stored.tags == ["new"])
+    }
+
+    @Test func noOpWhenNothingChanged() async {
+        let note = makeNote(filename: "A")
+        store.notes = [note]
+        fs.stubbedNotes = [note]
+        await store.reloadExternalChanges()
+        #expect(idx.indexNoteCalledWith.isEmpty)
+        #expect(idx.removeNoteCalledWith.isEmpty)
+    }
+
+    @Test func updatesChangedNoteFilename() async throws {
+        let note = makeNote(filename: "OldName")
+        store.notes = [note]
+        var updated = note
+        updated.filename = "NewName"
+        fs.stubbedNotes = [updated]
+        await store.reloadExternalChanges()
+        let stored = try #require(store.notes.first { $0.id == note.id })
+        #expect(stored.filename == "NewName")
+    }
+
+    @Test func sortsByFilenameAfterReload() async {
+        let a = makeNote(filename: "A")
+        let c = makeNote(filename: "C")
+        let b = makeNote(filename: "B")
+        store.notes = [a, c]
+        fs.stubbedNotes = [a, c, b]
+        await store.reloadExternalChanges()
+        #expect(store.notes.map(\.filename) == ["A", "B", "C"])
+    }
+}

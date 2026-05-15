@@ -25,10 +25,20 @@ final class NoteStore {
     private let fileService: any FileServicing
     private let indexer: any NoteIndexing
 
+    private var directoryWatcher: DispatchSourceFileSystemObject?
+    private var watcherFD: Int32 = -1
+    private var reloadTask: Task<Void, Never>?
+
     init(fileService: any FileServicing = FileService(),
          indexer: any NoteIndexing = NoteIndexer()) {
         self.fileService = fileService
         self.indexer = indexer
+    }
+
+    deinit {
+        directoryWatcher?.cancel()
+        if watcherFD >= 0 { close(watcherFD) }
+        reloadTask?.cancel()
     }
 
     var selectedNote: Note? {
@@ -76,6 +86,7 @@ final class NoteStore {
         } else {
             indexingState = .ready(count: 0)
         }
+        startWatchingNotesDirectory()
     }
 
     // MARK: - CRUD
@@ -174,5 +185,77 @@ final class NoteStore {
 
     private func sortNotes() {
         notes.sort { $0.filename.localizedCompare($1.filename) == .orderedAscending }
+    }
+
+    // MARK: - File watching
+
+    private func startWatchingNotesDirectory() {
+        let dir = FileService.notesDirectoryURL
+        let fd = open(dir.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        watcherFD = fd
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .link],
+            queue: .global(qos: .utility)
+        )
+        source.setEventHandler { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.scheduleExternalReload()
+            }
+        }
+        source.setCancelHandler { [weak self] in
+            guard let self else { return }
+            close(self.watcherFD)
+            self.watcherFD = -1
+        }
+        source.resume()
+        directoryWatcher = source
+    }
+
+    func scheduleExternalReload() {
+        reloadTask?.cancel()
+        reloadTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled, let self else { return }
+            await self.reloadExternalChanges()
+        }
+    }
+
+    func reloadExternalChanges() async {
+        guard let freshNotes = try? fileService.loadAllNotes(bookmarkedIDs: bookmarkedIDs) else { return }
+
+        let currentMap = Dictionary(uniqueKeysWithValues: notes.map { ($0.id, $0) })
+        let freshMap = Dictionary(uniqueKeysWithValues: freshNotes.map { ($0.id, $0) })
+        let currentIDs = Set(currentMap.keys)
+        let freshIDs = Set(freshMap.keys)
+
+        let removedIDs = currentIDs.subtracting(freshIDs)
+        let addedIDs = freshIDs.subtracting(currentIDs)
+        let changedNotes = freshNotes.filter { fresh in
+            guard let current = currentMap[fresh.id] else { return false }
+            return current.body != fresh.body || current.tags != fresh.tags || current.filename != fresh.filename
+        }
+
+        guard !removedIDs.isEmpty || !addedIDs.isEmpty || !changedNotes.isEmpty else { return }
+
+        for id in removedIDs {
+            notes.removeAll { $0.id == id }
+            await indexer.removeNote(id: id)
+        }
+        for note in changedNotes {
+            if let idx = notes.firstIndex(where: { $0.id == note.id }) {
+                notes[idx] = note
+            }
+            try? await indexer.indexNote(note)
+        }
+        for id in addedIDs {
+            if let note = freshMap[id] {
+                notes.append(note)
+                try? await indexer.indexNote(note)
+            }
+        }
+        sortNotes()
     }
 }
