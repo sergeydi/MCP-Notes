@@ -87,6 +87,30 @@ enum NotesToolHandler {
             annotations: Tool.Annotations(destructiveHint: true, idempotentHint: true, openWorldHint: false)
         ),
         Tool(
+            name: "create_note",
+            description: "Create a new note with the given title, optional tags, and optional body. Returns the uid of the created note.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "title": [
+                        "type": "string",
+                        "description": "Note title (used as filename)"
+                    ],
+                    "tags": [
+                        "type": "array",
+                        "items": ["type": "string"],
+                        "description": "Optional list of tags to assign to the note"
+                    ],
+                    "body": [
+                        "type": "string",
+                        "description": "Optional initial markdown body content"
+                    ]
+                ],
+                "required": ["title"]
+            ],
+            annotations: Tool.Annotations(openWorldHint: false)
+        ),
+        Tool(
             name: "find_note",
             description: "Find notes by filename (title). Returns uid and filename for all matches.",
             inputSchema: [
@@ -138,6 +162,8 @@ enum NotesToolHandler {
             return getNote(params.arguments ?? [:], service: service)
         case "update_note":
             return updateNote(params.arguments ?? [:], service: service)
+        case "create_note":
+            return createNote(params.arguments ?? [:], service: service)
         case "find_note":
             return findNote(params.arguments ?? [:], service: service)
         case "rag_search":
@@ -258,6 +284,20 @@ enum NotesToolHandler {
             return text("Note updated successfully.")
         } catch {
             return Self.error("Failed to update note: \(error)")
+        }
+    }
+
+    private static func createNote(_ args: [String: Value], service: NotesService) -> CallTool.Result {
+        guard let title = args["title"]?.stringValue, !title.isEmpty else {
+            return error("Missing or empty required argument: title")
+        }
+        let tags = args["tags"]?.arrayValue?.compactMap { $0.stringValue } ?? []
+        let body = args["body"]?.stringValue ?? ""
+        do {
+            let note = try service.createNote(title: title, tags: tags, body: body)
+            return text("Created note '\(note.filename)' with uid:\(note.id.uuidString)")
+        } catch {
+            return Self.error("Failed to create note: \(error)")
         }
     }
 

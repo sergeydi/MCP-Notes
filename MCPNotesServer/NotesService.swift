@@ -76,6 +76,21 @@ struct NotesService: Sendable {
         try content.write(to: existing.fileURL, atomically: true, encoding: .utf8)
     }
 
+    func createNote(title: String, tags: [String] = [], body: String = "") throws -> Note {
+        var filename = title.isEmpty ? "New Note" : title
+        var url = directory.appending(path: "\(filename).md")
+        var counter = 1
+        while FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
+            filename = "\(title) \(counter)"
+            url = directory.appending(path: "\(filename).md")
+            counter += 1
+        }
+        let uid = UUID()
+        let content = FrontmatterParser.serialize(uid: uid, tags: tags, body: body)
+        try content.write(to: url, atomically: true, encoding: .utf8)
+        return Note(id: uid, filename: filename, tags: tags, body: body, fileURL: url)
+    }
+
     // MARK: - Private
 
     private static func icloudNotesURL() -> URL? {
