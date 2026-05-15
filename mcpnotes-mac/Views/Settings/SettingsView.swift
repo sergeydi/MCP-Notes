@@ -102,7 +102,7 @@ private struct RAGSettingsView: View {
     }
 
     private var mcpConfigSnippet: String {
-        let serverPath = Bundle.main.bundlePath + "/Contents/MacOS/MCPNotesServer"
+        let serverPath = Bundle.main.bundlePath + "/Contents/MacOS/mcpnotes-server"
         let notesPath = FileService.notesDirectoryURL.path(percentEncoded: false)
         return """
         {
