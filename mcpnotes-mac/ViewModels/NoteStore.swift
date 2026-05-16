@@ -172,6 +172,14 @@ final class NoteStore {
         try await indexer.searchRanked(query: query, limit: limit)
     }
 
+    func outgoingLinks(from noteID: UUID) async -> [UUID] {
+        await indexer.outgoingLinks(from: noteID)
+    }
+
+    func incomingLinks(to noteID: UUID) async -> [UUID] {
+        await indexer.incomingLinks(to: noteID)
+    }
+
     // MARK: - Bookmarks
 
     func toggleBookmark(for noteID: UUID) {

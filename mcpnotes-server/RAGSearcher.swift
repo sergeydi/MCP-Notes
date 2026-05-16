@@ -18,6 +18,8 @@ protocol RAGSearching: Actor {
     func searchRankedHybrid(query: String, limit: Int) async throws -> [HybridSearchResult]
     func allTags() async -> [(tag: String, count: Int)]
     func notes(forTag tag: String) async -> [(uuid: UUID, filename: String)]
+    func outgoingLinks(from noteID: UUID) async -> [(uuid: UUID, filename: String)]
+    func incomingLinks(to noteID: UUID) async -> [(uuid: UUID, filename: String)]
 }
 
 /// Loads the vector index built by the main app and runs semantic search queries.
@@ -211,6 +213,52 @@ actor RAGSearcher: RAGSearching {
         defer { sqlite3_finalize(stmt) }
         let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
         sqlite3_bind_text(stmt, 1, tag, -1, transient)
+        var results: [(uuid: UUID, filename: String)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let uuidCStr = sqlite3_column_text(stmt, 0),
+                  let uuid = UUID(uuidString: String(cString: uuidCStr)),
+                  let filenameCStr = sqlite3_column_text(stmt, 1) else { continue }
+            results.append((uuid: uuid, filename: String(cString: filenameCStr)))
+        }
+        return results
+    }
+
+    func outgoingLinks(from noteID: UUID) async -> [(uuid: UUID, filename: String)] {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbURL.path, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_close(db) }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, """
+            SELECT nl.target_uid, nm.filename
+            FROM note_links nl JOIN note_meta nm ON nl.target_uid = nm.uuid
+            WHERE nl.source_uid = ? ORDER BY nm.filename
+            """, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        sqlite3_bind_text(stmt, 1, noteID.uuidString, -1, transient)
+        var results: [(uuid: UUID, filename: String)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let uuidCStr = sqlite3_column_text(stmt, 0),
+                  let uuid = UUID(uuidString: String(cString: uuidCStr)),
+                  let filenameCStr = sqlite3_column_text(stmt, 1) else { continue }
+            results.append((uuid: uuid, filename: String(cString: filenameCStr)))
+        }
+        return results
+    }
+
+    func incomingLinks(to noteID: UUID) async -> [(uuid: UUID, filename: String)] {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbURL.path, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_close(db) }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, """
+            SELECT nl.source_uid, nm.filename
+            FROM note_links nl JOIN note_meta nm ON nl.source_uid = nm.uuid
+            WHERE nl.target_uid = ? ORDER BY nm.filename
+            """, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        sqlite3_bind_text(stmt, 1, noteID.uuidString, -1, transient)
         var results: [(uuid: UUID, filename: String)] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             guard let uuidCStr = sqlite3_column_text(stmt, 0),

@@ -38,7 +38,17 @@ final class IndexDatabase: @unchecked Sendable {
                 uuid     TEXT PRIMARY KEY,
                 filename TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS note_links (
+                source_uid TEXT NOT NULL,
+                target_uid TEXT NOT NULL,
+                PRIMARY KEY (source_uid, target_uid)
+            );
             """, nil, nil, nil)
+        let linksVersion = intMeta("links_schema_version") ?? 0
+        if linksVersion < 1 {
+            clearHashes()
+            setMeta("links_schema_version", 1)
+        }
     }
 
     deinit { sqlite3_close(db) }
@@ -281,7 +291,94 @@ final class IndexDatabase: @unchecked Sendable {
 
     nonisolated func clearAll() {
         sqlite3_exec(db,
-            "DELETE FROM note_chunks; DELETE FROM file_hashes; DELETE FROM meta; DELETE FROM notes_fts; DELETE FROM note_tags; DELETE FROM note_meta",
+            "DELETE FROM note_chunks; DELETE FROM file_hashes; DELETE FROM meta; DELETE FROM notes_fts; DELETE FROM note_tags; DELETE FROM note_meta; DELETE FROM note_links",
             nil, nil, nil)
+    }
+
+    // MARK: note_links
+
+    nonisolated func resolveFilename(_ name: String) -> UUID? {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT uuid FROM note_meta WHERE LOWER(filename) = LOWER(?)",
+                                  -1, &stmt, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, name, -1, transient)
+        guard sqlite3_step(stmt) == SQLITE_ROW,
+              let cStr = sqlite3_column_text(stmt, 0) else { return nil }
+        return UUID(uuidString: String(cString: cStr))
+    }
+
+    nonisolated func setLinks(source: UUID, targets: [UUID]) {
+        let src = source.uuidString
+        sqlite3_exec(db, "BEGIN", nil, nil, nil)
+        var delStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "DELETE FROM note_links WHERE source_uid = ?",
+                               -1, &delStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(delStmt, 1, src, -1, transient)
+            sqlite3_step(delStmt)
+            sqlite3_finalize(delStmt)
+        }
+        var insStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "INSERT OR IGNORE INTO note_links (source_uid, target_uid) VALUES (?, ?)",
+                               -1, &insStmt, nil) == SQLITE_OK {
+            for target in targets {
+                sqlite3_bind_text(insStmt, 1, src, -1, transient)
+                sqlite3_bind_text(insStmt, 2, target.uuidString, -1, transient)
+                sqlite3_step(insStmt)
+                sqlite3_reset(insStmt)
+            }
+            sqlite3_finalize(insStmt)
+        }
+        sqlite3_exec(db, "COMMIT", nil, nil, nil)
+    }
+
+    nonisolated func outgoingLinks(from source: UUID) -> [UUID] {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT target_uid FROM note_links WHERE source_uid = ?",
+                                  -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, source.uuidString, -1, transient)
+        var result: [UUID] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let cStr = sqlite3_column_text(stmt, 0),
+               let uuid = UUID(uuidString: String(cString: cStr)) {
+                result.append(uuid)
+            }
+        }
+        return result
+    }
+
+    nonisolated func incomingLinks(to target: UUID) -> [UUID] {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT source_uid FROM note_links WHERE target_uid = ?",
+                                  -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, target.uuidString, -1, transient)
+        var result: [UUID] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let cStr = sqlite3_column_text(stmt, 0),
+               let uuid = UUID(uuidString: String(cString: cStr)) {
+                result.append(uuid)
+            }
+        }
+        return result
+    }
+
+    nonisolated func removeLinks(source: UUID) {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "DELETE FROM note_links WHERE source_uid = ?",
+                                  -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, source.uuidString, -1, transient)
+        sqlite3_step(stmt)
+    }
+
+    nonisolated func removeLinksTo(target: UUID) {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "DELETE FROM note_links WHERE target_uid = ?",
+                                  -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, target.uuidString, -1, transient)
+        sqlite3_step(stmt)
     }
 }

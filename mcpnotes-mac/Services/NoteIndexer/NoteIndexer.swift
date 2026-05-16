@@ -147,6 +147,9 @@ actor NoteIndexer: NoteIndexing {
         db.insertFTS(uuid: note.id, content: ftsContent)
         db.upsertTags(note.tags, for: note.id)
         db.upsertMeta(filename: note.filename, for: note.id)
+        let linkTargets = NoteIndexer.extractWikilinkNames(from: note.body)
+            .compactMap { db.resolveFilename($0) }
+        db.setLinks(source: note.id, targets: linkTargets)
     }
 
     /// Remove a note and all its chunk vectors from the index.
@@ -162,6 +165,8 @@ actor NoteIndexer: NoteIndexing {
         db.deleteFTS(uuid: id)
         db.removeTags(for: id)
         db.removeMeta(for: id)
+        db.removeLinks(source: id)
+        db.removeLinksTo(target: id)
         scheduleSave()
     }
 
@@ -191,6 +196,10 @@ actor NoteIndexer: NoteIndexing {
 
         let needed = max(UInt32(vectorIndex.count) + UInt32(toIndex.count * Self.maxChunksPerNote), 64)
         vectorIndex.reserve(needed)
+
+        // Pre-populate note_meta for all notes being indexed so that cross-note
+        // wikilink resolution succeeds regardless of processing order.
+        for note in toIndex { db.upsertMeta(filename: note.filename, for: note.id) }
 
         for note in toIndex {
             try await indexNoteCore(note)
@@ -287,12 +296,23 @@ actor NoteIndexer: NoteIndexing {
         return vector
     }
 
+    // MARK: - Link graph
+
+    func outgoingLinks(from noteID: UUID) async -> [UUID] { db.outgoingLinks(from: noteID) }
+    func incomingLinks(to noteID: UUID) async -> [UUID] { db.incomingLinks(to: noteID) }
+
     // MARK: - Private: chunking
 
     /// Split markdown-stripped body into non-empty paragraphs.
     private nonisolated static func paragraphs(_ text: String) -> [String] {
         text.components(separatedBy: "\n\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private nonisolated static func extractWikilinkNames(from body: String) -> [String] {
+        body.matches(of: /\[\[([^\]]+)\]\]/)
+            .map { String($0.output.1).trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
     }
 

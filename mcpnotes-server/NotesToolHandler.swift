@@ -126,6 +126,21 @@ enum NotesToolHandler {
             annotations: Tool.Annotations(readOnlyHint: true, openWorldHint: false)
         ),
         Tool(
+            name: "get_note_links",
+            description: "Get the outgoing wikilinks (notes this note links to) and incoming backlinks (notes that link to this note) for a given note UID.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "uid": [
+                        "type": "string",
+                        "description": "Note UID (UUID string)"
+                    ]
+                ],
+                "required": ["uid"]
+            ],
+            annotations: Tool.Annotations(readOnlyHint: true, openWorldHint: false)
+        ),
+        Tool(
             name: "rag_search",
             description: "Hybrid BM25+vector semantic search (evaluation mode). Results show vector rank (v:N) and BM25 rank (h:N) for comparison. Sorted by combined hybrid score.",
             inputSchema: [
@@ -166,6 +181,8 @@ enum NotesToolHandler {
             return createNote(params.arguments ?? [:], service: service)
         case "find_note":
             return findNote(params.arguments ?? [:], service: service)
+        case "get_note_links":
+            return await getNoteLinks(params.arguments ?? [:], searcher: searcher)
         case "rag_search":
             return try await ragSearch(params.arguments ?? [:], service: service, searcher: searcher)
         default:
@@ -314,6 +331,28 @@ enum NotesToolHandler {
         }
         let lines = matches.map { "uid:\($0.id.uuidString)  \($0.filename)" }
         return text(lines.joined(separator: "\n"))
+    }
+
+    private static func getNoteLinks(_ args: [String: Value], searcher: any RAGSearching) async -> CallTool.Result {
+        guard let uidString = args["uid"]?.stringValue,
+              let uid = UUID(uuidString: uidString) else {
+            return error("Missing or invalid argument: uid")
+        }
+        let outgoing = await searcher.outgoingLinks(from: uid)
+        let incoming = await searcher.incomingLinks(to: uid)
+        let outLines = outgoing.isEmpty
+            ? "  (none)"
+            : outgoing.map { "  uid:\($0.uuid.uuidString)  \($0.filename)" }.joined(separator: "\n")
+        let inLines = incoming.isEmpty
+            ? "  (none)"
+            : incoming.map { "  uid:\($0.uuid.uuidString)  \($0.filename)" }.joined(separator: "\n")
+        return text("""
+        outgoing (this note links to):
+        \(outLines)
+
+        incoming (notes linking to this note):
+        \(inLines)
+        """)
     }
 
     private static func ragSearch(_ args: [String: Value], service: NotesService, searcher: any RAGSearching) async throws -> CallTool.Result {

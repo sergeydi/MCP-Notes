@@ -47,6 +47,8 @@ private actor MockRAGSearcher: RAGSearching {
     private(set) var stubbedResults: [(uuid: UUID, score: Float)] = []
     private(set) var stubbedTags: [(tag: String, count: Int)] = []
     private(set) var stubbedNotesByTag: [String: [(uuid: UUID, filename: String)]] = [:]
+    private(set) var stubbedOutgoing: [(uuid: UUID, filename: String)] = []
+    private(set) var stubbedIncoming: [(uuid: UUID, filename: String)] = []
 
     var isReady: Bool { ready }
 
@@ -70,12 +72,17 @@ private actor MockRAGSearcher: RAGSearching {
     func notes(forTag tag: String) async -> [(uuid: UUID, filename: String)] {
         stubbedNotesByTag[tag] ?? []
     }
+    func outgoingLinks(from noteID: UUID) async -> [(uuid: UUID, filename: String)] { stubbedOutgoing }
+    func incomingLinks(to noteID: UUID) async -> [(uuid: UUID, filename: String)] { stubbedIncoming }
 
     func setReady() { ready = true }
     func setResults(_ r: [(uuid: UUID, score: Float)]) { ready = true; stubbedResults = r }
     func setTags(_ t: [(tag: String, count: Int)]) { ready = true; stubbedTags = t }
     func setNotes(forTag tag: String, _ notes: [(uuid: UUID, filename: String)]) {
         ready = true; stubbedNotesByTag[tag] = notes
+    }
+    func setLinks(outgoing: [(uuid: UUID, filename: String)], incoming: [(uuid: UUID, filename: String)]) {
+        stubbedOutgoing = outgoing; stubbedIncoming = incoming
     }
 }
 
@@ -477,5 +484,68 @@ private func call(
         let text = try #require(try await call("rag_search", args: ["query": .string("test")], fixture: fixture, rag: rag).firstText)
         #expect(text.contains("v:1"))
         #expect(text.contains("h:1"))
+    }
+}
+
+@Suite("get_note_links") final class GetNoteLinksTests {
+    let fixture: Fixture
+    init() throws { fixture = try Fixture() }
+    deinit { fixture.cleanup() }
+
+    private func call(_ args: [String: Value], rag: MockRAGSearcher) async throws -> CallTool.Result {
+        try await NotesToolHandler.call(
+            CallTool.Parameters(name: "get_note_links", arguments: args),
+            service: fixture.service, searcher: rag
+        )
+    }
+
+    @Test func missingUIDReturnsError() async throws {
+        let rag = MockRAGSearcher()
+        let result = try await call([:], rag: rag)
+        #expect(result.isError == true)
+        #expect(result.firstText?.contains("uid") == true)
+    }
+
+    @Test func invalidUIDReturnsError() async throws {
+        let rag = MockRAGSearcher()
+        let result = try await call(["uid": .string("not-a-uuid")], rag: rag)
+        #expect(result.isError == true)
+    }
+
+    @Test func noLinksShowsNoneForBothSections() async throws {
+        let uid = UUID()
+        let rag = MockRAGSearcher()
+        let text = try #require(try await call(["uid": .string(uid.uuidString)], rag: rag).firstText)
+        #expect(text.contains("outgoing"))
+        #expect(text.contains("incoming"))
+        #expect(text.contains("(none)"))
+    }
+
+    @Test func outgoingLinksFormattedCorrectly() async throws {
+        let sourceUID = UUID()
+        let targetUID = UUID()
+        let rag = MockRAGSearcher()
+        await rag.setLinks(
+            outgoing: [(uuid: targetUID, filename: "Target Note")],
+            incoming: []
+        )
+        let text = try #require(try await call(["uid": .string(sourceUID.uuidString)], rag: rag).firstText)
+        #expect(text.contains("uid:\(targetUID.uuidString)"))
+        #expect(text.contains("Target Note"))
+        #expect(text.contains("outgoing"))
+    }
+
+    @Test func incomingLinksFormattedCorrectly() async throws {
+        let noteUID = UUID()
+        let backlinkerUID = UUID()
+        let rag = MockRAGSearcher()
+        await rag.setLinks(
+            outgoing: [],
+            incoming: [(uuid: backlinkerUID, filename: "Backlinker")]
+        )
+        let text = try #require(try await call(["uid": .string(noteUID.uuidString)], rag: rag).firstText)
+        #expect(text.contains("uid:\(backlinkerUID.uuidString)"))
+        #expect(text.contains("Backlinker"))
+        #expect(text.contains("incoming"))
     }
 }

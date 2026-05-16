@@ -57,6 +57,20 @@ private func makeUsearchIndex(at path: String, key: UInt64) {
     index.save(path: path)
 }
 
+private func addLinkData(dbURL: URL, sourceUID: UUID, targetUID: UUID) {
+    var db: OpaquePointer?
+    sqlite3_open_v2(dbURL.path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil)
+    defer { sqlite3_close(db) }
+    sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS note_links (source_uid TEXT NOT NULL, target_uid TEXT NOT NULL, PRIMARY KEY (source_uid, target_uid));", nil, nil, nil)
+    let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    var stmt: OpaquePointer?
+    guard sqlite3_prepare_v2(db, "INSERT OR IGNORE INTO note_links (source_uid, target_uid) VALUES (?, ?)", -1, &stmt, nil) == SQLITE_OK else { return }
+    defer { sqlite3_finalize(stmt) }
+    sqlite3_bind_text(stmt, 1, sourceUID.uuidString, -1, transient)
+    sqlite3_bind_text(stmt, 2, targetUID.uuidString, -1, transient)
+    sqlite3_step(stmt)
+}
+
 private func addTagData(dbURL: URL, uuid: UUID, tags: [String], filename: String) {
     var db: OpaquePointer?
     sqlite3_open_v2(dbURL.path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil)
@@ -348,5 +362,60 @@ struct RAGSearcherHybridTests {
         let target = results.first { $0.uuid == uuids[limit] }
         #expect(target != nil)
         #expect(target?.bm25Rank != nil)  // must not be h:-
+    }
+}
+
+@Suite("RAGSearcher – links")
+struct RAGSearcherLinksTests {
+
+    @Test func outgoingLinksReturnsMappedNotes() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let dbURL = tmp.appendingPathComponent("notes-index.db")
+        let sourceUID = UUID()
+        let targetUID = UUID()
+        makeDB(at: dbURL, version: 8)
+        addTagData(dbURL: dbURL, uuid: targetUID, tags: [], filename: "Target Note")
+        addLinkData(dbURL: dbURL, sourceUID: sourceUID, targetUID: targetUID)
+        makeUsearchIndex(at: tmp.appendingPathComponent("notes.usearch").path, key: 1)
+        addChunkKey(dbURL: dbURL, uuid: targetUID, key: 1)
+
+        let searcher = RAGSearcher(storageDirectory: tmp)
+        let links = await searcher.outgoingLinks(from: sourceUID)
+        #expect(links.count == 1)
+        #expect(links.first?.uuid == targetUID)
+        #expect(links.first?.filename == "Target Note")
+    }
+
+    @Test func incomingLinksReturnsMappedNotes() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let dbURL = tmp.appendingPathComponent("notes-index.db")
+        let sourceUID = UUID()
+        let targetUID = UUID()
+        makeDB(at: dbURL, version: 8)
+        addTagData(dbURL: dbURL, uuid: sourceUID, tags: [], filename: "Source Note")
+        addLinkData(dbURL: dbURL, sourceUID: sourceUID, targetUID: targetUID)
+        makeUsearchIndex(at: tmp.appendingPathComponent("notes.usearch").path, key: 1)
+        addChunkKey(dbURL: dbURL, uuid: sourceUID, key: 1)
+
+        let searcher = RAGSearcher(storageDirectory: tmp)
+        let backlinks = await searcher.incomingLinks(to: targetUID)
+        #expect(backlinks.count == 1)
+        #expect(backlinks.first?.uuid == sourceUID)
+        #expect(backlinks.first?.filename == "Source Note")
+    }
+
+    @Test func outgoingLinksEmptyWhenNoData() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let dbURL = tmp.appendingPathComponent("notes-index.db")
+        makeDB(at: dbURL, version: 8)
+        makeUsearchIndex(at: tmp.appendingPathComponent("notes.usearch").path, key: 1)
+        addChunkKey(dbURL: dbURL, uuid: UUID(), key: 1)
+
+        let searcher = RAGSearcher(storageDirectory: tmp)
+        let links = await searcher.outgoingLinks(from: UUID())
+        #expect(links.isEmpty)
     }
 }
