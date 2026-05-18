@@ -180,6 +180,10 @@ final class NoteStore {
         await indexer.incomingLinks(to: noteID)
     }
 
+    func allWikilinkEdges() async -> [(source: UUID, target: UUID)] {
+        await indexer.allLinks()
+    }
+
     // MARK: - Bookmarks
 
     func toggleBookmark(for noteID: UUID) {

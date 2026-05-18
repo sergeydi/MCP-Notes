@@ -49,6 +49,7 @@ final class MockNoteIndexer: NoteIndexing {
     func searchBM25Ranked(query: String, limit: Int) async -> [(id: UUID, rank: Int)] { [] }
     func outgoingLinks(from noteID: UUID) async -> [UUID] { [] }
     func incomingLinks(to noteID: UUID) async -> [UUID] { [] }
+    func allLinks() async -> [(source: UUID, target: UUID)] { [] }
 }
 
 // MARK: - Shared fixture

@@ -27,6 +27,13 @@ struct MCPNotesApp: App {
             }
         }
 
+        Window("Wikilink Graph", id: "wikilink-graph") {
+            WikilinkGraphView()
+                .environment(noteStore)
+                .frame(minWidth: 400, minHeight: 300)
+        }
+        .defaultSize(width: 800, height: 600)
+
         Settings {
             SettingsView()
                 .environment(noteStore)

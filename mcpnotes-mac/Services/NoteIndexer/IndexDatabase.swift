@@ -373,6 +373,22 @@ final class IndexDatabase: @unchecked Sendable {
         sqlite3_step(stmt)
     }
 
+    nonisolated func allLinks() -> [(source: UUID, target: UUID)] {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT source_uid, target_uid FROM note_links",
+                                  -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        var result: [(source: UUID, target: UUID)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let s = sqlite3_column_text(stmt, 0), let t = sqlite3_column_text(stmt, 1),
+               let src = UUID(uuidString: String(cString: s)),
+               let tgt = UUID(uuidString: String(cString: t)) {
+                result.append((source: src, target: tgt))
+            }
+        }
+        return result
+    }
+
     nonisolated func removeLinksTo(target: UUID) {
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, "DELETE FROM note_links WHERE target_uid = ?",

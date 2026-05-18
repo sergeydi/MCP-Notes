@@ -45,16 +45,26 @@ struct SidebarView: View {
         @Bindable var store = store
 
         VStack(spacing: 0) {
-            Picker("View", selection: $mode) {
-                ForEach(SidebarMode.allCases, id: \.self) { m in
-                    Image(systemName: m.symbolName)
-                        .accessibilityLabel(m.label)
-                        .tag(m)
+            HStack(spacing: 4) {
+                Picker("View", selection: $mode) {
+                    ForEach(SidebarMode.allCases, id: \.self) { m in
+                        Image(systemName: m.symbolName)
+                            .accessibilityLabel(m.label)
+                            .tag(m)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .accessibilityLabel("Sidebar Mode")
+
+                Button {
+                    openWindow(id: "wikilink-graph")
+                } label: {
+                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                }
+                .buttonStyle(.plain)
+                .help("Show Wikilink Graph")
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .accessibilityLabel("Sidebar Mode")
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
 

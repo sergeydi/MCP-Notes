@@ -300,6 +300,7 @@ actor NoteIndexer: NoteIndexing {
 
     func outgoingLinks(from noteID: UUID) async -> [UUID] { db.outgoingLinks(from: noteID) }
     func incomingLinks(to noteID: UUID) async -> [UUID] { db.incomingLinks(to: noteID) }
+    func allLinks() async -> [(source: UUID, target: UUID)] { db.allLinks() }
 
     // MARK: - Private: chunking
 
