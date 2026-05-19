@@ -15,7 +15,7 @@ private struct GraphSKViewRepresentable: NSViewRepresentable {
 
         let scene = GraphSKScene()
         scene.scaleMode = .resizeFill
-        scene.backgroundColor = .textBackgroundColor
+        scene.backgroundColor = .black
         scene.onTap = { [weak c] id in c?.store?.selectedNoteID = id }
         c.scene = scene
         skv.presentScene(scene)
@@ -62,6 +62,7 @@ private struct GraphSKViewRepresentable: NSViewRepresentable {
 
         func reloadGraph() {
             guard let scene, let store else { return }
+            scene.clearImmediate()
             Task {
                 let notes = store.notes
                 let rawEdges = await store.allWikilinkEdges()
@@ -76,18 +77,9 @@ struct WikilinkGraphView: View {
     @State private var reloadID = 0
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            GraphSKViewRepresentable(reloadID: reloadID)
-            Button {
-                reloadID += 1
-            } label: {
-                Image(systemName: "arrow.clockwise")
-            }
-            .padding(10)
-            .help("Reload graph")
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .textBackgroundColor))
-        .onAppear { reloadID += 1 }
+        GraphSKViewRepresentable(reloadID: reloadID)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.black)
+            .onAppear { reloadID += 1 }
     }
 }

@@ -21,11 +21,14 @@ final class GraphSKScene: SKScene {
     private var edgeShape: SKShapeNode?
     private let cam = SKCameraNode()
 
-    var selectedID: UUID? { didSet { syncSelection() } }
+    var selectedID: UUID? { didSet { syncSelection(oldID: oldValue) } }
     var onTap: ((UUID) -> Void)?
 
     private var dragNodeIndex: Int?
     private var cameraAnchor: CGPoint = .zero
+    private var labelsVisible: Bool = true
+    private var isolatedIndices: Set<Int> = []
+    private var isolatedDotsVisible: Bool = true
 
     // MARK: Lifecycle
 
@@ -34,7 +37,7 @@ final class GraphSKScene: SKScene {
 
         if edgeShape == nil {
             let shape = SKShapeNode()
-            shape.strokeColor = NSColor.labelColor.withAlphaComponent(0.3)
+            shape.strokeColor = NSColor.white.withAlphaComponent(0.4)
             shape.lineWidth = 1
             shape.zPosition = -1
             addChild(shape)
@@ -58,6 +61,8 @@ final class GraphSKScene: SKScene {
         edges = []
         simAlpha = 0
         edgeShape?.path = nil
+        isolatedIndices = []
+        isolatedDotsVisible = true
     }
 
     func load(notes: [Note], rawEdges: [(source: UUID, target: UUID)]) {
@@ -83,6 +88,12 @@ final class GraphSKScene: SKScene {
             let y = cellH * Double(i / cols + 1) + Double.random(in: -cellH * 0.3 ... cellH * 0.3)
             let sprite = makeSprite(note)
             sprite.position = CGPoint(x: x, y: y)
+            (sprite.childNode(withName: "dot") as? SKShapeNode).map {
+                $0.alpha = 0; $0.run(.fadeIn(withDuration: 2.0))
+            }
+            (sprite.childNode(withName: "lbl") as? SKLabelNode).map {
+                $0.alpha = 0; $0.run(.fadeIn(withDuration: 3.0), withKey: "labelFade")
+            }
             addChild(sprite)
             idToIdx[note.id] = i
             return SimNode(id: note.id, sprite: sprite)
@@ -93,10 +104,27 @@ final class GraphSKScene: SKScene {
             return (from: f, to: t)
         }
 
+        edgeShape?.removeAllActions()
+        edgeShape?.alpha = 0
+        edgeShape?.run(.fadeIn(withDuration: 2.0))
+        let connected = Set(edges.flatMap { [$0.from, $0.to] })
+        isolatedIndices = Set(simNodes.indices).subtracting(connected)
+        isolatedDotsVisible = true
         simAlpha = 1.0
+        labelsVisible = true
         cam.position = CGPoint(x: sz.width / 2, y: sz.height / 2)
-        cam.setScale(1.0)
+        cam.setScale(3.0)
         syncSelection()
+        syncLabelScale()
+    }
+
+    private func truncated(_ text: String, limit: Int = 30) -> String {
+        guard text.count > limit else { return text }
+        let prefix = text.prefix(limit)
+        if let lastSpace = prefix.lastIndex(of: " ") {
+            return String(prefix[..<lastSpace]) + "…"
+        }
+        return String(prefix) + "…"
     }
 
     private func makeSprite(_ note: Note) -> SKNode {
@@ -105,14 +133,15 @@ final class GraphSKScene: SKScene {
 
         let dot = SKShapeNode(circleOfRadius: 6)
         dot.name = "dot"
-        dot.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.6)
+        dot.fillColor = NSColor(white: 0.5, alpha: 1.0)
         dot.strokeColor = .clear
         root.addChild(dot)
 
-        let lbl = SKLabelNode(text: note.filename)
+        let lbl = SKLabelNode(text: truncated(note.filename))
         lbl.name = "lbl"
-        lbl.fontSize = 9
-        lbl.fontColor = .secondaryLabelColor
+        lbl.fontName = NSFont.systemFont(ofSize: 0, weight: .medium).fontName
+        lbl.fontSize = 13
+        lbl.fontColor = NSColor.white.withAlphaComponent(0.3)
         lbl.position = CGPoint(x: 0, y: -20)
         lbl.horizontalAlignmentMode = .center
         lbl.verticalAlignmentMode = .top
@@ -121,18 +150,30 @@ final class GraphSKScene: SKScene {
         return root
     }
 
-    private func syncSelection() {
+    private func syncSelection(oldID: UUID? = nil) {
         for node in simNodes {
             guard let s = node.sprite else { continue }
             let sel = node.id == selectedID
             if let dot = s.childNode(withName: "dot") as? SKShapeNode {
-                dot.fillColor = sel ? .controlAccentColor : NSColor.controlAccentColor.withAlphaComponent(0.6)
-                dot.strokeColor = sel ? .controlAccentColor : .clear
+                dot.fillColor = sel ? .white : NSColor(white: 0.5, alpha: 1.0)
+                dot.strokeColor = sel ? .white : .clear
                 dot.lineWidth = sel ? 2 : 0
             }
             if let lbl = s.childNode(withName: "lbl") as? SKLabelNode {
-                lbl.fontColor = sel ? .labelColor : .secondaryLabelColor
+                lbl.fontColor = sel ? .white : NSColor.white.withAlphaComponent(0.3)
             }
+        }
+
+        guard !isolatedDotsVisible else { return }
+        if let old = oldID, old != selectedID,
+           let idx = simNodes.firstIndex(where: { $0.id == old }),
+           isolatedIndices.contains(idx) {
+            simNodes[idx].sprite?.run(.fadeOut(withDuration: 0.3), withKey: "isolatedFade")
+        }
+        if let newID = selectedID,
+           let idx = simNodes.firstIndex(where: { $0.id == newID }),
+           isolatedIndices.contains(idx) {
+            simNodes[idx].sprite?.run(.fadeIn(withDuration: 0.3), withKey: "isolatedFade")
         }
     }
 
@@ -190,13 +231,18 @@ final class GraphSKScene: SKScene {
 
     private func rebuildEdges() {
         let n = simNodes.count
+        let r = CGFloat(6)
         let path = CGMutablePath()
         for e in edges {
             guard e.from < n, e.to < n,
                   let p0 = simNodes[e.from].sprite?.position,
                   let p1 = simNodes[e.to].sprite?.position else { continue }
-            path.move(to: p0)
-            path.addLine(to: p1)
+            let dx = p1.x - p0.x, dy = p1.y - p0.y
+            let d = hypot(dx, dy)
+            guard d > r * 2 else { continue }
+            let nx = dx / d, ny = dy / d
+            path.move(to: CGPoint(x: p0.x + nx * r, y: p0.y + ny * r))
+            path.addLine(to: CGPoint(x: p1.x - nx * r, y: p1.y - ny * r))
         }
         edgeShape?.path = path
     }
@@ -237,7 +283,7 @@ final class GraphSKScene: SKScene {
     }
 
     func handleScroll(event: NSEvent, in view: SKView) {
-        let factor = pow(1.01, -event.scrollingDeltaY)
+        let factor = pow(1.005, -event.scrollingDeltaY)
         let newScale = max(0.125, min(8.0, cam.xScale * factor))
         let pivot = convertPoint(fromView: view.convert(event.locationInWindow, from: nil))
         let ratio = newScale / cam.xScale
@@ -246,6 +292,34 @@ final class GraphSKScene: SKScene {
             y: pivot.y + (cam.position.y - pivot.y) * ratio
         )
         cam.setScale(newScale)
+        syncLabelScale()
+    }
+
+    private func syncLabelScale() {
+        let s = cam.xScale
+        let shouldShow = s < 1.25
+        for node in simNodes {
+            guard let lbl = node.sprite?.childNode(withName: "lbl") as? SKLabelNode else { continue }
+            lbl.xScale = s
+            lbl.yScale = s
+        }
+        if shouldShow != labelsVisible {
+            labelsVisible = shouldShow
+            let action: SKAction = shouldShow ? .fadeIn(withDuration: 0.3) : .fadeOut(withDuration: 0.3)
+            for node in simNodes {
+                node.sprite?.childNode(withName: "lbl")?.run(action, withKey: "labelFade")
+            }
+        }
+
+        let shouldShowIsolated = s < 2.0
+        if shouldShowIsolated != isolatedDotsVisible {
+            isolatedDotsVisible = shouldShowIsolated
+            let action: SKAction = shouldShowIsolated ? .fadeIn(withDuration: 0.3) : .fadeOut(withDuration: 0.3)
+            for i in isolatedIndices where i < simNodes.count {
+                if !shouldShowIsolated && simNodes[i].id == selectedID { continue }
+                simNodes[i].sprite?.run(action, withKey: "isolatedFade")
+            }
+        }
     }
 
     // MARK: Helpers
