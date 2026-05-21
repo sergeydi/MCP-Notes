@@ -22,7 +22,7 @@ final class GraphSKScene: SKScene {
     private let cam = SKCameraNode()
 
     var selectedID: UUID? { didSet { syncSelection(oldID: oldValue) } }
-    var onTap: ((UUID) -> Void)?
+    var onTap: ((UUID?) -> Void)?
 
     private var dragNodeIndex: Int?
     private var cameraAnchor: CGPoint = .zero
@@ -56,6 +56,7 @@ final class GraphSKScene: SKScene {
     // MARK: Data
 
     func clearImmediate() {
+        stopIdleFlicker()
         simNodes.forEach { $0.sprite?.removeFromParent() }
         simNodes = []
         edges = []
@@ -131,6 +132,26 @@ final class GraphSKScene: SKScene {
         let root = SKNode()
         root.name = note.id.uuidString
 
+        let glow = SKShapeNode(circleOfRadius: 18)
+        glow.name = "glow"
+        glow.fillColor = .white
+        glow.strokeColor = .clear
+        glow.lineWidth = 0
+        glow.alpha = 0
+        glow.zPosition = -1
+        root.addChild(glow)
+
+        for i in 0..<3 {
+            let ring = SKShapeNode(circleOfRadius: 8)
+            ring.name = "ring\(i)"
+            ring.fillColor = .clear
+            ring.strokeColor = .white
+            ring.lineWidth = 1.5
+            ring.alpha = 0
+            ring.zPosition = -0.5
+            root.addChild(ring)
+        }
+
         let dot = SKShapeNode(circleOfRadius: 6)
         dot.name = "dot"
         dot.fillColor = NSColor(white: 0.5, alpha: 1.0)
@@ -150,6 +171,88 @@ final class GraphSKScene: SKScene {
         return root
     }
 
+    private func startIdleFlicker() {
+        let seq = SKAction.sequence([
+            .wait(forDuration: 3.0),
+            .run { [weak self] in self?.flickerRandomNode() }
+        ])
+        run(.repeatForever(seq), withKey: "idleFlicker")
+    }
+
+    private func stopIdleFlicker() {
+        removeAction(forKey: "idleFlicker")
+    }
+
+    private func flickerRandomNode() {
+        guard selectedID == nil, !simNodes.isEmpty,
+              let node = simNodes.randomElement(),
+              let sprite = node.sprite else { return }
+
+        if let glow = sprite.childNode(withName: "glow") {
+            glow.setScale(1.0)
+            glow.alpha = 0
+            glow.run(SKAction.sequence([
+                SKAction.group([
+                    .scale(to: 2.2, duration: 0.5),
+                    .sequence([.fadeAlpha(to: 0.22, duration: 0.15), .fadeOut(withDuration: 0.35)])
+                ]),
+                SKAction.group([.scale(to: 1.0, duration: 0), .fadeOut(withDuration: 0)])
+            ]), withKey: "idleGlow")
+        }
+
+        if let ring = sprite.childNode(withName: "ring0") {
+            ring.setScale(1.0)
+            ring.alpha = 0
+            ring.run(SKAction.sequence([
+                SKAction.group([
+                    .scale(to: 4.0, duration: 1.2),
+                    .sequence([.fadeAlpha(to: 0.45, duration: 0.1), .fadeOut(withDuration: 1.1)])
+                ]),
+                SKAction.group([.scale(to: 1.0, duration: 0), .fadeOut(withDuration: 0)])
+            ]), withKey: "idleRing")
+        }
+    }
+
+    private func startRipple(on sprite: SKNode) {
+        if let glow = sprite.childNode(withName: "glow") {
+            glow.removeAllActions()
+            glow.setScale(1.0)
+            glow.alpha = 0.12
+            let breathe = SKAction.sequence([
+                SKAction.group([.scale(to: 1.5, duration: 2.8), .fadeAlpha(to: 0.20, duration: 2.8)]),
+                SKAction.group([.scale(to: 1.0, duration: 2.8), .fadeAlpha(to: 0.12, duration: 2.8)])
+            ])
+            glow.run(.repeatForever(breathe), withKey: "glow")
+        }
+
+        for i in 0..<3 {
+            guard let ring = sprite.childNode(withName: "ring\(i)") else { continue }
+            ring.removeAllActions()
+            ring.setScale(1.0)
+            ring.alpha = 0
+            let fire = SKAction.sequence([
+                SKAction.group([
+                    .scale(to: 5.0, duration: 2.2),
+                    .sequence([.fadeAlpha(to: 0.7, duration: 0.1), .fadeOut(withDuration: 2.1)])
+                ]),
+                SKAction.group([.scale(to: 1.0, duration: 0), .fadeOut(withDuration: 0)]),
+                .wait(forDuration: 1.0)
+            ])
+            ring.run(.sequence([.wait(forDuration: Double(i) * 1.0), .repeatForever(fire)]), withKey: "ring")
+        }
+    }
+
+    private func stopRipple(on sprite: SKNode) {
+        sprite.childNode(withName: "glow").map {
+            $0.removeAllActions(); $0.run(.fadeOut(withDuration: 0.3))
+        }
+        for i in 0..<3 {
+            guard let ring = sprite.childNode(withName: "ring\(i)") else { continue }
+            ring.removeAllActions()
+            ring.run(.fadeOut(withDuration: 0.2))
+        }
+    }
+
     private func syncSelection(oldID: UUID? = nil) {
         for node in simNodes {
             guard let s = node.sprite else { continue }
@@ -162,6 +265,23 @@ final class GraphSKScene: SKScene {
             if let lbl = s.childNode(withName: "lbl") as? SKLabelNode {
                 lbl.fontColor = sel ? .white : NSColor.white.withAlphaComponent(0.3)
             }
+            if sel && node.id != oldID {
+                startRipple(on: s)
+                if !labelsVisible {
+                    s.childNode(withName: "lbl")?.run(.fadeIn(withDuration: 0.3), withKey: "labelFade")
+                }
+            } else if !sel && node.id == oldID {
+                stopRipple(on: s)
+                if !labelsVisible {
+                    s.childNode(withName: "lbl")?.run(.fadeOut(withDuration: 0.3), withKey: "labelFade")
+                }
+            }
+        }
+
+        if selectedID == nil {
+            if action(forKey: "idleFlicker") == nil { startIdleFlicker() }
+        } else {
+            stopIdleFlicker()
         }
 
         guard !isolatedDotsVisible else { return }
@@ -279,7 +399,8 @@ final class GraphSKScene: SKScene {
     @objc func handleClick(_ g: NSClickGestureRecognizer) {
         guard let v = g.view as? SKView, g.state == .ended else { return }
         let loc = convertPoint(fromView: g.location(in: v))
-        if let i = nearestIndex(to: loc, screenRadius: 20) { onTap?(simNodes[i].id) }
+        let id = nearestIndex(to: loc, screenRadius: 40).map { simNodes[$0].id }
+        onTap?(id)
     }
 
     func handleScroll(event: NSEvent, in view: SKView) {
@@ -307,6 +428,7 @@ final class GraphSKScene: SKScene {
             labelsVisible = shouldShow
             let action: SKAction = shouldShow ? .fadeIn(withDuration: 0.3) : .fadeOut(withDuration: 0.3)
             for node in simNodes {
+                if !shouldShow && node.id == selectedID { continue }
                 node.sprite?.childNode(withName: "lbl")?.run(action, withKey: "labelFade")
             }
         }
