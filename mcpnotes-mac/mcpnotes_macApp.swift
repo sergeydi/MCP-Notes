@@ -33,6 +33,7 @@ struct MCPNotesApp: App {
                 .frame(minWidth: 400, minHeight: 300)
         }
         .defaultSize(width: 800, height: 600)
+        .windowStyle(.hiddenTitleBar)
 
         Settings {
             SettingsView()

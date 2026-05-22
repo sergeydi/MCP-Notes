@@ -18,10 +18,11 @@ final class GraphSKScene: SKScene {
     private var simNodes: [SimNode] = []
     private var edges: [(from: Int, to: Int)] = []
     private var simAlpha: Double = 0
-    private var edgeShape: SKShapeNode?
+    private var edgeNodes: [SKShapeNode] = []
+    private var edgeParticles: [[SKShapeNode]] = []
     private let cam = SKCameraNode()
 
-    var selectedID: UUID? { didSet { syncSelection(oldID: oldValue) } }
+    var selectedID: UUID? { didSet { guard oldValue != selectedID else { return }; syncSelection(oldID: oldValue) } }
     var onTap: ((UUID?) -> Void)?
 
     private var dragNodeIndex: Int?
@@ -35,13 +36,7 @@ final class GraphSKScene: SKScene {
     override func didMove(to view: SKView) {
         anchorPoint = .zero
 
-        if edgeShape == nil {
-            let shape = SKShapeNode()
-            shape.strokeColor = NSColor.white.withAlphaComponent(0.4)
-            shape.lineWidth = 1
-            shape.zPosition = -1
-            addChild(shape)
-            edgeShape = shape
+        if camera == nil {
             addChild(cam)
             camera = cam
         }
@@ -61,7 +56,10 @@ final class GraphSKScene: SKScene {
         simNodes = []
         edges = []
         simAlpha = 0
-        edgeShape?.path = nil
+        edgeNodes.forEach { $0.removeFromParent() }
+        edgeNodes = []
+        edgeParticles.forEach { $0.forEach { $0.removeFromParent() } }
+        edgeParticles = []
         isolatedIndices = []
         isolatedDotsVisible = true
     }
@@ -73,6 +71,10 @@ final class GraphSKScene: SKScene {
         simNodes = []
         edges = []
         simAlpha = 0
+        edgeNodes.forEach { $0.removeFromParent() }
+        edgeNodes = []
+        edgeParticles.forEach { $0.forEach { $0.removeFromParent() } }
+        edgeParticles = []
 
         let n = notes.count
         guard n > 0 else { return }
@@ -105,9 +107,17 @@ final class GraphSKScene: SKScene {
             return (from: f, to: t)
         }
 
-        edgeShape?.removeAllActions()
-        edgeShape?.alpha = 0
-        edgeShape?.run(.fadeIn(withDuration: 2.0))
+        edgeNodes = edges.map { _ in
+            let shape = SKShapeNode()
+            shape.strokeColor = .white
+            shape.lineWidth = 1
+            shape.zPosition = -1
+            shape.alpha = 0
+            shape.run(.fadeAlpha(to: 0.4, duration: 2.0))
+            addChild(shape)
+            return shape
+        }
+        edgeParticles = Array(repeating: [], count: edges.count)
         let connected = Set(edges.flatMap { [$0.from, $0.to] })
         isolatedIndices = Set(simNodes.indices).subtracting(connected)
         isolatedDotsVisible = true
@@ -188,6 +198,20 @@ final class GraphSKScene: SKScene {
               let node = simNodes.randomElement(),
               let sprite = node.sprite else { return }
 
+        if let lbl = sprite.childNode(withName: "lbl") as? SKLabelNode {
+            lbl.removeAction(forKey: "labelFade")
+            lbl.fontColor = .white
+            lbl.run(.sequence([
+                .fadeIn(withDuration: 0.15),
+                .wait(forDuration: 1.0),
+                .run { [weak self, weak lbl] in
+                    guard let self, let lbl else { return }
+                    lbl.fontColor = NSColor.white.withAlphaComponent(0.3)
+                    lbl.run(.fadeAlpha(to: self.labelsVisible ? 1.0 : 0.0, duration: 0.3), withKey: "labelFade")
+                }
+            ]), withKey: "labelFlicker")
+        }
+
         if let glow = sprite.childNode(withName: "glow") {
             glow.setScale(1.0)
             glow.alpha = 0
@@ -267,14 +291,8 @@ final class GraphSKScene: SKScene {
             }
             if sel && node.id != oldID {
                 startRipple(on: s)
-                if !labelsVisible {
-                    s.childNode(withName: "lbl")?.run(.fadeIn(withDuration: 0.3), withKey: "labelFade")
-                }
             } else if !sel && node.id == oldID {
                 stopRipple(on: s)
-                if !labelsVisible {
-                    s.childNode(withName: "lbl")?.run(.fadeOut(withDuration: 0.3), withKey: "labelFade")
-                }
             }
         }
 
@@ -283,6 +301,9 @@ final class GraphSKScene: SKScene {
         } else {
             stopIdleFlicker()
         }
+
+        syncEdgeAnimation()
+        syncLabelVisibility()
 
         guard !isolatedDotsVisible else { return }
         if let old = oldID, old != selectedID,
@@ -352,19 +373,110 @@ final class GraphSKScene: SKScene {
     private func rebuildEdges() {
         let n = simNodes.count
         let r = CGFloat(6)
-        let path = CGMutablePath()
-        for e in edges {
+        for (idx, e) in edges.enumerated() {
+            guard idx < edgeNodes.count else { continue }
+            let edgeNode = edgeNodes[idx]
             guard e.from < n, e.to < n,
                   let p0 = simNodes[e.from].sprite?.position,
-                  let p1 = simNodes[e.to].sprite?.position else { continue }
+                  let p1 = simNodes[e.to].sprite?.position else {
+                edgeNode.path = nil; continue
+            }
             let dx = p1.x - p0.x, dy = p1.y - p0.y
             let d = hypot(dx, dy)
-            guard d > r * 2 else { continue }
+            guard d > r * 2 else { edgeNode.path = nil; continue }
             let nx = dx / d, ny = dy / d
+            let path = CGMutablePath()
             path.move(to: CGPoint(x: p0.x + nx * r, y: p0.y + ny * r))
             path.addLine(to: CGPoint(x: p1.x - nx * r, y: p1.y - ny * r))
+            edgeNode.path = path
         }
-        edgeShape?.path = path
+    }
+
+    private func startEdgePulse(on edge: SKShapeNode) {
+        edge.removeAction(forKey: "edgePulse")
+        edge.lineWidth = 1.5
+        let pulse = SKAction.repeatForever(SKAction.sequence([
+            .fadeAlpha(to: 0.9, duration: 1.4),
+            .fadeAlpha(to: 0.45, duration: 1.4)
+        ]))
+        edge.run(pulse, withKey: "edgePulse")
+    }
+
+    private func stopEdgePulse(on edge: SKShapeNode) {
+        edge.removeAction(forKey: "edgePulse")
+        edge.lineWidth = 1.0
+        edge.run(.fadeAlpha(to: 0.4, duration: 0.3), withKey: "edgePulse")
+    }
+
+    private func startEdgeParticles(edgeIndex: Int, from fromIdx: Int, to toIdx: Int) {
+        guard edgeIndex < edgeParticles.count else { return }
+        stopEdgeParticles(edgeIndex: edgeIndex)
+
+        let count = 3
+        let duration: Double = 3.5
+        let spacing = duration / Double(count)
+
+        edgeParticles[edgeIndex] = (0..<count).map { i in
+            let dot = SKShapeNode(circleOfRadius: 2)
+            dot.fillColor = .white
+            dot.strokeColor = .clear
+            dot.alpha = 0
+            dot.zPosition = 1
+            addChild(dot)
+
+            let move = SKAction.customAction(withDuration: duration) { [weak self] node, elapsed in
+                guard let self,
+                      let p0 = self.simNodes[fromIdx].sprite?.position,
+                      let p1 = self.simNodes[toIdx].sprite?.position else { return }
+                let t = CGFloat(elapsed) / CGFloat(duration)
+                node.position = CGPoint(x: p0.x + (p1.x - p0.x) * t,
+                                        y: p0.y + (p1.y - p0.y) * t)
+                if t < 0.15 {
+                    node.alpha = t / 0.15
+                } else if t > 0.85 {
+                    node.alpha = (1.0 - t) / 0.15
+                } else {
+                    node.alpha = 1.0
+                }
+            }
+            let arrive = SKAction.run { [weak self] in
+                guard let self, let sprite = self.simNodes[toIdx].sprite else { return }
+                self.pulseArrive(on: sprite)
+            }
+            dot.run(.sequence([.wait(forDuration: Double(i) * spacing), .repeatForever(.sequence([move, arrive]))]))
+            return dot
+        }
+    }
+
+    private func pulseArrive(on sprite: SKNode) {
+        guard let dot = sprite.childNode(withName: "dot") as? SKShapeNode else { return }
+        dot.removeAction(forKey: "arrive")
+        dot.run(.sequence([
+            .scale(to: 1.3, duration: 0.2),
+            .scale(to: 1.0, duration: 0.5)
+        ]), withKey: "arrive")
+    }
+
+    private func stopEdgeParticles(edgeIndex: Int) {
+        guard edgeIndex < edgeParticles.count else { return }
+        edgeParticles[edgeIndex].forEach { $0.removeFromParent() }
+        edgeParticles[edgeIndex] = []
+    }
+
+    private func syncEdgeAnimation() {
+        let selIdx = selectedID.flatMap { id in simNodes.firstIndex(where: { $0.id == id }) }
+        for (idx, e) in edges.enumerated() {
+            guard idx < edgeNodes.count else { continue }
+            let connected = selIdx.map { e.from == $0 || e.to == $0 } ?? false
+            if connected, let si = selIdx {
+                startEdgePulse(on: edgeNodes[idx])
+                let (from, to) = (e.from == si) ? (e.from, e.to) : (e.to, e.from)
+                startEdgeParticles(edgeIndex: idx, from: from, to: to)
+            } else {
+                stopEdgePulse(on: edgeNodes[idx])
+                stopEdgeParticles(edgeIndex: idx)
+            }
+        }
     }
 
     // MARK: Input
@@ -426,10 +538,11 @@ final class GraphSKScene: SKScene {
         }
         if shouldShow != labelsVisible {
             labelsVisible = shouldShow
-            let action: SKAction = shouldShow ? .fadeIn(withDuration: 0.3) : .fadeOut(withDuration: 0.3)
-            for node in simNodes {
-                if !shouldShow && node.id == selectedID { continue }
-                node.sprite?.childNode(withName: "lbl")?.run(action, withKey: "labelFade")
+            if selectedID == nil {
+                let action: SKAction = shouldShow ? .fadeIn(withDuration: 0.3) : .fadeOut(withDuration: 0.3)
+                for node in simNodes {
+                    node.sprite?.childNode(withName: "lbl")?.run(action, withKey: "labelFade")
+                }
             }
         }
 
@@ -440,6 +553,33 @@ final class GraphSKScene: SKScene {
             for i in isolatedIndices where i < simNodes.count {
                 if !shouldShowIsolated && simNodes[i].id == selectedID { continue }
                 simNodes[i].sprite?.run(action, withKey: "isolatedFade")
+            }
+        }
+    }
+
+    private func neighborIndices(of idx: Int) -> Set<Int> {
+        var result = Set<Int>()
+        for e in edges {
+            if e.from == idx { result.insert(e.to) }
+            else if e.to == idx { result.insert(e.from) }
+        }
+        return result
+    }
+
+    private func syncLabelVisibility() {
+        if let selIdx = simNodes.firstIndex(where: { $0.id == selectedID }) {
+            let visible = neighborIndices(of: selIdx).union([selIdx])
+            for (i, node) in simNodes.enumerated() {
+                let show = visible.contains(i)
+                node.sprite?.childNode(withName: "lbl")?.run(
+                    show ? .fadeIn(withDuration: 0.3) : .fadeOut(withDuration: 0.3),
+                    withKey: "labelFade"
+                )
+            }
+        } else {
+            let action: SKAction = labelsVisible ? .fadeIn(withDuration: 0.3) : .fadeOut(withDuration: 0.3)
+            for node in simNodes {
+                node.sprite?.childNode(withName: "lbl")?.run(action, withKey: "labelFade")
             }
         }
     }
