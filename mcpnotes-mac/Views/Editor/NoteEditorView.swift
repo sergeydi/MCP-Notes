@@ -19,7 +19,12 @@ struct NoteEditorView: View {
 
             MarkdownEditorView(
                 text: $viewModel.body,
-                onTextChanged: viewModel.scheduleAutosave
+                onTextChanged: viewModel.scheduleAutosave,
+                onWikilinkTapped: { name in
+                    if let target = store.notes.first(where: { $0.filename == name }) {
+                        store.selectedNoteID = target.id
+                    }
+                }
             )
         }
         .navigationTitle(note.filename)

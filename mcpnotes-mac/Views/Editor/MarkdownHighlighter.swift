@@ -37,9 +37,9 @@ struct MarkdownHighlighter {
         pattern: #"~~([^~\n]+)~~"#)
     private static let inlineCodeRx = try! NSRegularExpression(
         pattern: #"`([^`\n]+)`"#)
-    private static let linkRx = try! NSRegularExpression(
-        pattern: #"\[[^\]\n]+\]\([^)\n]+\)"#)
-    private static let wikilinkRx = try! NSRegularExpression(
+    static let linkRx = try! NSRegularExpression(
+        pattern: #"\[[^\]\n]+\]\(([^)\n]+)\)"#)
+    static let wikilinkRx = try! NSRegularExpression(
         pattern: #"\[\[[^\]\n]+\]\]"#)
 
     // MARK: Code fence tracking

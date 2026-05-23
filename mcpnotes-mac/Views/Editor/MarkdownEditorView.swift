@@ -7,9 +7,10 @@ import SwiftUI
 struct MarkdownEditorView: View {
     @Binding var text: String
     var onTextChanged: () -> Void
+    var onWikilinkTapped: ((String) -> Void)? = nil
 
     var body: some View {
-        MarkdownTextViewRepresentable(text: $text, onTextChanged: onTextChanged)
+        MarkdownTextViewRepresentable(text: $text, onTextChanged: onTextChanged, onWikilinkTapped: onWikilinkTapped)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityLabel("Note content")
     }
