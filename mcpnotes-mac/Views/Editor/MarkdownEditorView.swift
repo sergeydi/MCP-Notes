@@ -1,20 +1,16 @@
 import SwiftUI
 
-/// Plain-text Markdown editor backed by `TextEditor`.
+/// Markdown editor with CommonMark + GFM syntax highlighting.
 ///
-/// Syntax highlighting and Wikilink navigation are not yet implemented;
-/// those require a custom `NSTextView` subclass or a third-party library.
+/// Backed by `NSTextView` with TextKit 2 rendering attributes.
+/// Wikilink click-navigation is not yet implemented.
 struct MarkdownEditorView: View {
     @Binding var text: String
     var onTextChanged: () -> Void
 
     var body: some View {
-        TextEditor(text: $text)
-            .font(.system(.body, design: .monospaced))
+        MarkdownTextViewRepresentable(text: $text, onTextChanged: onTextChanged)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .onChange(of: text) { _, _ in
-                onTextChanged()
-            }
             .accessibilityLabel("Note content")
     }
 }
