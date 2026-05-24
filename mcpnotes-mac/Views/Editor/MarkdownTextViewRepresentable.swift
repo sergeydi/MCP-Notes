@@ -127,6 +127,97 @@ private final class WikilinkTextView: NSTextView {
         linkRects = rects
     }
 
+    // MARK: List continuation
+
+    override func insertNewline(_ sender: Any?) {
+        let sel = selectedRange()
+        let nsStr = string as NSString
+        let lineRange = nsStr.lineRange(for: NSRange(location: sel.location, length: 0))
+        let line = nsStr.substring(with: lineRange)
+
+        guard let (prefixLen, continuation) = listPrefixInfo(in: line) else {
+            super.insertNewline(sender)
+            return
+        }
+
+        let body = String(line.dropFirst(prefixLen)).trimmingCharacters(in: .newlines)
+        if body.isEmpty {
+            // Empty list item — exit the list by removing the prefix
+            let deleteRange = NSRange(location: lineRange.location, length: prefixLen)
+            if shouldChangeText(in: deleteRange, replacementString: "") {
+                textStorage?.replaceCharacters(in: deleteRange, with: "")
+                didChangeText()
+            }
+        } else {
+            super.insertNewline(sender)
+            insertText(continuation, replacementRange: selectedRange())
+        }
+    }
+
+    /// Scans all lines and renumbers any numbered list sections where items are out of sequence.
+    /// Applied directly to textStorage without shouldChangeText/didChangeText to avoid recursion.
+    fileprivate func renumberAllLists() {
+        let nsStr = string as NSString
+        let length = nsStr.length
+        var pos = 0
+        var replacements: [(NSRange, String)] = []
+        // Maps indent string → next expected number for that nesting level.
+        var contexts: [String: Int] = [:]
+
+        while pos < length {
+            let lineRange = nsStr.lineRange(for: NSRange(location: pos, length: 0))
+            let line = nsStr.substring(with: lineRange)
+            let trimmed = line.drop(while: { $0 == " " || $0 == "\t" })
+            let indent = String(line.prefix(line.count - trimmed.count))
+            var digits = ""
+            var rest = String(trimmed)
+            while let ch = rest.first, ch.isNumber { digits.append(ch); rest = String(rest.dropFirst()) }
+
+            if !digits.isEmpty, rest.hasPrefix(". "), let n = Int(digits) {
+                if let expected = contexts[indent] {
+                    if n != expected {
+                        let oldLen = indent.count + digits.count + 2
+                        replacements.append((NSRange(location: lineRange.location, length: oldLen), indent + "\(expected). "))
+                    }
+                    contexts[indent] = expected + 1
+                } else {
+                    contexts[indent] = n + 1
+                }
+            } else if !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                contexts.removeAll()
+            }
+            pos = NSMaxRange(lineRange)
+        }
+
+        guard !replacements.isEmpty else { return }
+        for (range, replacement) in replacements.reversed() {
+            textStorage?.replaceCharacters(in: range, with: replacement)
+        }
+    }
+
+    /// Returns (original prefix char length, continuation prefix) for list lines.
+    private func listPrefixInfo(in line: String) -> (Int, String)? {
+        let trimmed = line.drop(while: { $0 == " " || $0 == "\t" })
+        let indent = String(line.prefix(line.count - trimmed.count))
+
+        // Task list must be checked before plain "- "
+        for marker in ["- [ ] ", "- [x] ", "- [X] "] {
+            if trimmed.hasPrefix(marker) { return (indent.count + marker.count, indent + "- [ ] ") }
+        }
+        // Unordered bullets
+        for marker in ["- ", "* ", "+ "] {
+            if trimmed.hasPrefix(marker) { return (indent.count + marker.count, indent + marker) }
+        }
+        // Numbered list: \d+\.
+        var digits = ""
+        var rest = String(trimmed)
+        while let ch = rest.first, ch.isNumber { digits.append(ch); rest = String(rest.dropFirst()) }
+        if !digits.isEmpty, rest.hasPrefix(". "), let n = Int(digits) {
+            return (indent.count + digits.count + 2, indent + "\(n + 1). ")
+        }
+        return nil
+    }
+
     // MARK: Click navigation
 
     override func mouseDown(with event: NSEvent) {
@@ -178,6 +269,7 @@ extension MarkdownTextViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard !isUpdatingFromSwiftUI, let tv = textView else { return }
+            (tv as? WikilinkTextView)?.renumberAllLists()
             text.wrappedValue = tv.string
             onTextChanged()
             refreshHighlighting()
