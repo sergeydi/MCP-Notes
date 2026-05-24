@@ -80,12 +80,16 @@ struct MarkdownHighlighter {
         let fullRange = NSRange(location: 0, length: nsStr.length)
         let docRange = layoutManager.documentRange
         let monoFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-        let boldFont = NSFont.boldSystemFont(ofSize: NSFont.systemFontSize)
-        let italicFont = NSFontManager.shared.convert(monoFont, toHaveTrait: .italicFontMask)
+        let boldFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .bold)
+        let italicFont = NSFont(descriptor: monoFont.fontDescriptor.withSymbolicTraits(.italic), size: monoFont.pointSize) ?? monoFont
 
-        for key: NSAttributedString.Key in [.foregroundColor, .font, .backgroundColor, .strikethroughStyle] {
+        for key: NSAttributedString.Key in [.foregroundColor, .backgroundColor] {
             layoutManager.removeRenderingAttribute(key, for: docRange)
         }
+
+        // Font and strikethrough must go through textStorage — addRenderingAttribute has no visual effect for these.
+        textStorage.addAttribute(.font, value: monoFont, range: fullRange)
+        textStorage.removeAttribute(.strikethroughStyle, range: fullRange)
 
         func tr(_ r: NSRange) -> NSTextRange? {
             guard r.location != NSNotFound, r.length >= 0,
@@ -101,17 +105,23 @@ struct MarkdownHighlighter {
             layoutManager.addRenderingAttribute(key, value: value, for: range)
         }
 
+        func setFont(_ font: NSFont, _ r: NSRange) {
+            guard r.location != NSNotFound, r.length > 0,
+                  r.location + r.length <= nsStr.length else { return }
+            textStorage.addAttribute(.font, value: font, range: r)
+        }
+
         // MARK: Line-level elements
 
         Self.headingRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
             guard let m else { return }
             add(.foregroundColor, NSColor.systemBlue, m.range)
-            add(.font, boldFont, m.range)
+            setFont(boldFont, m.range)
             let hashRange = m.range(at: 1)
             if hashRange.location != NSNotFound {
                 let markerRange = NSRange(location: hashRange.location, length: hashRange.length + 1)
                 add(.foregroundColor, NSColor.tertiaryLabelColor, markerRange)
-                add(.font, monoFont, markerRange)
+                setFont(monoFont, markerRange)
             }
         }
 
@@ -174,7 +184,7 @@ struct MarkdownHighlighter {
             let content = m.range(at: 1)
             add(.foregroundColor, NSColor.quaternaryLabelColor, open)
             add(.foregroundColor, NSColor.quaternaryLabelColor, close)
-            if content.location != NSNotFound { add(.font, boldFont, content) }
+            if content.location != NSNotFound { setFont(boldFont, content) }
         }
 
         Self.boldUnderscoreRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
@@ -184,7 +194,7 @@ struct MarkdownHighlighter {
             let content = m.range(at: 1)
             add(.foregroundColor, NSColor.quaternaryLabelColor, open)
             add(.foregroundColor, NSColor.quaternaryLabelColor, close)
-            if content.location != NSNotFound { add(.font, boldFont, content) }
+            if content.location != NSNotFound { setFont(boldFont, content) }
         }
 
         Self.italicRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
@@ -194,7 +204,7 @@ struct MarkdownHighlighter {
             let content = m.range(at: 1)
             add(.foregroundColor, NSColor.quaternaryLabelColor, open)
             add(.foregroundColor, NSColor.quaternaryLabelColor, close)
-            if content.location != NSNotFound { add(.font, italicFont, content) }
+            if content.location != NSNotFound { setFont(italicFont, content) }
         }
 
         Self.italicUnderscoreRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
@@ -204,13 +214,13 @@ struct MarkdownHighlighter {
             let content = m.range(at: 1)
             add(.foregroundColor, NSColor.quaternaryLabelColor, open)
             add(.foregroundColor, NSColor.quaternaryLabelColor, close)
-            if content.location != NSNotFound { add(.font, italicFont, content) }
+            if content.location != NSNotFound { setFont(italicFont, content) }
         }
 
         Self.strikeRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
             guard let m else { return }
             add(.foregroundColor, NSColor.secondaryLabelColor, m.range)
-            add(.strikethroughStyle, NSNumber(value: NSUnderlineStyle.single.rawValue), m.range)
+            textStorage.addAttribute(.strikethroughStyle, value: NSNumber(value: NSUnderlineStyle.single.rawValue), range: m.range)
         }
 
         Self.inlineCodeRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
