@@ -16,7 +16,7 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
 
-        let textView = WikilinkTextView(frame: NSRect(x: 0, y: 0, width: scrollView.contentSize.width, height: 0))
+        let textView = MarkdownTextView(frame: NSRect(x: 0, y: 0, width: scrollView.contentSize.width, height: 0))
         textView.isEditable = true
         textView.isRichText = false
         textView.allowsUndo = true
@@ -49,7 +49,7 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.onTextChanged = onTextChanged
-        (context.coordinator.textView as? WikilinkTextView)?.onWikilinkTapped = onWikilinkTapped
+        (context.coordinator.textView as? MarkdownTextView)?.onWikilinkTapped = onWikilinkTapped
         guard let textView = context.coordinator.textView,
               text != textView.string else { return }
 
@@ -63,13 +63,127 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
     }
 }
 
-// MARK: - WikilinkTextView
+// MARK: - MarkdownTextView
 
-/// NSTextView subclass that navigates to wikilinked notes and opens markdown links on click,
-/// and shows a pointing-hand cursor when hovering over either link type.
-private final class WikilinkTextView: NSTextView {
+/// NSTextView subclass with markdown-aware behaviour: code block background drawing,
+/// pointing-hand cursor and click navigation for wikilinks and URLs, and list auto-continuation.
+private final class MarkdownTextView: NSTextView {
     var onWikilinkTapped: ((String) -> Void)?
     private var linkRects: [CGRect] = []
+    var codeBlockRanges: [NSRange] = []
+    var codeContentRanges: [NSRange] = []
+    private var copyButtons: [NSButton] = []
+
+    // MARK: Code block background
+
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+        guard !codeBlockRanges.isEmpty,
+              let layoutManager = textLayoutManager,
+              let contentStorage = textContentStorage else { return }
+
+        let bg = NSColor.systemGray.withAlphaComponent(0.10)
+        let origin = textContainerOrigin
+        let vertPad: CGFloat = 4
+        let horzMargin: CGFloat = 2
+        let cornerRadius: CGFloat = 6
+
+        for nsRange in codeBlockRanges {
+            let base = contentStorage.documentRange.location
+            guard let startLoc = contentStorage.location(base, offsetBy: nsRange.location),
+                  let endLoc = contentStorage.location(startLoc, offsetBy: nsRange.length) else { continue }
+
+            var minY: CGFloat = .greatestFiniteMagnitude
+            var maxY: CGFloat = -.greatestFiniteMagnitude
+
+            layoutManager.enumerateTextLayoutFragments(from: startLoc, options: [.ensuresLayout]) { fragment in
+                if let elemRange = fragment.textElement?.elementRange,
+                   elemRange.location.compare(endLoc) != .orderedAscending { return false }
+                let frame = fragment.layoutFragmentFrame.offsetBy(dx: origin.x, dy: origin.y)
+                minY = min(minY, frame.minY)
+                maxY = max(maxY, frame.maxY)
+                return true
+            }
+
+            guard minY < maxY else { continue }
+
+            let blockRect = CGRect(
+                x: bounds.minX + horzMargin,
+                y: minY - vertPad,
+                width: bounds.width - 2 * horzMargin,
+                height: (maxY - minY) + 2 * vertPad
+            )
+            bg.setFill()
+            NSBezierPath(roundedRect: blockRect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
+        }
+    }
+
+    // MARK: Copy buttons
+
+    func updateCopyButtons() {
+        copyButtons.forEach { $0.removeFromSuperview() }
+        copyButtons = []
+
+        guard !codeBlockRanges.isEmpty,
+              let layoutManager = textLayoutManager,
+              let contentStorage = textContentStorage else { return }
+
+        let origin = textContainerOrigin
+        let vertPad: CGFloat = 4
+        let horzMargin: CGFloat = 2
+        let buttonSize: CGFloat = 22
+        let buttonPad: CGFloat = 5
+
+        for (index, nsRange) in codeBlockRanges.enumerated() {
+            let base = contentStorage.documentRange.location
+            guard let startLoc = contentStorage.location(base, offsetBy: nsRange.location),
+                  let endLoc = contentStorage.location(startLoc, offsetBy: nsRange.length) else { continue }
+
+            var minY: CGFloat = .greatestFiniteMagnitude
+            layoutManager.enumerateTextLayoutFragments(from: startLoc, options: [.ensuresLayout]) { fragment in
+                if let elemRange = fragment.textElement?.elementRange,
+                   elemRange.location.compare(endLoc) != .orderedAscending { return false }
+                minY = min(minY, fragment.layoutFragmentFrame.offsetBy(dx: origin.x, dy: origin.y).minY)
+                return true
+            }
+            guard minY < .greatestFiniteMagnitude else { continue }
+
+            let button = NSButton()
+            let symConfig = NSImage.SymbolConfiguration(pointSize: 11, weight: .regular)
+            button.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "Copy code")?
+                .withSymbolConfiguration(symConfig)
+            button.bezelStyle = .regularSquare
+            button.isBordered = false
+            button.imageScaling = .scaleProportionallyDown
+            button.toolTip = "Copy"
+            button.tag = index
+            button.target = self
+            button.action = #selector(copyCodeBlock(_:))
+            button.wantsLayer = true
+            button.layer?.cornerRadius = 4
+            button.layer?.backgroundColor = NSColor.systemGray.withAlphaComponent(0.15).cgColor
+            button.frame = CGRect(
+                x: bounds.width - horzMargin - buttonSize - buttonPad,
+                y: minY - vertPad + buttonPad,
+                width: buttonSize,
+                height: buttonSize
+            )
+            addSubview(button)
+            copyButtons.append(button)
+        }
+    }
+
+    @objc private func copyCodeBlock(_ sender: NSButton) {
+        let index = sender.tag
+        guard index < codeContentRanges.count else { return }
+        let nsRange = codeContentRanges[index]
+        let nsStr = string as NSString
+        guard nsRange.location + nsRange.length <= nsStr.length else { return }
+        let content = nsStr.substring(with: nsRange)
+            .trimmingCharacters(in: .newlines)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(content, forType: .string)
+    }
 
     // MARK: Cursor appearance
 
@@ -86,7 +200,9 @@ private final class WikilinkTextView: NSTextView {
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
         let point = convert(event.locationInWindow, from: nil)
-        if linkRects.contains(where: { $0.contains(point) }) {
+        if copyButtons.contains(where: { $0.frame.contains(point) }) {
+            NSCursor.arrow.set()
+        } else if linkRects.contains(where: { $0.contains(point) }) {
             NSCursor.pointingHand.set()
         } else {
             NSCursor.iBeam.set()
@@ -269,7 +385,7 @@ extension MarkdownTextViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard !isUpdatingFromSwiftUI, let tv = textView else { return }
-            (tv as? WikilinkTextView)?.renumberAllLists()
+            (tv as? MarkdownTextView)?.renumberAllLists()
             text.wrappedValue = tv.string
             onTextChanged()
             refreshHighlighting()
@@ -279,7 +395,13 @@ extension MarkdownTextViewRepresentable {
             guard let tv = textView else { return }
             highlighter.recomputeCodeFenceRanges(in: tv.string)
             highlighter.applyHighlights(to: tv)
-            (tv as? WikilinkTextView)?.recomputeLinkRects()
+            (tv as? MarkdownTextView)?.recomputeLinkRects()
+            if let wv = tv as? MarkdownTextView {
+                wv.codeBlockRanges = highlighter.codeFenceFullRanges
+                wv.codeContentRanges = highlighter.codeFenceRanges
+                wv.setNeedsDisplay(wv.bounds)
+                DispatchQueue.main.async { wv.updateCopyButtons() }
+            }
         }
     }
 }

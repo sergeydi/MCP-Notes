@@ -6,6 +6,8 @@ import AppKit
 /// leaving `NSTextStorage` (and the on-disk Markdown) as plain text.
 struct MarkdownHighlighter {
     private(set) var codeFenceRanges: [NSRange] = []
+    /// Full ranges including the opening and closing ``` marker lines.
+    private(set) var codeFenceFullRanges: [NSRange] = []
 
     // MARK: Regex patterns (compiled once)
 
@@ -45,8 +47,9 @@ struct MarkdownHighlighter {
     // MARK: Code fence tracking
 
     mutating func recomputeCodeFenceRanges(in string: String) {
-        var result: [NSRange] = []
-        var openEnd: Int? = nil
+        var contentRanges: [NSRange] = []
+        var fullRanges: [NSRange] = []
+        var fenceOpen: (start: Int, contentStart: Int)? = nil
         let nsStr = string as NSString
         nsStr.enumerateSubstrings(
             in: NSRange(location: 0, length: nsStr.length),
@@ -54,18 +57,22 @@ struct MarkdownHighlighter {
         ) { sub, _, enclosing, _ in
             guard let sub else { return }
             if sub.hasPrefix("```") {
-                if let start = openEnd {
-                    result.append(NSRange(location: start, length: enclosing.location - start))
-                    openEnd = nil
+                if let open = fenceOpen {
+                    contentRanges.append(NSRange(location: open.contentStart, length: enclosing.location - open.contentStart))
+                    fullRanges.append(NSRange(location: open.start, length: NSMaxRange(enclosing) - open.start))
+                    fenceOpen = nil
                 } else {
-                    openEnd = NSMaxRange(enclosing)
+                    fenceOpen = (start: enclosing.location, contentStart: NSMaxRange(enclosing))
                 }
             }
         }
-        if let start = openEnd {
-            result.append(NSRange(location: start, length: nsStr.length - start))
+        if let open = fenceOpen {
+            let len = nsStr.length
+            contentRanges.append(NSRange(location: open.contentStart, length: len - open.contentStart))
+            fullRanges.append(NSRange(location: open.start, length: len - open.start))
         }
-        codeFenceRanges = result
+        codeFenceRanges = contentRanges
+        codeFenceFullRanges = fullRanges
     }
 
     // MARK: Highlighting
@@ -139,12 +146,11 @@ struct MarkdownHighlighter {
 
         Self.codeFenceRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
             guard let m else { return }
-            add(.foregroundColor, NSColor.systemGreen, m.range)
+            add(.foregroundColor, NSColor.tertiaryLabelColor, m.range)
         }
 
         for fenceRange in codeFenceRanges {
-            add(.foregroundColor, NSColor.systemGreen, fenceRange)
-            add(.backgroundColor, NSColor.systemGray.withAlphaComponent(0.08), fenceRange)
+            add(.foregroundColor, NSColor.labelColor, fenceRange)
         }
 
         Self.bulletRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
@@ -172,7 +178,7 @@ struct MarkdownHighlighter {
             guard let m, m.numberOfRanges > 2 else { return }
             let sub = m.range(at: 2)
             guard sub.location != NSNotFound else { return }
-            add(.foregroundColor, NSColor.systemGreen, sub)
+            add(.foregroundColor, NSColor.labelColor, sub)
         }
 
         // MARK: Inline elements
@@ -224,8 +230,16 @@ struct MarkdownHighlighter {
         }
 
         Self.inlineCodeRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m else { return }
-            add(.foregroundColor, NSColor.systemGreen, m.range)
+            guard let m, m.numberOfRanges > 1 else { return }
+            let content = m.range(at: 1)
+            let openTick = NSRange(location: m.range.location, length: 1)
+            let closeTick = NSRange(location: NSMaxRange(m.range) - 1, length: 1)
+            add(.backgroundColor, NSColor.systemGray.withAlphaComponent(0.10), m.range)
+            if content.location != NSNotFound {
+                add(.foregroundColor, NSColor.labelColor, content)
+            }
+            add(.foregroundColor, NSColor.tertiaryLabelColor, openTick)
+            add(.foregroundColor, NSColor.tertiaryLabelColor, closeTick)
         }
 
         Self.linkRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
