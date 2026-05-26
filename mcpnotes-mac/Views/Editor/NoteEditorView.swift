@@ -5,6 +5,7 @@ struct NoteEditorView: View {
     let note: Note
 
     @State private var viewModel = EditorViewModel()
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,26 +47,39 @@ struct NoteEditorView: View {
         .onDisappear {
             viewModel.flushAutosave()
         }
+        .confirmationDialog("Delete \"\(note.filename)\"?", isPresented: $showDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                viewModel.cancelAutosave()
+                store.deleteNote(note)
+            }
+        } message: {
+            Text("This note will be permanently deleted.")
+        }
     }
 
     // MARK: - Toolbar
 
     @ToolbarContentBuilder
     private var editorToolbar: some ToolbarContent {
-        ToolbarItem(placement: .navigation) {
-            HStack(spacing: 2) {
-                Button { store.navigateBack() } label: {
-                    Image(systemName: "chevron.left")
-                }
-                .disabled(!store.canNavigateBack)
-                .help("Back")
-
-                Button { store.navigateForward() } label: {
-                    Image(systemName: "chevron.right")
-                }
-                .disabled(!store.canNavigateForward)
-                .help("Forward")
+        ToolbarItemGroup(placement: .navigation) {
+            Button { store.navigateBack() } label: {
+                Image(systemName: "chevron.left")
             }
+            .disabled(!store.canNavigateBack)
+            .help("Back")
+
+            Button { store.navigateForward() } label: {
+                Image(systemName: "chevron.right")
+            }
+            .disabled(!store.canNavigateForward)
+            .help("Forward")
+        }
+
+        ToolbarItemGroup(placement: .navigation) {
+            Button("Delete Note", systemImage: "trash", role: .destructive) {
+                showDeleteConfirmation = true
+            }
+            .help("Delete note")
         }
 
         ToolbarItemGroup {

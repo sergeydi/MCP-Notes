@@ -37,4 +37,10 @@ final class EditorViewModel {
         autosaveTask = nil
         onSave?(body, tags)
     }
+
+    /// Cancels any pending autosave without saving (e.g., before deletion).
+    func cancelAutosave() {
+        autosaveTask?.cancel()
+        autosaveTask = nil
+    }
 }
