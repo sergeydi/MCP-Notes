@@ -10,7 +10,6 @@ struct NoteEditorView: View {
     var body: some View {
         VStack(spacing: 0) {
             FrontmatterView(
-                uid: note.id,
                 tags: $viewModel.tags,
                 allTags: store.allTags,
                 onTagsChanged: viewModel.scheduleAutosave
