@@ -45,25 +45,42 @@ struct SidebarView: View {
         @Bindable var store = store
 
         VStack(spacing: 0) {
-            HStack(spacing: 4) {
-                Picker("View", selection: $mode) {
-                    ForEach(SidebarMode.allCases, id: \.self) { m in
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                ForEach(SidebarMode.allCases, id: \.self) { m in
+                    Button {
+                        mode = m
+                    } label: {
                         Image(systemName: m.symbolName)
-                            .accessibilityLabel(m.label)
-                            .tag(m)
+                            .font(.system(size: 13, weight: .regular))
+                            .frame(width: 36, height: 36)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(mode == m ? Color.accentColor : Color.clear)
+                            )
+                            .foregroundStyle(mode == m ? Color.white : Color.secondary)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .help(m.label)
+                    .accessibilityLabel(m.label)
+                    Spacer(minLength: 0)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .accessibilityLabel("Sidebar Mode")
-
+                Divider()
+                    .frame(height: 18)
+                Spacer(minLength: 0)
                 Button {
                     openWindow(id: "wikilink-graph")
                 } label: {
                     Image(systemName: "point.3.connected.trianglepath.dotted")
+                        .font(.system(size: 13, weight: .regular))
+                        .frame(width: 28, height: 28)
+                        .foregroundStyle(Color.secondary)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Show Wikilink Graph")
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -99,6 +116,7 @@ struct SidebarView: View {
                 }
             }
         }
+        .navigationSplitViewColumnWidth(min: 275, ideal: 275)
         .navigationTitle("MCP Notes")
         .onChange(of: searchText) { triggerSemanticSearch() }
         .onChange(of: mode) {

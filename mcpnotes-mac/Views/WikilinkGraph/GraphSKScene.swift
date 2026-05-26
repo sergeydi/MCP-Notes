@@ -183,7 +183,7 @@ final class GraphSKScene: SKScene {
 
     private func startIdleFlicker() {
         let seq = SKAction.sequence([
-            .wait(forDuration: 3.0),
+            .wait(forDuration: 4.0),
             .run { [weak self] in self?.flickerRandomNode() }
         ])
         run(.repeatForever(seq), withKey: "idleFlicker")
@@ -203,7 +203,7 @@ final class GraphSKScene: SKScene {
             lbl.fontColor = .white
             lbl.run(.sequence([
                 .fadeIn(withDuration: 0.15),
-                .wait(forDuration: 1.0),
+                .wait(forDuration: 2.0),
                 .run { [weak self, weak lbl] in
                     guard let self, let lbl else { return }
                     lbl.fontColor = NSColor.white.withAlphaComponent(0.3)
