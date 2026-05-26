@@ -18,8 +18,60 @@ enum IndexingState {
 @Observable
 final class NoteStore {
     var notes: [Note] = []
-    var selectedNoteID: UUID?
     var indexingState: IndexingState = .idle
+
+    // Navigation history — back/forward like a browser
+    @ObservationIgnored private var navHistory: [UUID] = []
+    @ObservationIgnored private var navIndex: Int = -1
+    @ObservationIgnored private var isNavigating: Bool = false
+
+    private(set) var canNavigateBack: Bool = false
+    private(set) var canNavigateForward: Bool = false
+
+    @ObservationIgnored private var _selectedNoteID: UUID?
+    var selectedNoteID: UUID? {
+        get {
+            access(keyPath: \.selectedNoteID)
+            return _selectedNoteID
+        }
+        set {
+            withMutation(keyPath: \.selectedNoteID) {
+                let old = _selectedNoteID
+                _selectedNoteID = newValue
+                if !isNavigating, let id = newValue, id != old {
+                    if navIndex < navHistory.count - 1 {
+                        navHistory = Array(navHistory.prefix(navIndex + 1))
+                    }
+                    navHistory.append(id)
+                    navIndex = navHistory.count - 1
+                    updateNavState()
+                }
+            }
+        }
+    }
+
+    func navigateBack() {
+        guard canNavigateBack else { return }
+        isNavigating = true
+        navIndex -= 1
+        selectedNoteID = navHistory[navIndex]
+        isNavigating = false
+        updateNavState()
+    }
+
+    func navigateForward() {
+        guard canNavigateForward else { return }
+        isNavigating = true
+        navIndex += 1
+        selectedNoteID = navHistory[navIndex]
+        isNavigating = false
+        updateNavState()
+    }
+
+    private func updateNavState() {
+        canNavigateBack = navIndex > 0
+        canNavigateForward = navIndex < navHistory.count - 1
+    }
 
     private var bookmarkedIDs: Set<UUID> = []
     private let fileService: any FileServicing
@@ -115,9 +167,17 @@ final class NoteStore {
 
     func deleteNote(_ note: Note) {
         notes.removeAll { $0.id == note.id }
+
+        navHistory.removeAll { $0 == note.id }
+        navIndex = navHistory.isEmpty ? -1 : min(navIndex, navHistory.count - 1)
+        updateNavState()
+
         if selectedNoteID == note.id {
-            selectedNoteID = notes.first?.id
+            isNavigating = true
+            selectedNoteID = navIndex >= 0 ? navHistory[navIndex] : notes.first?.id
+            isNavigating = false
         }
+
         Task {
             // TODO: surface errors to user
             try? fileService.deleteNote(note)
