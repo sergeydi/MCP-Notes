@@ -9,8 +9,29 @@
           "fill" : {
             "solid" : "extended-gray:1.00000,1.00000"
           },
-          "image-name" : "text.page.badge.magnifyingglass.png",
-          "name" : "text.page.badge.magnifyingglass"
+          "image-name" : "text.page.fill.png",
+          "name" : "text.page.fill",
+          "position" : {
+            "scale" : 0.7,
+            "translation-in-points" : [
+              -183.75,
+              124.22031249999998
+            ]
+          }
+        },
+        {
+          "fill" : {
+            "solid" : "extended-gray:1.00000,1.00000"
+          },
+          "image-name" : "point.3.filled.connected.trianglepath.dotted.png",
+          "name" : "point.3.filled.connected.trianglepath.dotted",
+          "position" : {
+            "scale" : 0.7,
+            "translation-in-points" : [
+              153.6171875,
+              -189.35000000000002
+            ]
+          }
         }
       ],
       "name" : "Group",
