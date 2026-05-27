@@ -14,6 +14,8 @@ struct Note: Identifiable, Hashable, Sendable {
     var fileURL: URL
     /// Whether this note is bookmarked (persisted as `bookmarked: true` in frontmatter).
     var isBookmarked: Bool
+    /// Last modification date of the note file on disk.
+    var modifiedAt: Date
 
     init(
         id: UUID = UUID(),
@@ -21,7 +23,8 @@ struct Note: Identifiable, Hashable, Sendable {
         tags: [String] = [],
         body: String = "",
         fileURL: URL,
-        isBookmarked: Bool = false
+        isBookmarked: Bool = false,
+        modifiedAt: Date = .now
     ) {
         self.id = id
         self.filename = filename
@@ -29,5 +32,6 @@ struct Note: Identifiable, Hashable, Sendable {
         self.body = body
         self.fileURL = fileURL
         self.isBookmarked = isBookmarked
+        self.modifiedAt = modifiedAt
     }
 }
