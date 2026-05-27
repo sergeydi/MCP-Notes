@@ -12,7 +12,7 @@ final class MockFileService: FileServicing {
     private(set) var createdBaseName: String?
     private(set) var renamedTo: String?
 
-    func loadAllNotes(bookmarkedIDs: Set<UUID>) throws -> [Note] { stubbedNotes }
+    func loadAllNotes() throws -> [Note] { stubbedNotes }
     func saveNote(_ note: Note) throws { savedNotes.append(note) }
     func createNote(baseName: String) throws -> Note {
         createdBaseName = baseName

@@ -12,7 +12,7 @@ struct Note: Identifiable, Hashable, Sendable {
     var body: String
     /// URL of the note file on disk.
     var fileURL: URL
-    /// Whether this note is bookmarked (persisted in iCloud Key-Value Store).
+    /// Whether this note is bookmarked (persisted as `bookmarked: true` in frontmatter).
     var isBookmarked: Bool
 
     init(

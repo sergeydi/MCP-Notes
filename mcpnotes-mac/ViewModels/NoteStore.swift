@@ -73,7 +73,6 @@ final class NoteStore {
         canNavigateForward = navIndex < navHistory.count - 1
     }
 
-    private var bookmarkedIDs: Set<UUID> = []
     private let fileService: any FileServicing
     private let indexer: any NoteIndexing
 
@@ -108,9 +107,8 @@ final class NoteStore {
     // MARK: - Loading
 
     func load() async {
-        bookmarkedIDs = BookmarkService.loadBookmarks()
         do {
-            notes = try fileService.loadAllNotes(bookmarkedIDs: bookmarkedIDs)
+            notes = try fileService.loadAllNotes()
         } catch {
             // TODO: surface error to user
         }
@@ -157,11 +155,13 @@ final class NoteStore {
 
     func updateNote(_ updated: Note) {
         guard let index = notes.firstIndex(where: { $0.id == updated.id }) else { return }
-        notes[index] = updated
+        var merged = updated
+        merged.isBookmarked = notes[index].isBookmarked
+        notes[index] = merged
         Task {
             // TODO: surface errors to user
-            try? fileService.saveNote(updated)
-            try? await indexer.indexNote(updated)
+            try? fileService.saveNote(merged)
+            try? await indexer.indexNote(merged)
         }
     }
 
@@ -247,10 +247,10 @@ final class NoteStore {
     // MARK: - Bookmarks
 
     func toggleBookmark(for noteID: UUID) {
-        BookmarkService.toggle(id: noteID, in: &bookmarkedIDs)
-        if let index = notes.firstIndex(where: { $0.id == noteID }) {
-            notes[index].isBookmarked.toggle()
-        }
+        guard let index = notes.firstIndex(where: { $0.id == noteID }) else { return }
+        notes[index].isBookmarked.toggle()
+        let note = notes[index]
+        Task { try? fileService.saveNote(note) }
     }
 
     // MARK: - Private
@@ -296,7 +296,7 @@ final class NoteStore {
     }
 
     func reloadExternalChanges() async {
-        guard let freshNotes = try? fileService.loadAllNotes(bookmarkedIDs: bookmarkedIDs) else { return }
+        guard let freshNotes = try? fileService.loadAllNotes() else { return }
 
         let currentMap = Dictionary(uniqueKeysWithValues: notes.map { ($0.id, $0) })
         let freshMap = Dictionary(uniqueKeysWithValues: freshNotes.map { ($0.id, $0) })

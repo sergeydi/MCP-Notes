@@ -5,6 +5,7 @@ struct FrontmatterParser {
     struct ParseResult {
         let uid: UUID
         let tags: [String]
+        let bookmarked: Bool
         let body: String
     }
 
@@ -28,6 +29,7 @@ struct FrontmatterParser {
 
         var uid: UUID?
         var tags: [String] = []
+        var bookmarked = false
 
         for line in frontmatterLines {
             if line.hasPrefix("uid:") {
@@ -36,19 +38,23 @@ struct FrontmatterParser {
             } else if line.hasPrefix("tags:") {
                 let value = line.dropFirst("tags:".count).trimmingCharacters(in: .whitespaces)
                 tags = parseInlineArray(String(value))
+            } else if line.hasPrefix("bookmarked:") {
+                let value = line.dropFirst("bookmarked:".count).trimmingCharacters(in: .whitespaces)
+                bookmarked = value == "true"
             }
         }
 
         guard let uid else { return nil }
-        return ParseResult(uid: uid, tags: tags, body: body)
+        return ParseResult(uid: uid, tags: tags, bookmarked: bookmarked, body: body)
     }
 
-    static func serialize(uid: UUID, tags: [String], body: String) -> String {
+    static func serialize(uid: UUID, tags: [String], isBookmarked: Bool = false, body: String) -> String {
         let tagList = tags.isEmpty ? "[]" : "[" + tags.joined(separator: ", ") + "]"
+        let bookmarkedLine = isBookmarked ? "\nbookmarked: true" : ""
         return """
         ---
         uid: \(uid.uuidString)
-        tags: \(tagList)
+        tags: \(tagList)\(bookmarkedLine)
         ---
 
         \(body)

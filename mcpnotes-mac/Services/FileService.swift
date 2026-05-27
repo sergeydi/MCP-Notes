@@ -1,7 +1,7 @@
 import Foundation
 
 protocol FileServicing {
-    func loadAllNotes(bookmarkedIDs: Set<UUID>) throws -> [Note]
+    func loadAllNotes() throws -> [Note]
     func saveNote(_ note: Note) throws
     func createNote(baseName: String) throws -> Note
     func deleteNote(_ note: Note) throws
@@ -23,7 +23,7 @@ struct FileService: FileServicing {
         return localFallbackURL()
     }
 
-    func loadAllNotes(bookmarkedIDs: Set<UUID>) throws -> [Note] {
+    func loadAllNotes() throws -> [Note] {
         let dir = Self.notesDirectoryURL
         let files = try FileManager.default.contentsOfDirectory(
             at: dir,
@@ -44,13 +44,13 @@ struct FileService: FileServicing {
                 tags: parsed.tags,
                 body: parsed.body,
                 fileURL: url,
-                isBookmarked: bookmarkedIDs.contains(parsed.uid)
+                isBookmarked: parsed.bookmarked
             )
         }.sorted { $0.filename.localizedCompare($1.filename) == .orderedAscending }
     }
 
     func saveNote(_ note: Note) throws {
-        let content = FrontmatterParser.serialize(uid: note.id, tags: note.tags, body: note.body)
+        let content = FrontmatterParser.serialize(uid: note.id, tags: note.tags, isBookmarked: note.isBookmarked, body: note.body)
         try content.write(to: note.fileURL, atomically: true, encoding: .utf8)
     }
 
