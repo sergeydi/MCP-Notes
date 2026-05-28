@@ -74,18 +74,18 @@ struct NoteEditorView: View {
             .help("Forward")
         }
 
-        ToolbarItemGroup(placement: .navigation) {
-            Button("Delete Note", systemImage: "trash", role: .destructive) {
-                showDeleteConfirmation = true
-            }
-            .help("Delete note")
-        }
-
         ToolbarItemGroup {
             headingsMenu
             styleMenu
             blocksMenu
             listsMenu
+        }
+
+        ToolbarItem(placement: .primaryAction) {
+            Button("Delete Note", systemImage: "trash", role: .destructive) {
+                showDeleteConfirmation = true
+            }
+            .help("Delete note")
         }
 
         ToolbarItem(placement: .primaryAction) {
