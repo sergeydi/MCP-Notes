@@ -9,6 +9,8 @@ struct SidebarView: View {
     @State private var searchText: String = ""
     @State private var semanticResults: [(id: UUID, score: Float)] = []
     @State private var searchTask: Task<Void, Never>?
+    @State private var expandedTags: Set<String> = []
+    @State private var noTagsExpanded: Bool = false
 
     private var isRAGReady: Bool {
         if case .ready = store.indexingState { return true }
@@ -164,22 +166,73 @@ struct SidebarView: View {
         let untagged = store.notes.filter { $0.tags.isEmpty }
 
         ForEach(store.allTags, id: \.self) { tag in
-            Section(tag) {
-                ForEach(store.notes.filter { $0.tags.contains(tag) }) { note in
-                    NoteListItemView(note: note)
-                        .tag(note.id)
-                        .contextMenu { contextMenu(for: note) }
+            let tagNotes = store.notes.filter { $0.tags.contains(tag) }
+            let isExpanded = expandedTags.contains(tag)
+            Section {
+                if isExpanded {
+                    ForEach(tagNotes) { note in
+                        NoteListItemView(note: note)
+                            .tag(note.id)
+                            .contextMenu { contextMenu(for: note) }
+                    }
                 }
+            } header: {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        if isExpanded { expandedTags.remove(tag) }
+                        else { expandedTags.insert(tag) }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        Text(tag)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text("\(tagNotes.count)")
+                            .foregroundStyle(.tertiary)
+                            .font(.caption)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
 
         if !untagged.isEmpty {
-            Section("No Tags") {
-                ForEach(untagged) { note in
-                    NoteListItemView(note: note)
-                        .tag(note.id)
-                        .contextMenu { contextMenu(for: note) }
+            Section {
+                if noTagsExpanded {
+                    ForEach(untagged) { note in
+                        NoteListItemView(note: note)
+                            .tag(note.id)
+                            .contextMenu { contextMenu(for: note) }
+                    }
                 }
+            } header: {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        noTagsExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .rotationEffect(.degrees(noTagsExpanded ? 90 : 0))
+                        Text("No Tags")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text("\(untagged.count)")
+                            .foregroundStyle(.tertiary)
+                            .font(.caption)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
     }
