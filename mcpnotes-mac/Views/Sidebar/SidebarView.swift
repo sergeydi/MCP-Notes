@@ -30,7 +30,7 @@ struct SidebarView: View {
         case .favorites:
             return store.bookmarkedNotes
         case .search:
-            guard !searchText.isEmpty else { return store.notes }
+            guard !searchText.isEmpty else { return [] }
             if ragEnabled && isRAGReady && !semanticResults.isEmpty {
                 return semanticResults.compactMap { r in store.notes.first { $0.id == r.id } }
             }
@@ -110,11 +110,16 @@ struct SidebarView: View {
                 Divider()
             }
 
-            List(selection: $store.selectedNoteID) {
-                if mode == .byTag {
-                    tagGroupedContent
-                } else {
-                    flatContent
+            ScrollViewReader { proxy in
+                List(selection: $store.selectedNoteID) {
+                    if mode == .byTag {
+                        tagGroupedContent
+                    } else {
+                        flatContent
+                    }
+                }
+                .onChange(of: searchText) {
+                    proxy.scrollTo("search-top", anchor: .top)
                 }
             }
         }
@@ -149,15 +154,84 @@ struct SidebarView: View {
 
     // MARK: - List content
 
+    private var textSearchTitleMatches: [Note] {
+        let q = searchText.lowercased()
+        return store.notes.filter { $0.filename.lowercased().contains(q) }
+    }
+
+    private var textSearchBodyMatches: [Note] {
+        let q = searchText.lowercased()
+        let titleIDs = Set(textSearchTitleMatches.map { $0.id })
+        return store.notes.filter {
+            !titleIDs.contains($0.id) &&
+            ($0.body.lowercased().contains(q) || $0.tags.contains { $0.lowercased().contains(q) })
+        }
+    }
+
     @ViewBuilder
     private var flatContent: some View {
-        ForEach(visibleNotes) { note in
-            NoteListItemView(note: note, score: mode == .search ? semanticScores[note.id] : nil)
-                .tag(note.id)
-                .contextMenu { contextMenu(for: note) }
+        if mode == .search && !searchText.isEmpty {
+            textSearchContent
+        } else {
+            ForEach(visibleNotes) { note in
+                NoteListItemView(note: note)
+                    .tag(note.id)
+                    .contextMenu { contextMenu(for: note) }
+            }
+            .onDelete { offsets in
+                offsets.forEach { store.deleteNote(visibleNotes[$0]) }
+            }
         }
-        .onDelete { offsets in
-            offsets.forEach { store.deleteNote(visibleNotes[$0]) }
+    }
+
+    @ViewBuilder
+    private var textSearchContent: some View {
+        let titleMatches = textSearchTitleMatches
+        let bodyMatches = textSearchBodyMatches
+        let shownIDs = Set(titleMatches.map { $0.id } + bodyMatches.map { $0.id })
+        let semanticMatches = semanticResults
+            .filter { !shownIDs.contains($0.id) }
+            .compactMap { r in store.notes.first { $0.id == r.id }.map { ($0, r.score) } }
+
+        if !titleMatches.isEmpty {
+            Section {
+                ForEach(titleMatches) { note in
+                    NoteListItemView(note: note, searchQuery: searchText)
+                        .tag(note.id)
+                        .contextMenu { contextMenu(for: note) }
+                }
+            } header: {
+                Text("Title").id("search-top")
+            }
+            if !bodyMatches.isEmpty {
+                Section("Content") {
+                    ForEach(bodyMatches) { note in
+                        NoteListItemView(note: note, searchQuery: searchText)
+                            .tag(note.id)
+                            .contextMenu { contextMenu(for: note) }
+                    }
+                }
+            }
+        } else if !bodyMatches.isEmpty {
+            Section {
+                ForEach(bodyMatches) { note in
+                    NoteListItemView(note: note, searchQuery: searchText)
+                        .tag(note.id)
+                        .contextMenu { contextMenu(for: note) }
+                }
+            } header: {
+                Text("Content").id("search-top")
+            }
+        }
+
+        if !semanticMatches.isEmpty {
+            Section("Related") {
+                ForEach(semanticMatches, id: \.0.id) { note, score in
+                    NoteListItemView(note: note, score: score)
+                        .tag(note.id)
+                        .contextMenu { contextMenu(for: note) }
+                }
+            }
         }
     }
 

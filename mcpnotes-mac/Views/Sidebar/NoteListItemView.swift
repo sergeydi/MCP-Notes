@@ -3,6 +3,7 @@ import SwiftUI
 struct NoteListItemView: View {
     let note: Note
     var score: Float? = nil
+    var searchQuery: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -34,7 +35,12 @@ struct NoteListItemView: View {
                 }
             }
 
-            if !note.body.isEmpty {
+            if let snippet = bodySnippet {
+                Text(snippet)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            } else if !note.body.isEmpty {
                 Text(bodyPreview)
                     .font(.subheadline)
                     .foregroundStyle(.primary.opacity(0.5))
@@ -45,6 +51,41 @@ struct NoteListItemView: View {
         .listRowSeparator(.visible)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityDescription)
+    }
+
+    private var bodySnippet: AttributedString? {
+        guard let query = searchQuery, !query.isEmpty else { return nil }
+        let stripped = NoteIndexer.stripMarkdown(note.body)
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        let lowerStripped = stripped.lowercased()
+        let lowerQuery = query.lowercased()
+        guard let matchRange = lowerStripped.range(of: lowerQuery) else { return nil }
+
+        let matchOffset = lowerStripped.distance(from: lowerStripped.startIndex, to: matchRange.lowerBound)
+        let matchLength = lowerQuery.count
+        let startOffset = max(0, matchOffset - 40)
+        let endOffset = min(stripped.count, startOffset + 120)
+
+        let startIndex = stripped.index(stripped.startIndex, offsetBy: startOffset)
+        let matchStart = stripped.index(stripped.startIndex, offsetBy: matchOffset)
+        let matchEnd = stripped.index(matchStart, offsetBy: matchLength)
+        let endIndex = stripped.index(stripped.startIndex, offsetBy: endOffset)
+
+        let before = (startOffset > 0 ? "…" : "") + String(stripped[startIndex..<matchStart])
+        let match = String(stripped[matchStart..<matchEnd])
+        let after = String(stripped[matchEnd..<endIndex]) + (endOffset < stripped.count ? "…" : "")
+
+        var result = AttributedString(before)
+        var highlighted = AttributedString(match)
+        highlighted.font = Font.subheadline.bold()
+        highlighted.foregroundColor = Color.primary
+        result += highlighted
+        result += AttributedString(after)
+        return result
     }
 
     private var bodyPreview: String {
