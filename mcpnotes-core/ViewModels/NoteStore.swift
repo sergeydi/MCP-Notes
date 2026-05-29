@@ -1,13 +1,13 @@
 import Foundation
 import Observation
 
-enum IndexingState {
+public enum IndexingState {
     case idle
     case indexing(indexed: Int, total: Int)
     case ready(count: Int)
     case failed
 
-    var isIndexing: Bool {
+    public var isIndexing: Bool {
         if case .indexing = self { return true }
         return false
     }
@@ -16,20 +16,20 @@ enum IndexingState {
 /// Central data store for all notes. Injected as an environment object
 /// so every view in the hierarchy shares the same instance.
 @Observable
-final class NoteStore {
-    var notes: [Note] = []
-    var indexingState: IndexingState = .idle
+public final class NoteStore {
+    public var notes: [Note] = []
+    public var indexingState: IndexingState = .idle
 
     // Navigation history — back/forward like a browser
     @ObservationIgnored private var navHistory: [UUID] = []
     @ObservationIgnored private var navIndex: Int = -1
     @ObservationIgnored private var isNavigating: Bool = false
 
-    private(set) var canNavigateBack: Bool = false
-    private(set) var canNavigateForward: Bool = false
+    public private(set) var canNavigateBack: Bool = false
+    public private(set) var canNavigateForward: Bool = false
 
     @ObservationIgnored private var _selectedNoteID: UUID?
-    var selectedNoteID: UUID? {
+    public var selectedNoteID: UUID? {
         get {
             access(keyPath: \.selectedNoteID)
             return _selectedNoteID
@@ -50,7 +50,7 @@ final class NoteStore {
         }
     }
 
-    func navigateBack() {
+    public func navigateBack() {
         guard canNavigateBack else { return }
         isNavigating = true
         navIndex -= 1
@@ -59,7 +59,7 @@ final class NoteStore {
         updateNavState()
     }
 
-    func navigateForward() {
+    public func navigateForward() {
         guard canNavigateForward else { return }
         isNavigating = true
         navIndex += 1
@@ -80,8 +80,8 @@ final class NoteStore {
     private var watcherFD: Int32 = -1
     private var reloadTask: Task<Void, Never>?
 
-    init(fileService: any FileServicing = FileService(),
-         indexer: any NoteIndexing = NoteIndexer()) {
+    public init(fileService: any FileServicing = FileService(),
+                indexer: any NoteIndexing = NoteIndexer()) {
         self.fileService = fileService
         self.indexer = indexer
     }
@@ -92,21 +92,21 @@ final class NoteStore {
         reloadTask?.cancel()
     }
 
-    var selectedNote: Note? {
+    public var selectedNote: Note? {
         notes.first { $0.id == selectedNoteID }
     }
 
-    var allTags: [String] {
+    public var allTags: [String] {
         Array(Set(notes.flatMap(\.tags))).sorted()
     }
 
-    var bookmarkedNotes: [Note] {
+    public var bookmarkedNotes: [Note] {
         notes.filter(\.isBookmarked)
     }
 
     // MARK: - Loading
 
-    func load() async {
+    public func load() async {
         do {
             notes = try fileService.loadAllNotes()
         } catch {
@@ -141,7 +141,7 @@ final class NoteStore {
 
     // MARK: - CRUD
 
-    func createNote() async {
+    public func createNote() async {
         do {
             let note = try fileService.createNote(baseName: "New Note")
             notes.append(note)
@@ -153,7 +153,7 @@ final class NoteStore {
         }
     }
 
-    func updateNote(_ updated: Note) {
+    public func updateNote(_ updated: Note) {
         guard let index = notes.firstIndex(where: { $0.id == updated.id }) else { return }
         var merged = updated
         merged.isBookmarked = notes[index].isBookmarked
@@ -165,7 +165,7 @@ final class NoteStore {
         }
     }
 
-    func deleteNote(_ note: Note) {
+    public func deleteNote(_ note: Note) {
         notes.removeAll { $0.id == note.id }
 
         navHistory.removeAll { $0 == note.id }
@@ -185,7 +185,7 @@ final class NoteStore {
         }
     }
 
-    func renameNote(_ note: Note, to newName: String) {
+    public func renameNote(_ note: Note, to newName: String) {
         guard !newName.isEmpty else { return }
         Task {
             // TODO: surface errors to user
@@ -199,7 +199,7 @@ final class NoteStore {
         }
     }
 
-    func reindexAll() async {
+    public func reindexAll() async {
         guard !notes.isEmpty else { return }
         await indexer.resetAndClearIndex()
         let snapshot = notes
@@ -224,29 +224,29 @@ final class NoteStore {
 
     // MARK: - Search
 
-    func search(query: String, limit: Int = 10) async throws -> [UUID] {
+    public func search(query: String, limit: Int = 10) async throws -> [UUID] {
         try await indexer.search(query: query, limit: limit)
     }
 
-    func searchRanked(query: String, limit: Int = 10) async throws -> [(id: UUID, score: Float)] {
+    public func searchRanked(query: String, limit: Int = 10) async throws -> [(id: UUID, score: Float)] {
         try await indexer.searchRanked(query: query, limit: limit)
     }
 
-    func outgoingLinks(from noteID: UUID) async -> [UUID] {
+    public func outgoingLinks(from noteID: UUID) async -> [UUID] {
         await indexer.outgoingLinks(from: noteID)
     }
 
-    func incomingLinks(to noteID: UUID) async -> [UUID] {
+    public func incomingLinks(to noteID: UUID) async -> [UUID] {
         await indexer.incomingLinks(to: noteID)
     }
 
-    func allWikilinkEdges() async -> [(source: UUID, target: UUID)] {
+    public func allWikilinkEdges() async -> [(source: UUID, target: UUID)] {
         await indexer.allLinks()
     }
 
     // MARK: - Bookmarks
 
-    func toggleBookmark(for noteID: UUID) {
+    public func toggleBookmark(for noteID: UUID) {
         guard let index = notes.firstIndex(where: { $0.id == noteID }) else { return }
         notes[index].isBookmarked.toggle()
         let note = notes[index]
@@ -286,7 +286,7 @@ final class NoteStore {
         directoryWatcher = source
     }
 
-    func scheduleExternalReload() {
+    public func scheduleExternalReload() {
         reloadTask?.cancel()
         reloadTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(500))
@@ -295,7 +295,7 @@ final class NoteStore {
         }
     }
 
-    func reloadExternalChanges() async {
+    public func reloadExternalChanges() async {
         guard let freshNotes = try? fileService.loadAllNotes() else { return }
 
         let currentMap = Dictionary(uniqueKeysWithValues: notes.map { ($0.id, $0) })

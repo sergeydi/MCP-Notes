@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+@testable import MCPNotesCore
 @testable import mcpnotes_mac
 
 @Suite("NoteIndexer – BM25 search", .timeLimit(.minutes(5)))

@@ -36,19 +36,23 @@ actor RAGSearcher: RAGSearching {
     private let indexPath: String
     private let dbURL: URL
     nonisolated(unsafe) private var indexModDate: Date?
+    /// When set, replaces real model inference. Lets tests pass a fixed vector without loading CoreML.
+    private let customEmbedder: ((String) async throws -> [Float])?
 
     init() {
         let dir = Self.ragDirectory
         indexPath = dir.appendingPathComponent("notes.usearch").path
         dbURL = dir.appendingPathComponent("notes-index.db")
+        customEmbedder = nil
         loadFromSQLite(dbURL: dbURL, indexPath: indexPath)
         indexModDate = (try? FileManager.default.attributesOfItem(atPath: indexPath))?[.modificationDate] as? Date
     }
 
     /// Loads the index from a custom directory. Used in tests to avoid touching the app container.
-    init(storageDirectory: URL) {
+    init(storageDirectory: URL, embedder: ((String) async throws -> [Float])? = nil) {
         indexPath = storageDirectory.appendingPathComponent("notes.usearch").path
         dbURL = storageDirectory.appendingPathComponent("notes-index.db")
+        customEmbedder = embedder
         loadFromSQLite(dbURL: dbURL, indexPath: indexPath)
         indexModDate = (try? FileManager.default.attributesOfItem(atPath: indexPath))?[.modificationDate] as? Date
     }
@@ -287,6 +291,7 @@ actor RAGSearcher: RAGSearching {
     }
 
     private func embed(_ text: String) async throws -> [Float] {
+        if let custom = customEmbedder { return try await custom(text) }
         let bundle = try await loadedModel()
         let tokens = try bundle.tokenizer.tokenizeText(text, maxLength: 512)
         let seqLen = tokens.count

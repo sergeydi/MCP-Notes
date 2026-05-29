@@ -1,13 +1,13 @@
 import SwiftUI
 
 /// Display mode of the notes sidebar list.
-enum SidebarMode: Int, CaseIterable, Hashable {
+public enum SidebarMode: Int, CaseIterable, Hashable {
     case all
     case byTag
     case favorites
     case search
 
-    var symbolName: String {
+    public var symbolName: String {
         switch self {
         case .all:       "note.text"
         case .byTag:     "tag"
@@ -16,7 +16,7 @@ enum SidebarMode: Int, CaseIterable, Hashable {
         }
     }
 
-    var label: LocalizedStringKey {
+    public var label: LocalizedStringKey {
         switch self {
         case .all:       "All Notes"
         case .byTag:     "By Tags"

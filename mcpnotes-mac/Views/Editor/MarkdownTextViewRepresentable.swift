@@ -1,4 +1,5 @@
 import AppKit
+import MCPNotesCore
 import SwiftUI
 
 struct MarkdownTextViewRepresentable: NSViewRepresentable {
@@ -232,11 +233,11 @@ private final class MarkdownTextView: NSTextView {
             }
         }
 
-        MarkdownHighlighter.wikilinkRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
+        MarkdownPatterns.wikilinkRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
             guard let m else { return }
             addRects(for: m.range)
         }
-        MarkdownHighlighter.linkRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
+        MarkdownPatterns.linkRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
             guard let m else { return }
             addRects(for: m.range)
         }
@@ -251,14 +252,13 @@ private final class MarkdownTextView: NSTextView {
         let lineRange = nsStr.lineRange(for: NSRange(location: sel.location, length: 0))
         let line = nsStr.substring(with: lineRange)
 
-        guard let (prefixLen, continuation) = listPrefixInfo(in: line) else {
+        guard let (prefixLen, continuation) = MarkdownListContinuation.info(for: line) else {
             super.insertNewline(sender)
             return
         }
 
         let body = String(line.dropFirst(prefixLen)).trimmingCharacters(in: .newlines)
         if body.isEmpty {
-            // Empty list item — exit the list by removing the prefix
             let deleteRange = NSRange(location: lineRange.location, length: prefixLen)
             if shouldChangeText(in: deleteRange, replacementString: "") {
                 textStorage?.replaceCharacters(in: deleteRange, with: "")
@@ -273,65 +273,11 @@ private final class MarkdownTextView: NSTextView {
     /// Scans all lines and renumbers any numbered list sections where items are out of sequence.
     /// Applied directly to textStorage without shouldChangeText/didChangeText to avoid recursion.
     fileprivate func renumberAllLists() {
-        let nsStr = string as NSString
-        let length = nsStr.length
-        var pos = 0
-        var replacements: [(NSRange, String)] = []
-        // Maps indent string → next expected number for that nesting level.
-        var contexts: [String: Int] = [:]
-
-        while pos < length {
-            let lineRange = nsStr.lineRange(for: NSRange(location: pos, length: 0))
-            let line = nsStr.substring(with: lineRange)
-            let trimmed = line.drop(while: { $0 == " " || $0 == "\t" })
-            let indent = String(line.prefix(line.count - trimmed.count))
-            var digits = ""
-            var rest = String(trimmed)
-            while let ch = rest.first, ch.isNumber { digits.append(ch); rest = String(rest.dropFirst()) }
-
-            if !digits.isEmpty, rest.hasPrefix(". "), let n = Int(digits) {
-                if let expected = contexts[indent] {
-                    if n != expected {
-                        let oldLen = indent.count + digits.count + 2
-                        replacements.append((NSRange(location: lineRange.location, length: oldLen), indent + "\(expected). "))
-                    }
-                    contexts[indent] = expected + 1
-                } else {
-                    contexts[indent] = n + 1
-                }
-            } else if !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                contexts.removeAll()
-            }
-            pos = NSMaxRange(lineRange)
-        }
-
+        let replacements = MarkdownListContinuation.renumberingReplacements(in: string)
         guard !replacements.isEmpty else { return }
         for (range, replacement) in replacements.reversed() {
             textStorage?.replaceCharacters(in: range, with: replacement)
         }
-    }
-
-    /// Returns (original prefix char length, continuation prefix) for list lines.
-    private func listPrefixInfo(in line: String) -> (Int, String)? {
-        let trimmed = line.drop(while: { $0 == " " || $0 == "\t" })
-        let indent = String(line.prefix(line.count - trimmed.count))
-
-        // Task list must be checked before plain "- "
-        for marker in ["- [ ] ", "- [x] ", "- [X] "] {
-            if trimmed.hasPrefix(marker) { return (indent.count + marker.count, indent + "- [ ] ") }
-        }
-        // Unordered bullets
-        for marker in ["- ", "* ", "+ "] {
-            if trimmed.hasPrefix(marker) { return (indent.count + marker.count, indent + marker) }
-        }
-        // Numbered list: \d+\.
-        var digits = ""
-        var rest = String(trimmed)
-        while let ch = rest.first, ch.isNumber { digits.append(ch); rest = String(rest.dropFirst()) }
-        if !digits.isEmpty, rest.hasPrefix(". "), let n = Int(digits) {
-            return (indent.count + digits.count + 2, indent + "\(n + 1). ")
-        }
-        return nil
     }
 
     // MARK: Click navigation
@@ -345,7 +291,7 @@ private final class MarkdownTextView: NSTextView {
         let fullRange = NSRange(location: 0, length: nsStr.length)
 
         // Wikilinks: [[Note Name]]
-        MarkdownHighlighter.wikilinkRx.enumerateMatches(in: string, range: fullRange) { m, _, stop in
+        MarkdownPatterns.wikilinkRx.enumerateMatches(in: string, range: fullRange) { m, _, stop in
             guard let m, NSLocationInRange(charIdx, m.range) else { return }
             let nameRange = NSRange(location: m.range.location + 2, length: m.range.length - 4)
             guard nameRange.length > 0 else { return }
@@ -354,7 +300,7 @@ private final class MarkdownTextView: NSTextView {
         }
 
         // Markdown links: [text](url)
-        MarkdownHighlighter.linkRx.enumerateMatches(in: string, range: fullRange) { m, _, stop in
+        MarkdownPatterns.linkRx.enumerateMatches(in: string, range: fullRange) { m, _, stop in
             guard let m, NSLocationInRange(charIdx, m.range),
                   m.numberOfRanges > 1 else { return }
             let urlRange = m.range(at: 1)

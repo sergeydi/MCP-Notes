@@ -4,17 +4,19 @@ import Observation
 /// Manages the transient editing state for a single note, including
 /// debounced autosave to avoid writing on every keystroke.
 @Observable
-final class EditorViewModel {
-    var body: String = ""
-    var tags: [String] = []
-    private(set) var noteID: UUID?
+public final class EditorViewModel {
+    public var body: String = ""
+    public var tags: [String] = []
+    public private(set) var noteID: UUID?
 
-    var onSave: ((_ body: String, _ tags: [String]) -> Void)?
+    public var onSave: ((_ body: String, _ tags: [String]) -> Void)?
 
     private var autosaveTask: Task<Void, Never>?
 
+    public init() {}
+
     /// Loads a note into the editor, resetting any pending autosave.
-    func load(note: Note) {
+    public func load(note: Note) {
         autosaveTask?.cancel()
         noteID = note.id
         body = note.body
@@ -22,7 +24,7 @@ final class EditorViewModel {
     }
 
     /// Resets the autosave timer. Call this whenever `body` or `tags` change.
-    func scheduleAutosave() {
+    public func scheduleAutosave() {
         autosaveTask?.cancel()
         autosaveTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(1))
@@ -32,14 +34,14 @@ final class EditorViewModel {
     }
 
     /// Flushes any pending autosave immediately (e.g., on view disappear).
-    func flushAutosave() {
+    public func flushAutosave() {
         autosaveTask?.cancel()
         autosaveTask = nil
         onSave?(body, tags)
     }
 
     /// Cancels any pending autosave without saving (e.g., before deletion).
-    func cancelAutosave() {
+    public func cancelAutosave() {
         autosaveTask?.cancel()
         autosaveTask = nil
     }

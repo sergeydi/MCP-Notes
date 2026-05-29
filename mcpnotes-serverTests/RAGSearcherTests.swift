@@ -5,6 +5,14 @@ import USearch
 
 // MARK: - Helpers
 
+/// Fixed unit vector matching the one stored by makeUsearchIndex (axis-0 = 1, rest = 0).
+/// Avoids loading CoreML and its XPC services in test environments.
+private func mockEmbedder(_ text: String) async throws -> [Float] {
+    var v = [Float](repeating: 0, count: 384)
+    v[0] = 1
+    return v
+}
+
 private func makeTempDir() throws -> URL {
     let tmp = FileManager.default.temporaryDirectory
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -162,7 +170,7 @@ struct RAGSearcherLoadingTests {
     @Test func searchRankedReturnsEmptyWhenNotReady() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let searcher = RAGSearcher(storageDirectory: tmp)
+        let searcher = RAGSearcher(storageDirectory: tmp, embedder: mockEmbedder)
         let results = try await searcher.searchRanked(query: "test", limit: 5)
         #expect(results.isEmpty)
     }
@@ -297,7 +305,7 @@ struct RAGSearcherHybridTests {
     @Test func hybridReturnsEmptyWhenNotReady() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let searcher = RAGSearcher(storageDirectory: tmp)
+        let searcher = RAGSearcher(storageDirectory: tmp, embedder: mockEmbedder)
         let results = try await searcher.searchRankedHybrid(query: "test", limit: 5)
         #expect(results.isEmpty)
     }
@@ -315,7 +323,7 @@ struct RAGSearcherHybridTests {
         addFTSContent(dbURL: dbURL, uuid: noteID, content: "swift concurrency actors")
         makeUsearchIndex(at: tmp.appendingPathComponent("notes.usearch").path, key: chunkKey)
 
-        let searcher = RAGSearcher(storageDirectory: tmp)
+        let searcher = RAGSearcher(storageDirectory: tmp, embedder: mockEmbedder)
         #expect(await searcher.isReady)
 
         let results = try await searcher.searchRankedHybrid(query: "swift actors", limit: 5)
@@ -323,12 +331,12 @@ struct RAGSearcherHybridTests {
         let first = results[0]
         #expect(first.uuid == noteID)
         #expect(first.vectorRank >= 1)
-        #expect(first.bm25Rank != nil)   // keyword match → must get a BM25 rank
+        #expect(first.bm25Rank != nil)
         #expect(first.hybridScore > 0)
     }
 
     // Verifies that the BM25 candidate pool (limit*5) is wider than the returned limit,
-    // so a note ranked beyond `limit` in BM25 still receives a rank rather than h:-.
+    // so a note ranked beyond `limit` in BM25 still receives a rank rather than nil.
     @Test func bm25RankAssignedWhenNoteExceedsNarrowLimit() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
@@ -352,16 +360,16 @@ struct RAGSearcherHybridTests {
         // Only the last note's chunk key (index `limit`) is in the USearch index.
         makeUsearchIndex(at: tmp.appendingPathComponent("notes.usearch").path, key: UInt64(limit))
 
-        let searcher = RAGSearcher(storageDirectory: tmp)
+        let searcher = RAGSearcher(storageDirectory: tmp, embedder: mockEmbedder)
         #expect(await searcher.isReady)
 
-        // With limit=2, old bm25 limit would be 2 → the 3rd BM25 result gets h:-.
+        // With limit=2, old bm25 limit would be 2 → the 3rd BM25 result gets nil.
         // With limit*5=10, all 3 notes are in the BM25 pool → vector rank-1 note gets a real rank.
         let results = try await searcher.searchRankedHybrid(query: "keyword", limit: limit)
         #expect(!results.isEmpty)
         let target = results.first { $0.uuid == uuids[limit] }
         #expect(target != nil)
-        #expect(target?.bm25Rank != nil)  // must not be h:-
+        #expect(target?.bm25Rank != nil)
     }
 }
 

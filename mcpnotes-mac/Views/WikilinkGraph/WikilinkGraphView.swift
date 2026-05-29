@@ -1,5 +1,6 @@
-import SwiftUI
+import MCPNotesCore
 import SpriteKit
+import SwiftUI
 
 private struct GraphSKViewRepresentable: NSViewRepresentable {
     @Environment(NoteStore.self) private var store

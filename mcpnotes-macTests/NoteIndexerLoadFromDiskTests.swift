@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+@testable import MCPNotesCore
 @testable import mcpnotes_mac
 
 @Suite("NoteIndexer – loadFromDisk", .timeLimit(.minutes(5)))

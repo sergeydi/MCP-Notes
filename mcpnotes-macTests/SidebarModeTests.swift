@@ -1,4 +1,5 @@
 import Testing
+@testable import MCPNotesCore
 @testable import mcpnotes_mac
 
 @Suite("SidebarMode")

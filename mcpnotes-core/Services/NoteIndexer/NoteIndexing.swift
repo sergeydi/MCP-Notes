@@ -1,6 +1,6 @@
 import Foundation
 
-protocol NoteIndexing {
+public protocol NoteIndexing {
     func loadFromDisk() async
     func indexedCount() async -> Int
     func indexAll(_ notes: [Note]) async throws

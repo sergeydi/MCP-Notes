@@ -1,4 +1,5 @@
 import AppKit
+import MCPNotesCore
 
 /// Applies TextKit 2 rendering attributes for CommonMark + GFM syntax highlighting.
 ///
@@ -9,73 +10,11 @@ struct MarkdownHighlighter {
     /// Full ranges including the opening and closing ``` marker lines.
     private(set) var codeFenceFullRanges: [NSRange] = []
 
-    // MARK: Regex patterns (compiled once)
-
-    private static let headingRx = try! NSRegularExpression(
-        pattern: #"^(#{1,6}) .*$"#, options: .anchorsMatchLines)
-    private static let blockquoteRx = try! NSRegularExpression(
-        pattern: #"^> .*$"#, options: .anchorsMatchLines)
-    private static let hrRx = try! NSRegularExpression(
-        pattern: #"^[-*_]{3,}\s*$"#, options: .anchorsMatchLines)
-    private static let codeFenceRx = try! NSRegularExpression(
-        pattern: #"^```[^\n]*$"#, options: .anchorsMatchLines)
-    private static let bulletRx = try! NSRegularExpression(
-        pattern: #"^(\s*)([-*+]) "#, options: .anchorsMatchLines)
-    private static let numberedRx = try! NSRegularExpression(
-        pattern: #"^(\s*)(\d+\.) "#, options: .anchorsMatchLines)
-    private static let taskUncheckedRx = try! NSRegularExpression(
-        pattern: #"^(\s*- )(\[ \]) "#, options: .anchorsMatchLines)
-    private static let taskCheckedRx = try! NSRegularExpression(
-        pattern: #"^(\s*- )(\[x\]) "#, options: [.anchorsMatchLines, .caseInsensitive])
-    private static let boldRx = try! NSRegularExpression(
-        pattern: #"\*\*([^*\n]+)\*\*"#)
-    private static let boldUnderscoreRx = try! NSRegularExpression(
-        pattern: #"__([^_\n]+)__"#)
-    private static let italicRx = try! NSRegularExpression(
-        pattern: #"(?<!\*)\*(?!\*)([^*\n]+)(?<!\*)\*(?!\*)"#)
-    private static let italicUnderscoreRx = try! NSRegularExpression(
-        pattern: #"(?<!_)_(?!_)([^_\n]+)(?<!_)_(?!_)"#)
-    private static let strikeRx = try! NSRegularExpression(
-        pattern: #"~~([^~\n]+)~~"#)
-    private static let inlineCodeRx = try! NSRegularExpression(
-        pattern: #"`([^`\n]+)`"#)
-    static let linkRx = try! NSRegularExpression(
-        pattern: #"\[[^\]\n]+\]\(([^)\n]+)\)"#)
-    static let wikilinkRx = try! NSRegularExpression(
-        pattern: #"\[\[[^\]\n]+\]\]"#)
-
-    // MARK: Code fence tracking
-
     mutating func recomputeCodeFenceRanges(in string: String) {
-        var contentRanges: [NSRange] = []
-        var fullRanges: [NSRange] = []
-        var fenceOpen: (start: Int, contentStart: Int)? = nil
-        let nsStr = string as NSString
-        nsStr.enumerateSubstrings(
-            in: NSRange(location: 0, length: nsStr.length),
-            options: .byLines
-        ) { sub, _, enclosing, _ in
-            guard let sub else { return }
-            if sub.hasPrefix("```") {
-                if let open = fenceOpen {
-                    contentRanges.append(NSRange(location: open.contentStart, length: enclosing.location - open.contentStart))
-                    fullRanges.append(NSRange(location: open.start, length: NSMaxRange(enclosing) - open.start))
-                    fenceOpen = nil
-                } else {
-                    fenceOpen = (start: enclosing.location, contentStart: NSMaxRange(enclosing))
-                }
-            }
-        }
-        if let open = fenceOpen {
-            let len = nsStr.length
-            contentRanges.append(NSRange(location: open.contentStart, length: len - open.contentStart))
-            fullRanges.append(NSRange(location: open.start, length: len - open.start))
-        }
-        codeFenceRanges = contentRanges
-        codeFenceFullRanges = fullRanges
+        let result = MarkdownPatterns.codeFenceRanges(in: string)
+        codeFenceRanges = result.content
+        codeFenceFullRanges = result.full
     }
-
-    // MARK: Highlighting
 
     func applyHighlights(to textView: NSTextView) {
         guard let layoutManager = textView.textLayoutManager,
@@ -93,7 +32,6 @@ struct MarkdownHighlighter {
         for key: NSAttributedString.Key in [.foregroundColor, .backgroundColor] {
             layoutManager.removeRenderingAttribute(key, for: docRange)
         }
-
         // Font and strikethrough must go through textStorage — addRenderingAttribute has no visual effect for these.
         textStorage.addAttribute(.font, value: monoFont, range: fullRange)
         textStorage.removeAttribute(.strikethroughStyle, range: fullRange)
@@ -107,9 +45,14 @@ struct MarkdownHighlighter {
             return NSTextRange(location: s, end: e)
         }
 
-        func add(_ key: NSAttributedString.Key, _ value: Any, _ r: NSRange) {
+        func addFg(_ color: NSColor, _ r: NSRange) {
             guard let range = tr(r) else { return }
-            layoutManager.addRenderingAttribute(key, value: value, for: range)
+            layoutManager.addRenderingAttribute(.foregroundColor, value: color, for: range)
+        }
+
+        func addBg(_ color: NSColor, _ r: NSRange) {
+            guard let range = tr(r) else { return }
+            layoutManager.addRenderingAttribute(.backgroundColor, value: color, for: range)
         }
 
         func setFont(_ font: NSFont, _ r: NSRange) {
@@ -118,138 +61,55 @@ struct MarkdownHighlighter {
             textStorage.addAttribute(.font, value: font, range: r)
         }
 
-        // MARK: Line-level elements
-
-        Self.headingRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m else { return }
-            add(.foregroundColor, NSColor.systemBlue, m.range)
-            setFont(boldFont, m.range)
-            let hashRange = m.range(at: 1)
-            if hashRange.location != NSNotFound {
-                let markerRange = NSRange(location: hashRange.location, length: hashRange.length + 1)
-                add(.foregroundColor, NSColor.tertiaryLabelColor, markerRange)
-                setFont(monoFont, markerRange)
+        for token in MarkdownToken.tokenize(str, codeFenceRanges: codeFenceRanges) {
+            switch token.style {
+            case .headingText:
+                addFg(.systemBlue, token.range)
+                setFont(boldFont, token.range)
+            case .headingMarker:
+                addFg(.tertiaryLabelColor, token.range)
+                setFont(monoFont, token.range)
+            case .blockquoteText:
+                addFg(.secondaryLabelColor, token.range)
+            case .blockquoteMarker:
+                addFg(.systemOrange.withAlphaComponent(0.7), token.range)
+            case .hr:
+                addFg(.separatorColor, token.range)
+            case .codeFenceMarker:
+                addFg(.tertiaryLabelColor, token.range)
+            case .codeContent:
+                addFg(.labelColor, token.range)
+            case .listMarker:
+                addFg(.tertiaryLabelColor, token.range)
+            case .taskUnchecked:
+                addFg(.systemOrange, token.range)
+            case .taskChecked:
+                addFg(.labelColor, token.range)
+            case .boldMarker:
+                addFg(.quaternaryLabelColor, token.range)
+            case .boldContent:
+                setFont(boldFont, token.range)
+            case .italicMarker:
+                addFg(.quaternaryLabelColor, token.range)
+            case .italicContent:
+                setFont(italicFont, token.range)
+            case .strikethrough:
+                addFg(.secondaryLabelColor, token.range)
+                let r = token.range
+                guard r.location != NSNotFound, r.length > 0,
+                      r.location + r.length <= nsStr.length else { break }
+                textStorage.addAttribute(.strikethroughStyle, value: NSNumber(value: NSUnderlineStyle.single.rawValue), range: r)
+            case .inlineCodeBg:
+                addBg(.systemGray.withAlphaComponent(0.10), token.range)
+            case .inlineCodeContent:
+                addFg(.labelColor, token.range)
+            case .inlineCodeMarker:
+                addFg(.tertiaryLabelColor, token.range)
+            case .link:
+                addFg(.linkColor, token.range)
+            case .wikilink:
+                addFg(.systemPurple, token.range)
             }
-        }
-
-        Self.blockquoteRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m else { return }
-            add(.foregroundColor, NSColor.secondaryLabelColor, m.range)
-            let markerRange = NSRange(location: m.range.location, length: min(2, m.range.length))
-            add(.foregroundColor, NSColor.systemOrange.withAlphaComponent(0.7), markerRange)
-        }
-
-        Self.hrRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m else { return }
-            add(.foregroundColor, NSColor.separatorColor, m.range)
-        }
-
-        Self.codeFenceRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m else { return }
-            add(.foregroundColor, NSColor.tertiaryLabelColor, m.range)
-        }
-
-        for fenceRange in codeFenceRanges {
-            add(.foregroundColor, NSColor.labelColor, fenceRange)
-        }
-
-        Self.bulletRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m, m.numberOfRanges > 2 else { return }
-            let sub = m.range(at: 2)
-            guard sub.location != NSNotFound else { return }
-            add(.foregroundColor, NSColor.tertiaryLabelColor, sub)
-        }
-
-        Self.numberedRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m, m.numberOfRanges > 2 else { return }
-            let sub = m.range(at: 2)
-            guard sub.location != NSNotFound else { return }
-            add(.foregroundColor, NSColor.tertiaryLabelColor, sub)
-        }
-
-        Self.taskUncheckedRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m, m.numberOfRanges > 2 else { return }
-            let sub = m.range(at: 2)
-            guard sub.location != NSNotFound else { return }
-            add(.foregroundColor, NSColor.systemOrange, sub)
-        }
-
-        Self.taskCheckedRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m, m.numberOfRanges > 2 else { return }
-            let sub = m.range(at: 2)
-            guard sub.location != NSNotFound else { return }
-            add(.foregroundColor, NSColor.labelColor, sub)
-        }
-
-        // MARK: Inline elements
-
-        Self.boldRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m, m.numberOfRanges > 1, m.range.length > 4 else { return }
-            let open = NSRange(location: m.range.location, length: 2)
-            let close = NSRange(location: NSMaxRange(m.range) - 2, length: 2)
-            let content = m.range(at: 1)
-            add(.foregroundColor, NSColor.quaternaryLabelColor, open)
-            add(.foregroundColor, NSColor.quaternaryLabelColor, close)
-            if content.location != NSNotFound { setFont(boldFont, content) }
-        }
-
-        Self.boldUnderscoreRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m, m.numberOfRanges > 1, m.range.length > 4 else { return }
-            let open = NSRange(location: m.range.location, length: 2)
-            let close = NSRange(location: NSMaxRange(m.range) - 2, length: 2)
-            let content = m.range(at: 1)
-            add(.foregroundColor, NSColor.quaternaryLabelColor, open)
-            add(.foregroundColor, NSColor.quaternaryLabelColor, close)
-            if content.location != NSNotFound { setFont(boldFont, content) }
-        }
-
-        Self.italicRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m, m.numberOfRanges > 1, m.range.length > 2 else { return }
-            let open = NSRange(location: m.range.location, length: 1)
-            let close = NSRange(location: NSMaxRange(m.range) - 1, length: 1)
-            let content = m.range(at: 1)
-            add(.foregroundColor, NSColor.quaternaryLabelColor, open)
-            add(.foregroundColor, NSColor.quaternaryLabelColor, close)
-            if content.location != NSNotFound { setFont(italicFont, content) }
-        }
-
-        Self.italicUnderscoreRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m, m.numberOfRanges > 1, m.range.length > 2 else { return }
-            let open = NSRange(location: m.range.location, length: 1)
-            let close = NSRange(location: NSMaxRange(m.range) - 1, length: 1)
-            let content = m.range(at: 1)
-            add(.foregroundColor, NSColor.quaternaryLabelColor, open)
-            add(.foregroundColor, NSColor.quaternaryLabelColor, close)
-            if content.location != NSNotFound { setFont(italicFont, content) }
-        }
-
-        Self.strikeRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m else { return }
-            add(.foregroundColor, NSColor.secondaryLabelColor, m.range)
-            textStorage.addAttribute(.strikethroughStyle, value: NSNumber(value: NSUnderlineStyle.single.rawValue), range: m.range)
-        }
-
-        Self.inlineCodeRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m, m.numberOfRanges > 1 else { return }
-            let content = m.range(at: 1)
-            let openTick = NSRange(location: m.range.location, length: 1)
-            let closeTick = NSRange(location: NSMaxRange(m.range) - 1, length: 1)
-            add(.backgroundColor, NSColor.systemGray.withAlphaComponent(0.10), m.range)
-            if content.location != NSNotFound {
-                add(.foregroundColor, NSColor.labelColor, content)
-            }
-            add(.foregroundColor, NSColor.tertiaryLabelColor, openTick)
-            add(.foregroundColor, NSColor.tertiaryLabelColor, closeTick)
-        }
-
-        Self.linkRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m else { return }
-            add(.foregroundColor, NSColor.linkColor, m.range)
-        }
-
-        Self.wikilinkRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
-            guard let m else { return }
-            add(.foregroundColor, NSColor.systemPurple, m.range)
         }
 
         textView.needsDisplay = true

@@ -1,3 +1,4 @@
+import MCPNotesCore
 import SpriteKit
 
 final class GraphSKScene: SKScene {

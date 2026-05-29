@@ -7,7 +7,7 @@ import USearch
 /// Manages on-device vector indexing and semantic search for notes.
 /// Uses multilingual-e5-small (XLM-RoBERTa) downloaded from HuggingFace Hub on first launch.
 /// All data lives in Application Support — never synced to iCloud.
-actor NoteIndexer: NoteIndexing {
+public actor NoteIndexer: NoteIndexing {
 
     // MARK: - Constants
 
@@ -37,7 +37,7 @@ actor NoteIndexer: NoteIndexing {
 
     // MARK: - Init
 
-    init(storageDirectory: URL? = nil) {
+    public init(storageDirectory: URL? = nil) {
         let dir: URL
         if let custom = storageDirectory {
             dir = custom
@@ -55,12 +55,12 @@ actor NoteIndexer: NoteIndexing {
     // MARK: - NoteIndexing
 
     /// Returns the number of indexed notes (not chunk vectors).
-    func indexedCount() async -> Int { uuidToKeys.count }
+    public func indexedCount() async -> Int { uuidToKeys.count }
 
     // MARK: - Lifecycle
 
     /// Load persisted index and key mapping. Call once on app launch after NoteStore.load().
-    func loadFromDisk() {
+    public func loadFromDisk() {
         // Try current SQLite format first.
         if let storedVersion = db.intMeta("index_version"),
            storedVersion == Self.currentIndexVersion,
@@ -96,7 +96,7 @@ actor NoteIndexer: NoteIndexing {
     }
 
     /// Persist index and mapping to disk.
-    func saveToDisk() {
+    public func saveToDisk() {
         saveTask?.cancel()
         saveTask = nil
         vectorIndex.save(path: indexPath)
@@ -108,7 +108,7 @@ actor NoteIndexer: NoteIndexing {
 
     /// Index or re-index a single note. The body is split into paragraphs; each paragraph
     /// becomes a separate vector. Documents use the "passage: " E5 prefix.
-    func indexNote(_ note: Note) async throws {
+    public func indexNote(_ note: Note) async throws {
         try await indexNoteCore(note)
         scheduleSave()
     }
@@ -153,7 +153,7 @@ actor NoteIndexer: NoteIndexing {
     }
 
     /// Remove a note and all its chunk vectors from the index.
-    func removeNote(id: UUID) {
+    public func removeNote(id: UUID) {
         guard let keys = uuidToKeys[id] else { return }
         for key in keys {
             vectorIndex.remove(key: key)
@@ -172,7 +172,7 @@ actor NoteIndexer: NoteIndexing {
 
     /// Incrementally sync the index: remove deleted notes, skip unchanged notes,
     /// re-index only new or modified ones.
-    func indexAll(_ notes: [Note]) async throws {
+    public func indexAll(_ notes: [Note]) async throws {
         // Remove notes that no longer exist on disk.
         let incomingIDs = Set(notes.map(\.id))
         let staleIDs = uuidToKeys.keys.filter { !incomingIDs.contains($0) }
@@ -208,12 +208,12 @@ actor NoteIndexer: NoteIndexing {
     }
 
     /// Clear stored MD5 hashes so the next indexAll() re-indexes all notes.
-    func clearHashStore() {
+    public func clearHashStore() {
         db.clearHashes()
     }
 
     /// Wipe the entire index. Used before a manual full re-index from Settings.
-    func resetAndClearIndex() {
+    public func resetAndClearIndex() {
         uuidToKeys = [:]
         keyToUUID = [:]
         nextKey = 1
@@ -224,18 +224,18 @@ actor NoteIndexer: NoteIndexing {
     // MARK: - Search
 
     /// Returns notes ranked by BM25 keyword relevance (rank 1 = best match).
-    func searchBM25Ranked(query: String, limit: Int = 10) -> [(id: UUID, rank: Int)] {
+    public func searchBM25Ranked(query: String, limit: Int = 10) -> [(id: UUID, rank: Int)] {
         db.searchFTS(query: query, limit: limit)
             .enumerated().map { (id: $0.element.0, rank: $0.offset + 1) }
     }
 
     /// Returns note UUIDs ranked by semantic similarity, closest first.
-    func search(query: String, limit: Int = 10) async throws -> [UUID] {
+    public func search(query: String, limit: Int = 10) async throws -> [UUID] {
         try await searchRanked(query: query, limit: limit).map(\.id)
     }
 
     /// Returns note UUIDs with their best-chunk cosine similarity scores (0–1), highest first.
-    func searchRanked(query: String, limit: Int = 10) async throws -> [(id: UUID, score: Float)] {
+    public func searchRanked(query: String, limit: Int = 10) async throws -> [(id: UUID, score: Float)] {
         guard vectorIndex.count > 0 else { return [] }
         let queryVector = try await embed("query: \(query)")
 
@@ -298,9 +298,9 @@ actor NoteIndexer: NoteIndexing {
 
     // MARK: - Link graph
 
-    func outgoingLinks(from noteID: UUID) async -> [UUID] { db.outgoingLinks(from: noteID) }
-    func incomingLinks(to noteID: UUID) async -> [UUID] { db.incomingLinks(to: noteID) }
-    func allLinks() async -> [(source: UUID, target: UUID)] { db.allLinks() }
+    public func outgoingLinks(from noteID: UUID) async -> [UUID] { db.outgoingLinks(from: noteID) }
+    public func incomingLinks(to noteID: UUID) async -> [UUID] { db.incomingLinks(to: noteID) }
+    public func allLinks() async -> [(source: UUID, target: UUID)] { db.allLinks() }
 
     // MARK: - Private: chunking
 
@@ -319,7 +319,7 @@ actor NoteIndexer: NoteIndexing {
 
     // MARK: - Private: markdown stripping
 
-    nonisolated static func stripMarkdown(_ text: String) -> String {
+    public nonisolated static func stripMarkdown(_ text: String) -> String {
         var s = text
         // Code fence markers — keep code content, remove ``` lines
         s = s.replacing(/(?m)^```[^\n]*$/, with: "")

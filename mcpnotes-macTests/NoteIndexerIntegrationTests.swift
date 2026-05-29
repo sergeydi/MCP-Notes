@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+@testable import MCPNotesCore
 @testable import mcpnotes_mac
 
 /// Integration tests — download multilingual-e5-small (~115 MB) on first run.

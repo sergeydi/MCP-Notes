@@ -11,16 +11,18 @@ import Foundation
 ///
 /// Markdown body…
 /// ```
-struct FrontmatterParser {
-    struct ParseResult {
-        let uid: UUID
-        let tags: [String]
-        let bookmarked: Bool
-        let body: String
+public struct FrontmatterParser {
+    public struct ParseResult {
+        public let uid: UUID
+        public let tags: [String]
+        public let bookmarked: Bool
+        public let body: String
     }
 
+    public init() {}
+
     /// Returns `nil` if the content has no valid frontmatter block.
-    static func parse(_ content: String) -> ParseResult? {
+    public static func parse(_ content: String) -> ParseResult? {
         let lines = content.components(separatedBy: "\n")
         guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else { return nil }
 
@@ -82,7 +84,7 @@ struct FrontmatterParser {
         return ParseResult(uid: uid, tags: tags, bookmarked: bookmarked, body: body)
     }
 
-    static func serialize(uid: UUID, tags: [String], isBookmarked: Bool = false, body: String) -> String {
+    public static func serialize(uid: UUID, tags: [String], isBookmarked: Bool = false, body: String) -> String {
         let tagList = tags.isEmpty ? "[]" : "[" + tags.joined(separator: ", ") + "]"
         let bookmarkedLine = isBookmarked ? "\nbookmarked: true" : ""
         return """

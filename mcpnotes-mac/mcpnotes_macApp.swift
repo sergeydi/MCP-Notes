@@ -1,3 +1,4 @@
+import MCPNotesCore
 import SwiftUI
 
 @main
