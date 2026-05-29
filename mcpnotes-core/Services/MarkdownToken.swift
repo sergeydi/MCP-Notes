@@ -160,6 +160,11 @@ public struct MarkdownToken: Sendable {
             add(m.range, .wikilink)
         }
 
+        MarkdownPatterns.imageWikilinkRx.enumerateMatches(in: string, range: fullRange) { m, _, _ in
+            guard let m else { return }
+            add(m.range, .wikilink)
+        }
+
         return tokens
     }
 }

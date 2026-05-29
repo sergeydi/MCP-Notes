@@ -6,6 +6,7 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
     @Binding var text: String
     var onTextChanged: () -> Void
     var onWikilinkTapped: ((String) -> Void)?
+    var notesDirectoryURL: URL?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text, onTextChanged: onTextChanged)
@@ -35,6 +36,7 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
         textView.textContainer?.widthTracksTextView = true
         textView.font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         textView.onWikilinkTapped = onWikilinkTapped
+        textView.notesDirectoryURL = notesDirectoryURL
         textView.delegate = context.coordinator
         context.coordinator.textView = textView
 
@@ -50,7 +52,10 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.onTextChanged = onTextChanged
-        (context.coordinator.textView as? MarkdownTextView)?.onWikilinkTapped = onWikilinkTapped
+        if let mtv = context.coordinator.textView as? MarkdownTextView {
+            mtv.onWikilinkTapped = onWikilinkTapped
+            mtv.notesDirectoryURL = notesDirectoryURL
+        }
         guard let textView = context.coordinator.textView,
               text != textView.string else { return }
 
@@ -70,10 +75,32 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
 /// pointing-hand cursor and click navigation for wikilinks and URLs, and list auto-continuation.
 private final class MarkdownTextView: NSTextView {
     var onWikilinkTapped: ((String) -> Void)?
+    var notesDirectoryURL: URL?
     private var linkRects: [CGRect] = []
     var codeBlockRanges: [NSRange] = []
     var codeContentRanges: [NSRange] = []
     private var copyButtons: [NSButton] = []
+    private var imageViews: [NSImageView] = []
+    private var lastLayoutWidth: CGFloat = 0
+    private var minFrameHeight: CGFloat = 0
+
+    override func setFrameSize(_ newSize: NSSize) {
+        var s = newSize
+        if minFrameHeight > 0 { s.height = max(s.height, minFrameHeight) }
+        super.setFrameSize(s)
+    }
+
+    override func layout() {
+        super.layout()
+        let w = bounds.width
+        guard abs(w - lastLayoutWidth) > 1 else { return }
+        lastLayoutWidth = w
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.updateImagePreviews()
+            self.setNeedsDisplay(self.bounds)
+        }
+    }
 
     // MARK: Code block background
 
@@ -186,6 +213,127 @@ private final class MarkdownTextView: NSTextView {
         NSPasteboard.general.setString(content, forType: .string)
     }
 
+    // MARK: Image previews
+
+    func updateImagePreviews() {
+        imageViews.forEach { $0.removeFromSuperview() }
+        imageViews = []
+        minFrameHeight = 0
+
+        guard let textStorage = textContentStorage?.textStorage else { return }
+        let fullRange = NSRange(location: 0, length: (textStorage.string as NSString).length)
+        if fullRange.length > 0 {
+            textStorage.removeAttribute(.paragraphStyle, range: fullRange)
+        }
+
+        guard let notesDir = notesDirectoryURL,
+              let layoutManager = textLayoutManager,
+              let contentStorage = textContentStorage else { return }
+
+        let str = textStorage.string
+        let nsStr = str as NSString
+        let matchRange = NSRange(location: 0, length: nsStr.length)
+        guard matchRange.length > 0 else { return }
+
+        struct ImageEntry {
+            let lineRange: NSRange
+            let image: NSImage
+            let displaySize: CGSize
+            let spacing: CGFloat
+        }
+
+        let maxW = max(bounds.width - 20, 100)
+        let maxH = max((enclosingScrollView?.frame.height ?? bounds.height) - 40, 100)
+        let topGap: CGFloat = 6
+        let bottomGap: CGFloat = 6
+        var entries: [ImageEntry] = []
+
+        MarkdownPatterns.imageWikilinkRx.enumerateMatches(in: str, range: matchRange) { m, _, _ in
+            guard let m else { return }
+            let raw = nsStr.substring(with: m.range)
+            let filename = String(raw.dropFirst(3).dropLast(2))
+            let imageURL = notesDir.appendingPathComponent(filename)
+            guard let image = NSImage(contentsOf: imageURL),
+                  image.size.width > 0, image.size.height > 0 else { return }
+            let scale = min(min(maxW / image.size.width, maxH / image.size.height), 1.0)
+            let displaySize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            entries.append(ImageEntry(
+                lineRange: nsStr.lineRange(for: m.range),
+                image: image,
+                displaySize: displaySize,
+                spacing: topGap + displaySize.height + bottomGap
+            ))
+        }
+
+        guard !entries.isEmpty else { return }
+
+        let origin = textContainerOrigin
+        let base = contentStorage.documentRange.location
+
+        // Compute line bottom Y values before adding paragraph spacing.
+        // Each image's spacing shifts all subsequent lines; cumulativeShift corrects for this.
+        var lineBottoms: [CGFloat] = []
+        var cumulativeShift: CGFloat = 0
+
+        for entry in entries {
+            guard entry.lineRange.length > 0,
+                  let startLoc = contentStorage.location(base, offsetBy: entry.lineRange.location),
+                  let endLoc = contentStorage.location(startLoc, offsetBy: entry.lineRange.length) else {
+                lineBottoms.append(0)
+                cumulativeShift += entry.spacing
+                continue
+            }
+
+            var rawMaxY: CGFloat = 0
+            layoutManager.enumerateTextLayoutFragments(from: startLoc, options: [.ensuresLayout]) { frag in
+                guard let er = frag.textElement?.elementRange else { return true }
+                if er.location.compare(endLoc) != .orderedAscending { return false }
+                let frame = frag.layoutFragmentFrame.offsetBy(dx: origin.x, dy: origin.y)
+                rawMaxY = max(rawMaxY, frame.maxY)
+                return true
+            }
+
+            lineBottoms.append(rawMaxY + cumulativeShift)
+            cumulativeShift += entry.spacing
+        }
+
+        // Reserve vertical space for each image via paragraph spacing
+        for entry in entries {
+            let style = NSMutableParagraphStyle()
+            style.paragraphSpacing = entry.spacing
+            textStorage.addAttribute(.paragraphStyle, value: style, range: entry.lineRange)
+        }
+
+        // Position image views after layout updates
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            for (entry, lineBottom) in zip(entries, lineBottoms) {
+                guard lineBottom > 0 else { continue }
+                let iv = NSImageView()
+                iv.image = entry.image
+                iv.imageScaling = .scaleAxesIndependently
+                iv.imageAlignment = .alignLeft
+                iv.wantsLayer = true
+                iv.layer?.cornerRadius = 4
+                iv.layer?.masksToBounds = true
+                iv.frame = CGRect(
+                    x: self.textContainerOrigin.x + 2,
+                    y: lineBottom + topGap,
+                    width: entry.displaySize.width,
+                    height: entry.displaySize.height
+                )
+                self.addSubview(iv)
+                self.imageViews.append(iv)
+            }
+            if let lastIV = self.imageViews.last {
+                self.minFrameHeight = lastIV.frame.maxY + bottomGap
+            } else {
+                self.minFrameHeight = 0
+            }
+            self.sizeToFit()
+        }
+    }
+
     // MARK: Cursor appearance
 
     override func updateTrackingAreas() {
@@ -242,6 +390,76 @@ private final class MarkdownTextView: NSTextView {
             addRects(for: m.range)
         }
         linkRects = rects
+    }
+
+    // MARK: Paste image
+
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(paste(_:)), notesDirectoryURL != nil {
+            let types = NSPasteboard.general.types ?? []
+            if types.contains(.tiff) || types.contains(.png) ||
+               NSPasteboard.general.canReadObject(forClasses: [NSImage.self], options: nil) {
+                return true
+            }
+        }
+        return super.validateUserInterfaceItem(item)
+    }
+
+    override func paste(_ sender: Any?) {
+        guard let notesDir = notesDirectoryURL,
+              let pngData = Self.imagePNGData(from: .general) else {
+            super.paste(sender)
+            return
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMddHHmmss"
+        let timestamp = formatter.string(from: Date())
+        var filename = "Pasted image \(timestamp).png"
+        var fileURL = notesDir.appendingPathComponent(filename)
+        var counter = 1
+        while FileManager.default.fileExists(atPath: fileURL.path) {
+            filename = "Pasted image \(timestamp)-\(counter).png"
+            fileURL = notesDir.appendingPathComponent(filename)
+            counter += 1
+        }
+
+        guard (try? pngData.write(to: fileURL)) != nil else {
+            super.paste(sender)
+            return
+        }
+
+        let wikilink = "![[\(filename)]]"
+        if shouldChangeText(in: selectedRange(), replacementString: wikilink) {
+            replaceCharacters(in: selectedRange(), with: wikilink)
+            didChangeText()
+        }
+    }
+
+    private static func imagePNGData(from pb: NSPasteboard) -> Data? {
+        // PNG direct
+        if let data = pb.data(forType: .png) { return data }
+        // TIFF (screenshots, most apps)
+        if let data = pb.data(forType: .tiff),
+           let rep = NSBitmapImageRep(data: data) {
+            return rep.representation(using: .png, properties: [:])
+        }
+        // File URL pointing to an image
+        if let urls = pb.readObjects(forClasses: [NSURL.self],
+                                     options: [.urlReadingFileURLsOnly: true]) as? [URL],
+           let url = urls.first,
+           let image = NSImage(contentsOf: url),
+           let tiff = image.tiffRepresentation,
+           let rep = NSBitmapImageRep(data: tiff) {
+            return rep.representation(using: .png, properties: [:])
+        }
+        // Generic NSImage fallback
+        if let image = NSImage(pasteboard: pb),
+           let tiff = image.tiffRepresentation,
+           let rep = NSBitmapImageRep(data: tiff) {
+            return rep.representation(using: .png, properties: [:])
+        }
+        return nil
     }
 
     // MARK: List continuation
@@ -345,6 +563,7 @@ extension MarkdownTextViewRepresentable {
             if let wv = tv as? MarkdownTextView {
                 wv.codeBlockRanges = highlighter.codeFenceFullRanges
                 wv.codeContentRanges = highlighter.codeFenceRanges
+                wv.updateImagePreviews()
                 wv.setNeedsDisplay(wv.bounds)
                 DispatchQueue.main.async { wv.updateCopyButtons() }
             }

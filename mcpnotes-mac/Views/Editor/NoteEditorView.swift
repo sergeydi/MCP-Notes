@@ -25,7 +25,8 @@ struct NoteEditorView: View {
                     if let target = store.notes.first(where: { $0.filename == name }) {
                         store.selectedNoteID = target.id
                     }
-                }
+                },
+                notesDirectoryURL: FileService.notesDirectoryURL
             )
         }
         .navigationTitle(note.filename)
@@ -97,6 +98,7 @@ struct NoteEditorView: View {
                     note.isBookmarked ? "Remove Bookmark" : "Add Bookmark",
                     systemImage: note.isBookmarked ? "bookmark.fill" : "bookmark"
                 )
+                .foregroundStyle(note.isBookmarked ? Color.accentColor : Color.primary)
             }
             .accessibilityLabel(note.isBookmarked ? "Remove bookmark" : "Add bookmark")
         }

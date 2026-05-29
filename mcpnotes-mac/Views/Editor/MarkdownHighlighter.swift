@@ -106,9 +106,9 @@ struct MarkdownHighlighter {
             case .inlineCodeMarker:
                 addFg(.tertiaryLabelColor, token.range)
             case .link:
-                addFg(.linkColor, token.range)
+                addFg(.controlAccentColor, token.range)
             case .wikilink:
-                addFg(.systemPurple, token.range)
+                addFg(.controlAccentColor, token.range)
             }
         }
 

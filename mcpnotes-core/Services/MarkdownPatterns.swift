@@ -36,7 +36,10 @@ public struct MarkdownPatterns {
     public static let linkRx = try! NSRegularExpression(
         pattern: #"\[[^\]\n]+\]\(([^)\n]+)\)"#)
     public static let wikilinkRx = try! NSRegularExpression(
-        pattern: #"\[\[[^\]\n]+\]\]"#)
+        pattern: #"(?<!!)\[\[[^\]\n]+\]\]"#)
+    public static let imageWikilinkRx = try! NSRegularExpression(
+        pattern: #"!\[\[[^\]\n]+\.(png|jpg|jpeg|gif|webp|tiff|bmp)\]\]"#,
+        options: .caseInsensitive)
 
     /// Returns code fence content ranges and full (including ``` lines) ranges for a string.
     public static func codeFenceRanges(in string: String) -> (content: [NSRange], full: [NSRange]) {

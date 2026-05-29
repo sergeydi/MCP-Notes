@@ -8,10 +8,16 @@ struct MarkdownEditorView: View {
     @Binding var text: String
     var onTextChanged: () -> Void
     var onWikilinkTapped: ((String) -> Void)? = nil
+    var notesDirectoryURL: URL? = nil
 
     var body: some View {
-        MarkdownTextViewRepresentable(text: $text, onTextChanged: onTextChanged, onWikilinkTapped: onWikilinkTapped)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .accessibilityLabel("Note content")
+        MarkdownTextViewRepresentable(
+            text: $text,
+            onTextChanged: onTextChanged,
+            onWikilinkTapped: onWikilinkTapped,
+            notesDirectoryURL: notesDirectoryURL
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityLabel("Note content")
     }
 }
