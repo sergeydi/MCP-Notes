@@ -37,6 +37,9 @@ public struct MarkdownPatterns {
         pattern: #"\[[^\]\n]+\]\(([^)\n]+)\)"#)
     public static let wikilinkRx = try! NSRegularExpression(
         pattern: #"(?<!!)\[\[[^\]\n]+\]\]"#)
+    /// Matches bare https?:// URLs not already inside a markdown link (...)
+    public static let plainUrlRx = try! NSRegularExpression(
+        pattern: #"(?<!\()https?://[^\s\])\n'"<>]+"#)
     public static let imageWikilinkRx = try! NSRegularExpression(
         pattern: #"!\[\[[^\]\n]+\.(png|jpg|jpeg|gif|webp|tiff|bmp)\]\]"#,
         options: .caseInsensitive)

@@ -9,13 +9,15 @@ struct MarkdownEditorView: View {
     var onTextChanged: () -> Void
     var onWikilinkTapped: ((String) -> Void)? = nil
     var notesDirectoryURL: URL? = nil
+    var formatProxy: TextFormatProxy? = nil
 
     var body: some View {
         MarkdownTextViewRepresentable(
             text: $text,
             onTextChanged: onTextChanged,
             onWikilinkTapped: onWikilinkTapped,
-            notesDirectoryURL: notesDirectoryURL
+            notesDirectoryURL: notesDirectoryURL,
+            formatProxy: formatProxy
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityLabel("Note content")

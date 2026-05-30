@@ -119,6 +119,7 @@ struct SidebarView: View {
                         flatContent
                     }
                 }
+                .padding(.top, 8)
                 .onChange(of: searchText) {
                     proxy.scrollTo("search-top", anchor: .top)
                 }

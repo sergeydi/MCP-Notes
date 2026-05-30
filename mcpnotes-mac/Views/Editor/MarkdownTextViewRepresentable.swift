@@ -7,6 +7,7 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
     var onTextChanged: () -> Void
     var onWikilinkTapped: ((String) -> Void)?
     var notesDirectoryURL: URL?
+    var formatProxy: TextFormatProxy?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text, onTextChanged: onTextChanged)
@@ -35,14 +36,81 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
         )
         textView.textContainer?.widthTracksTextView = true
         textView.font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        textView.textColor = .labelColor
         textView.onWikilinkTapped = onWikilinkTapped
         textView.notesDirectoryURL = notesDirectoryURL
         textView.delegate = context.coordinator
         context.coordinator.textView = textView
 
+        formatProxy?.register(
+            wrap: { [weak textView] open, close in
+                guard let tv = textView else { return }
+                let sel = tv.selectedRange()
+                let nsStr = tv.string as NSString
+                let targetRange: NSRange
+                let replacement: String
+                if sel.length > 0 {
+                    let selected = nsStr.substring(with: sel)
+                    if selected.contains("\n") {
+                        // Multi-line selection: wrap each non-empty line individually
+                        let parts = selected.components(separatedBy: "\n")
+                        replacement = parts.map { $0.isEmpty ? $0 : open + $0 + close }.joined(separator: "\n")
+                    } else {
+                        replacement = open + selected + close
+                    }
+                    targetRange = sel
+                } else {
+                    var lineRange = nsStr.lineRange(for: NSRange(location: sel.location, length: 0))
+                    if lineRange.length > 0 && nsStr.character(at: lineRange.upperBound - 1) == 10 {
+                        lineRange.length -= 1
+                    }
+                    targetRange = lineRange
+                    replacement = open + nsStr.substring(with: lineRange) + close
+                }
+                tv.insertText(replacement, replacementRange: targetRange)
+                let cursor = targetRange.location + (replacement as NSString).length
+                tv.setSelectedRange(NSRange(location: cursor, length: 0))
+            },
+            prefix: { [weak textView] prefix in
+                guard let tv = textView else { return }
+                let sel = tv.selectedRange()
+                let nsStr = tv.string as NSString
+                let lineRange = nsStr.lineRange(for: sel)
+                let parts = nsStr.substring(with: lineRange).components(separatedBy: "\n")
+                let prefixed = parts.map { $0.isEmpty ? $0 : prefix + $0 }.joined(separator: "\n")
+                tv.insertText(prefixed, replacementRange: lineRange)
+            },
+            code: { [weak textView] in
+                guard let tv = textView else { return }
+                let sel = tv.selectedRange()
+                let nsStr = tv.string as NSString
+                if sel.length > 0 {
+                    let selected = nsStr.substring(with: sel)
+                    if selected.contains("\n") {
+                        // Multi-line selection → code block
+                        tv.insertText("```\n" + selected + "\n```", replacementRange: sel)
+                    } else {
+                        // Single-line selection → inline code
+                        tv.insertText("`" + selected + "`", replacementRange: sel)
+                    }
+                } else {
+                    // No selection → code block around current line
+                    var lineRange = nsStr.lineRange(for: NSRange(location: sel.location, length: 0))
+                    if lineRange.length > 0 && nsStr.character(at: lineRange.upperBound - 1) == 10 {
+                        lineRange.length -= 1
+                    }
+                    let lineContent = nsStr.substring(with: lineRange)
+                    let replacement = "```\n" + lineContent + "\n```"
+                    tv.insertText(replacement, replacementRange: lineRange)
+                    let cursor = lineRange.location + (replacement as NSString).length
+                    tv.setSelectedRange(NSRange(location: cursor, length: 0))
+                }
+            }
+        )
+
         let monoFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         textView.textContentStorage?.textStorage?.setAttributedString(
-            NSAttributedString(string: text, attributes: [.font: monoFont])
+            NSAttributedString(string: text, attributes: [.font: monoFont, .foregroundColor: NSColor.labelColor])
         )
         context.coordinator.refreshHighlighting()
 
@@ -62,7 +130,7 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
         let monoFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         context.coordinator.isUpdatingFromSwiftUI = true
         textView.textContentStorage?.textStorage?.setAttributedString(
-            NSAttributedString(string: text, attributes: [.font: monoFont])
+            NSAttributedString(string: text, attributes: [.font: monoFont, .foregroundColor: NSColor.labelColor])
         )
         context.coordinator.isUpdatingFromSwiftUI = false
         context.coordinator.refreshHighlighting()
@@ -112,8 +180,10 @@ private final class MarkdownTextView: NSTextView {
 
         let bg = NSColor.systemGray.withAlphaComponent(0.10)
         let origin = textContainerOrigin
-        let vertPad: CGFloat = 4
-        let horzMargin: CGFloat = 2
+        let topPad: CGFloat = 2
+        let bottomPad: CGFloat = -6
+        let leftMargin: CGFloat = 2
+        let rightMargin: CGFloat = 10
         let cornerRadius: CGFloat = 6
 
         for nsRange in codeBlockRanges {
@@ -136,10 +206,10 @@ private final class MarkdownTextView: NSTextView {
             guard minY < maxY else { continue }
 
             let blockRect = CGRect(
-                x: bounds.minX + horzMargin,
-                y: minY - vertPad,
-                width: bounds.width - 2 * horzMargin,
-                height: (maxY - minY) + 2 * vertPad
+                x: bounds.minX + leftMargin,
+                y: minY - topPad,
+                width: bounds.width - leftMargin - rightMargin,
+                height: (maxY - minY) + topPad + bottomPad
             )
             bg.setFill()
             NSBezierPath(roundedRect: blockRect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
@@ -157,8 +227,8 @@ private final class MarkdownTextView: NSTextView {
               let contentStorage = textContentStorage else { return }
 
         let origin = textContainerOrigin
-        let vertPad: CGFloat = 4
-        let horzMargin: CGFloat = 2
+        let topPad: CGFloat = 2
+        let rightMargin: CGFloat = 10
         let buttonSize: CGFloat = 22
         let buttonPad: CGFloat = 5
 
@@ -191,8 +261,8 @@ private final class MarkdownTextView: NSTextView {
             button.layer?.cornerRadius = 4
             button.layer?.backgroundColor = NSColor.systemGray.withAlphaComponent(0.15).cgColor
             button.frame = CGRect(
-                x: bounds.width - horzMargin - buttonSize - buttonPad,
-                y: minY - vertPad + buttonPad,
+                x: bounds.width - rightMargin - buttonSize - buttonPad,
+                y: minY - topPad + buttonPad,
                 width: buttonSize,
                 height: buttonSize
             )
@@ -389,6 +459,10 @@ private final class MarkdownTextView: NSTextView {
             guard let m else { return }
             addRects(for: m.range)
         }
+        MarkdownPatterns.plainUrlRx.enumerateMatches(in: str, range: fullRange) { m, _, _ in
+            guard let m else { return }
+            addRects(for: m.range)
+        }
         linkRects = rects
     }
 
@@ -524,6 +598,16 @@ private final class MarkdownTextView: NSTextView {
             let urlRange = m.range(at: 1)
             guard urlRange.location != NSNotFound, urlRange.length > 0 else { return }
             let urlString = nsStr.substring(with: urlRange)
+            if let url = URL(string: urlString) {
+                NSWorkspace.shared.open(url)
+            }
+            stop.pointee = true
+        }
+
+        // Plain URLs: https://...
+        MarkdownPatterns.plainUrlRx.enumerateMatches(in: string, range: fullRange) { m, _, stop in
+            guard let m, NSLocationInRange(charIdx, m.range) else { return }
+            let urlString = nsStr.substring(with: m.range)
             if let url = URL(string: urlString) {
                 NSWorkspace.shared.open(url)
             }

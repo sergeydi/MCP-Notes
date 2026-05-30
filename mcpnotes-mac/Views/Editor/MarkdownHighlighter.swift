@@ -79,6 +79,7 @@ struct MarkdownHighlighter {
                 addFg(.tertiaryLabelColor, token.range)
             case .codeContent:
                 addFg(.labelColor, token.range)
+                setFont(monoFont, token.range)
             case .listMarker:
                 addFg(.tertiaryLabelColor, token.range)
             case .taskUnchecked:
@@ -103,11 +104,14 @@ struct MarkdownHighlighter {
                 addBg(.systemGray.withAlphaComponent(0.10), token.range)
             case .inlineCodeContent:
                 addFg(.labelColor, token.range)
+                setFont(monoFont, token.range)
             case .inlineCodeMarker:
                 addFg(.tertiaryLabelColor, token.range)
             case .link:
                 addFg(.controlAccentColor, token.range)
             case .wikilink:
+                addFg(.controlAccentColor, token.range)
+            case .plainUrl:
                 addFg(.controlAccentColor, token.range)
             }
         }

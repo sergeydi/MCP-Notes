@@ -7,6 +7,7 @@ struct NoteEditorView: View {
 
     @State private var viewModel = EditorViewModel()
     @State private var showDeleteConfirmation = false
+    @State private var formatProxy = TextFormatProxy()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,7 +27,8 @@ struct NoteEditorView: View {
                         store.selectedNoteID = target.id
                     }
                 },
-                notesDirectoryURL: FileService.notesDirectoryURL
+                notesDirectoryURL: FileService.notesDirectoryURL,
+                formatProxy: formatProxy
             )
         }
         .navigationTitle(note.filename)
@@ -76,11 +78,27 @@ struct NoteEditorView: View {
             .help("Forward")
         }
 
-        ToolbarItemGroup {
-            headingsMenu
-            styleMenu
-            blocksMenu
-            listsMenu
+        ToolbarItem {
+            ControlGroup {
+                Button { formatProxy.applyWrap("**", "**") } label: {
+                    Label("Bold", systemImage: "bold")
+                }
+                Button { formatProxy.applyWrap("_", "_") } label: {
+                    Label("Italic", systemImage: "italic")
+                }
+                Button { formatProxy.applyWrap("~~", "~~") } label: {
+                    Label("Strikethrough", systemImage: "strikethrough")
+                }
+                Button { formatProxy.applyCode() } label: {
+                    Label("Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+                Button { formatProxy.applyPrefix("- ") } label: {
+                    Label("Bullet List", systemImage: "list.bullet")
+                }
+                Button { formatProxy.applyPrefix("1. ") } label: {
+                    Label("Numbered List", systemImage: "list.number")
+                }
+            }
         }
 
         ToolbarItem(placement: .primaryAction) {
@@ -108,61 +126,5 @@ struct NoteEditorView: View {
                 Label("Share", systemImage: "square.and.arrow.up")
             }
         }
-    }
-
-    private var headingsMenu: some View {
-        Menu {
-            Button("Heading 1") { insertPrefix("# ") }
-            Button("Heading 2") { insertPrefix("## ") }
-            Button("Heading 3") { insertPrefix("### ") }
-        } label: {
-            Label("Headings", systemImage: "textformat.size")
-        }
-        .accessibilityLabel("Insert heading")
-    }
-
-    private var styleMenu: some View {
-        Menu {
-            Button("Bold")          { insertWrapped(with: "**") }
-            Button("Italic")        { insertWrapped(with: "_") }
-            Button("Strikethrough") { insertWrapped(with: "~~") }
-        } label: {
-            Label("Style", systemImage: "bold")
-        }
-        .accessibilityLabel("Insert text style")
-    }
-
-    private var blocksMenu: some View {
-        Menu {
-            Button("Quote")       { insertPrefix("> ") }
-            Button("Inline Code") { insertWrapped(with: "`") }
-            Button("Code Block")  { insertWrapped(with: "```\n", closing: "\n```") }
-        } label: {
-            Label("Blocks", systemImage: "quote.bubble")
-        }
-        .accessibilityLabel("Insert block")
-    }
-
-    private var listsMenu: some View {
-        Menu {
-            Button("Bullet List")   { insertPrefix("- ") }
-            Button("Numbered List") { insertPrefix("1. ") }
-            Button("Task")          { insertPrefix("- [ ] ") }
-        } label: {
-            Label("Lists", systemImage: "list.bullet")
-        }
-        .accessibilityLabel("Insert list")
-    }
-
-    // Inserts a line prefix — cursor-aware insertion requires NSTextView integration (future work).
-    private func insertPrefix(_ prefix: String) {
-        viewModel.body += "\n" + prefix
-        viewModel.scheduleAutosave()
-    }
-
-    private func insertWrapped(with delimiter: String, closing: String? = nil) {
-        let close = closing ?? delimiter
-        viewModel.body += delimiter + close
-        viewModel.scheduleAutosave()
     }
 }

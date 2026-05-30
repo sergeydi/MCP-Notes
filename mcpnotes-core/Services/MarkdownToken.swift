@@ -23,6 +23,7 @@ public struct MarkdownToken: Sendable {
         case inlineCodeMarker
         case link
         case wikilink
+        case plainUrl
     }
 
     public var range: NSRange
@@ -163,6 +164,11 @@ public struct MarkdownToken: Sendable {
         MarkdownPatterns.imageWikilinkRx.enumerateMatches(in: string, range: fullRange) { m, _, _ in
             guard let m else { return }
             add(m.range, .wikilink)
+        }
+
+        MarkdownPatterns.plainUrlRx.enumerateMatches(in: string, range: fullRange) { m, _, _ in
+            guard let m else { return }
+            add(m.range, .plainUrl)
         }
 
         return tokens
