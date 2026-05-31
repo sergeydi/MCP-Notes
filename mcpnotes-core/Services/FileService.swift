@@ -29,7 +29,7 @@ public struct FileService: FileServicing {
         let dir = Self.notesDirectoryURL
         let files = try FileManager.default.contentsOfDirectory(
             at: dir,
-            includingPropertiesForKeys: [.nameKey, .contentModificationDateKey],
+            includingPropertiesForKeys: [.nameKey, .contentModificationDateKey, .creationDateKey],
             options: .skipsHiddenFiles
         ).filter { $0.pathExtension == "md" }
 
@@ -40,7 +40,9 @@ public struct FileService: FileServicing {
             else { return nil }
 
             let filename = url.deletingPathExtension().lastPathComponent
-            let modifiedAt = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+            let resourceValues = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey])
+            let modifiedAt = resourceValues?.contentModificationDate ?? .distantPast
+            let createdAt = resourceValues?.creationDate ?? .distantPast
             return Note(
                 id: parsed.uid,
                 filename: filename,
@@ -48,7 +50,8 @@ public struct FileService: FileServicing {
                 body: parsed.body,
                 fileURL: url,
                 isBookmarked: parsed.bookmarked,
-                modifiedAt: modifiedAt
+                modifiedAt: modifiedAt,
+                createdAt: createdAt
             )
         }.sorted { $0.filename.localizedCompare($1.filename) == .orderedAscending }
     }

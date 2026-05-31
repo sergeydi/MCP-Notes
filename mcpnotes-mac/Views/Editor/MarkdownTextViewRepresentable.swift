@@ -105,6 +105,13 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
                     let cursor = lineRange.location + (replacement as NSString).length
                     tv.setSelectedRange(NSRange(location: cursor, length: 0))
                 }
+            },
+            insert: { [weak textView] text in
+                guard let tv = textView else { return }
+                let sel = tv.selectedRange()
+                tv.insertText(text, replacementRange: sel)
+                let cursor = sel.location + (text as NSString).length
+                tv.setSelectedRange(NSRange(location: cursor, length: 0))
             }
         )
 
@@ -576,7 +583,9 @@ private final class MarkdownTextView: NSTextView {
 
     override func mouseDown(with event: NSEvent) {
         super.mouseDown(with: event)
-        guard event.clickCount == 1 else { return }
+        // super runs a tracking loop, so by here the full click/drag is done.
+        // Only navigate when no text was selected (pure click, not a drag-select).
+        guard event.clickCount == 1, selectedRange().length == 0 else { return }
         let charIdx = selectedRange().location
         guard charIdx != NSNotFound else { return }
         let nsStr = string as NSString

@@ -4,9 +4,6 @@ import SwiftUI
 struct SettingsView: View {
     var body: some View {
         TabView {
-            Tab("General", systemImage: "gear") {
-                GeneralSettingsView()
-            }
             Tab("RAG", systemImage: "brain") {
                 RAGSettingsView()
             }
@@ -15,32 +12,6 @@ struct SettingsView: View {
             }
         }
         .frame(width: 480, height: 320)
-    }
-}
-
-// MARK: - General
-
-private struct GeneralSettingsView: View {
-    @AppStorage("appLanguage") private var appLanguage = "system"
-    @AppStorage("colorScheme") private var colorSchemePreference = "auto"
-
-    var body: some View {
-        Form {
-            Picker("Language", selection: $appLanguage) {
-                Text("System Default").tag("system")
-                Text("English").tag("en")
-                Text("Русский").tag("ru")
-                Text("Українська").tag("uk")
-                Text("Deutsch").tag("de")
-            }
-
-            Picker("Appearance", selection: $colorSchemePreference) {
-                Text("Auto").tag("auto")
-                Text("Light").tag("light")
-                Text("Dark").tag("dark")
-            }
-        }
-        .formStyle(.grouped)
     }
 }
 

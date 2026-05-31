@@ -8,6 +8,7 @@ struct NoteEditorView: View {
     @State private var viewModel = EditorViewModel()
     @State private var showDeleteConfirmation = false
     @State private var formatProxy = TextFormatProxy()
+    @State private var showWikilinkPicker = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -83,20 +84,36 @@ struct NoteEditorView: View {
                 Button { formatProxy.applyWrap("**", "**") } label: {
                     Label("Bold", systemImage: "bold")
                 }
+                .help("Bold")
                 Button { formatProxy.applyWrap("_", "_") } label: {
                     Label("Italic", systemImage: "italic")
                 }
+                .help("Italic")
                 Button { formatProxy.applyWrap("~~", "~~") } label: {
                     Label("Strikethrough", systemImage: "strikethrough")
                 }
+                .help("Strikethrough")
                 Button { formatProxy.applyCode() } label: {
                     Label("Code", systemImage: "chevron.left.forwardslash.chevron.right")
                 }
+                .help("Code")
                 Button { formatProxy.applyPrefix("- ") } label: {
                     Label("Bullet List", systemImage: "list.bullet")
                 }
+                .help("Bullet list")
                 Button { formatProxy.applyPrefix("1. ") } label: {
                     Label("Numbered List", systemImage: "list.number")
+                }
+                .help("Numbered list")
+                Button { showWikilinkPicker = true } label: {
+                    Label("Insert Link", systemImage: "link.badge.plus")
+                }
+                .help("Insert wikilink")
+                .popover(isPresented: $showWikilinkPicker, arrowEdge: .bottom) {
+                    WikilinkPickerView(notes: store.notes.filter { $0.id != note.id }) { wikilink in
+                        formatProxy.insertText(wikilink)
+                        showWikilinkPicker = false
+                    }
                 }
             }
         }
@@ -119,12 +136,14 @@ struct NoteEditorView: View {
                 .foregroundStyle(note.isBookmarked ? Color.accentColor : Color.primary)
             }
             .accessibilityLabel(note.isBookmarked ? "Remove bookmark" : "Add bookmark")
+            .help(note.isBookmarked ? "Remove bookmark" : "Add bookmark")
         }
 
         ToolbarItem(placement: .primaryAction) {
             ShareLink(item: viewModel.body) {
                 Label("Share", systemImage: "square.and.arrow.up")
             }
+            .help("Share note")
         }
     }
 }

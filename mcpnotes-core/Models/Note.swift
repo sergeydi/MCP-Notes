@@ -16,6 +16,8 @@ public struct Note: Identifiable, Hashable, Sendable {
     public var isBookmarked: Bool
     /// Last modification date of the note file on disk.
     public var modifiedAt: Date
+    /// Creation date of the note file on disk.
+    public var createdAt: Date
 
     public init(
         id: UUID = UUID(),
@@ -24,7 +26,8 @@ public struct Note: Identifiable, Hashable, Sendable {
         body: String = "",
         fileURL: URL,
         isBookmarked: Bool = false,
-        modifiedAt: Date = .now
+        modifiedAt: Date = .now,
+        createdAt: Date = .now
     ) {
         self.id = id
         self.filename = filename
@@ -33,5 +36,6 @@ public struct Note: Identifiable, Hashable, Sendable {
         self.fileURL = fileURL
         self.isBookmarked = isBookmarked
         self.modifiedAt = modifiedAt
+        self.createdAt = createdAt
     }
 }
