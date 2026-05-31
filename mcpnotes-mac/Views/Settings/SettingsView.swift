@@ -65,7 +65,7 @@ private struct RAGSettingsView: View {
                     .foregroundStyle(.secondary)
             }
         case .ready(let count):
-            Label("\(count) note\(count == 1 ? "" : "s") indexed", systemImage: "checkmark.circle.fill")
+            Label(String(localized: "\(count) notes indexed"), systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
         case .failed:
             Label("Indexing failed", systemImage: "xmark.circle.fill")

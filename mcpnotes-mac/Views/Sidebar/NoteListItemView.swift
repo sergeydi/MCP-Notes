@@ -105,6 +105,6 @@ struct NoteListItemView: View {
         if note.tags.isEmpty {
             return note.filename
         }
-        return "\(note.filename), tags: \(note.tags.joined(separator: ", "))"
+        return String(localized: "\(note.filename), tags: \(note.tags.joined(separator: ", "))")
     }
 }
