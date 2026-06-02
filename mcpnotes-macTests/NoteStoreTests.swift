@@ -12,6 +12,7 @@ final class MockFileService: FileServicing {
     private(set) var deletedNotes: [Note] = []
     private(set) var createdBaseName: String?
     private(set) var renamedTo: String?
+    var shouldFailRename = false
 
     func loadAllNotes() throws -> [Note] { stubbedNotes }
     func saveNote(_ note: Note) throws { savedNotes.append(note) }
@@ -22,6 +23,7 @@ final class MockFileService: FileServicing {
     }
     func deleteNote(_ note: Note) throws { deletedNotes.append(note) }
     func renameNote(_ note: Note, to newName: String) throws -> Note {
+        if shouldFailRename { throw NSError(domain: "test", code: 1) }
         renamedTo = newName
         var updated = note
         updated.filename = newName
@@ -548,5 +550,116 @@ struct NoteStoreExternalChangesTests {
         fs.stubbedNotes = [a, c, b]
         await store.reloadExternalChanges()
         #expect(store.notes.map(\.filename) == ["A", "B", "C"])
+    }
+}
+
+// MARK: - Rename wikilink cascade
+
+@Suite("NoteStore – rename wikilink cascade")
+@MainActor
+struct NoteStoreRenameWikilinkTests {
+    let store: NoteStore
+    let fs: MockFileService
+    let idx: MockNoteIndexer
+
+    init() {
+        fs = MockFileService()
+        idx = MockNoteIndexer()
+        store = NoteStore(fileService: fs, indexer: idx)
+    }
+
+    @Test func updatesWikilinkInOtherNote() async {
+        var renamed = makeNote(filename: "Old")
+        var other = makeNote(filename: "Other")
+        other.body = "See [[Old]] for details"
+        store.notes = [renamed, other]
+        store.renameNote(renamed, to: "New")
+        await Task.yield()
+        let updatedOther = store.notes.first { $0.id == other.id }
+        #expect(updatedOther?.body == "See [[New]] for details")
+    }
+
+    @Test func updatesWikilinkCaseInsensitive() async {
+        var renamed = makeNote(filename: "Old")
+        var other = makeNote(filename: "Other")
+        other.body = "See [[old]] for details"
+        store.notes = [renamed, other]
+        store.renameNote(renamed, to: "New")
+        await Task.yield()
+        let updatedOther = store.notes.first { $0.id == other.id }
+        #expect(updatedOther?.body == "See [[New]] for details")
+    }
+
+    @Test func doesNotModifyNoteWithoutMatchingWikilink() async {
+        var renamed = makeNote(filename: "Old")
+        var other = makeNote(filename: "Other")
+        other.body = "No links here"
+        store.notes = [renamed, other]
+        store.renameNote(renamed, to: "New")
+        await Task.yield()
+        #expect(fs.savedNotes.filter { $0.id == other.id }.isEmpty)
+    }
+
+    @Test func callsOnCompleteWithUpdatedFilenames() async {
+        var renamed = makeNote(filename: "Old")
+        var other = makeNote(filename: "Other")
+        other.body = "[[Old]]"
+        store.notes = [renamed, other]
+        var result: [String]?
+        store.renameNote(renamed, to: "New") { result = $0 }
+        await Task.yield()
+        #expect(result == ["Other"])
+    }
+
+    @Test func callsOnCompleteWithEmptyArrayWhenNoWikilinks() async {
+        let renamed = makeNote(filename: "Old")
+        let other = makeNote(filename: "Other")
+        store.notes = [renamed, other]
+        var result: [String]?
+        store.renameNote(renamed, to: "New") { result = $0 }
+        await Task.yield()
+        #expect(result == [])
+    }
+
+    @Test func callsOnCompleteWithEmptyArrayWhenFileServiceFails() async {
+        fs.shouldFailRename = true
+        let renamed = makeNote(filename: "Old")
+        store.notes = [renamed]
+        var result: [String]?
+        store.renameNote(renamed, to: "New") { result = $0 }
+        await Task.yield()
+        #expect(result == [])
+    }
+
+    @Test func saveNoteCalledForEachUpdatedNote() async {
+        var renamed = makeNote(filename: "Old")
+        var a = makeNote(filename: "A")
+        var b = makeNote(filename: "B")
+        a.body = "[[Old]]"
+        b.body = "[[Old]] and [[Old]] again"
+        store.notes = [renamed, a, b]
+        store.renameNote(renamed, to: "New")
+        await Task.yield()
+        let savedIDs = Set(fs.savedNotes.map(\.id))
+        #expect(savedIDs.contains(a.id))
+        #expect(savedIDs.contains(b.id))
+    }
+
+    @Test func indexNoteCalledForRenamedNoteAndEachUpdatedNote() async {
+        var renamed = makeNote(filename: "Old")
+        var a = makeNote(filename: "A")
+        var b = makeNote(filename: "B")
+        a.body = "[[Old]]"
+        b.body = "[[Old]] and more"
+        store.notes = [renamed, a, b]
+        store.renameNote(renamed, to: "New")
+        // Two yields: first runs the outer renameNote Task (which spawns inner Tasks),
+        // second runs the inner indexNote Tasks.
+        await Task.yield()
+        await Task.yield()
+        let indexedIDs = Set(idx.indexNoteCalledWith.map(\.id))
+        #expect(indexedIDs.contains(renamed.id))
+        #expect(indexedIDs.contains(a.id))
+        #expect(indexedIDs.contains(b.id))
     }
 }

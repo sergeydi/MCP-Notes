@@ -107,6 +107,29 @@
         }
       }
     },
+    "A note with this filename already exists" : {
+      "comment" : "Tooltip on the conflict warning icon when the entered filename matches an existing note",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A note with this filename already exists"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Заметка с таким именем уже существует"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нотатка з таким іменем вже існує"
+          }
+        }
+      }
+    },
     "Add Bookmark" : {
       "localizations" : {
         "en" : {
@@ -194,6 +217,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Всі нотатки"
+          }
+        }
+      }
+    },
+    "Apply" : {
+      "comment" : "Button that commits a filename rename in the frontmatter editor",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apply"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Применить"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Застосувати"
           }
         }
       }
@@ -717,6 +763,135 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Конфігурація MCP"
+          }
+        }
+      }
+    },
+    "No wikilinks updated" : {
+      "comment" : "Message shown after rename when no wikilinks in other notes referenced the old filename",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No wikilinks updated"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вики-ссылок не найдено"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вікі-посилань не знайдено"
+          }
+        }
+      }
+    },
+    "1 wikilink updated" : {
+      "comment" : "Message shown after rename when exactly one wikilink was updated in other notes",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 wikilink updated"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 вики-ссылка обновлена"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 вікі-посилання оновлено"
+          }
+        }
+      }
+    },
+    "%lld wikilinks updated" : {
+      "comment" : "Message shown after rename when multiple wikilinks were updated in other notes; %lld is the count",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld wikilink updated"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld wikilinks updated"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld вики-ссылка обновлена"
+                }
+              },
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld вики-ссылки обновлены"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld вики-ссылок обновлено"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld вики-ссылки обновлены"
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld вікі-посилання оновлено"
+                }
+              },
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld вікі-посилання оновлено"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld вікі-посилань оновлено"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld вікі-посилання оновлено"
+                }
+              }
+            }
           }
         }
       }

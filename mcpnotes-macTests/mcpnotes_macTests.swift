@@ -187,3 +187,59 @@ struct FrontmatterParserTests {
         #expect(parsed?.body == "")
     }
 }
+
+// MARK: - NoteFilenameValidator
+
+@Suite("NoteFilenameValidator")
+struct NoteFilenameValidatorTests {
+
+    @Test func validName() {
+        #expect(NoteFilenameValidator.validate("My Note") == .valid)
+    }
+
+    @Test func emptyString() {
+        #expect(NoteFilenameValidator.validate("") == .empty)
+    }
+
+    @Test func whitespaceOnly() {
+        #expect(NoteFilenameValidator.validate("   ") == .empty)
+    }
+
+    @Test func exactlyMaxLength() {
+        let name = String(repeating: "a", count: NoteFilenameValidator.maxLength)
+        #expect(NoteFilenameValidator.validate(name) == .valid)
+    }
+
+    @Test func exceedsMaxLength() {
+        let name = String(repeating: "a", count: NoteFilenameValidator.maxLength + 1)
+        #expect(NoteFilenameValidator.validate(name) == .tooLong)
+    }
+
+    @Test func forbiddenCharacterSlash() {
+        #expect(NoteFilenameValidator.validate("my/note") == .forbiddenCharacter)
+    }
+
+    @Test func forbiddenCharacterColon() {
+        #expect(NoteFilenameValidator.validate("note:title") == .forbiddenCharacter)
+    }
+
+    @Test func forbiddenCharacterAsterisk() {
+        #expect(NoteFilenameValidator.validate("note*") == .forbiddenCharacter)
+    }
+
+    @Test func forbiddenCharacterQuote() {
+        #expect(NoteFilenameValidator.validate("note\"title") == .forbiddenCharacter)
+    }
+
+    @Test func forbiddenCharacterBackslash() {
+        #expect(NoteFilenameValidator.validate("note\\title") == .forbiddenCharacter)
+    }
+
+    @Test func forbiddenCharacterNull() {
+        #expect(NoteFilenameValidator.validate("note\0title") == .forbiddenCharacter)
+    }
+
+    @Test func trailingWhitespaceDoesNotMakeItEmpty() {
+        #expect(NoteFilenameValidator.validate("  note  ") == .valid)
+    }
+}

@@ -24,6 +24,7 @@ public final class NoteStore {
     @ObservationIgnored private var navHistory: [UUID] = []
     @ObservationIgnored private var navIndex: Int = -1
     @ObservationIgnored private var isNavigating: Bool = false
+    @ObservationIgnored private var isRenaming: Bool = false
 
     public private(set) var canNavigateBack: Bool = false
     public private(set) var canNavigateForward: Bool = false
@@ -185,17 +186,47 @@ public final class NoteStore {
         }
     }
 
-    public func renameNote(_ note: Note, to newName: String) {
+    public func renameNote(_ note: Note, to newName: String, onComplete: (@MainActor (_ updatedNoteFilenames: [String]) -> Void)? = nil) {
         guard !newName.isEmpty else { return }
+        let oldName = note.filename
         Task {
+            isRenaming = true
+            defer { isRenaming = false }
+
             // TODO: surface errors to user
-            if let renamed = try? fileService.renameNote(note, to: newName) {
-                if let index = notes.firstIndex(where: { $0.id == note.id }) {
-                    notes[index] = renamed
-                    sortNotes()
-                }
-                try? await indexer.indexNote(renamed)
+            guard let renamed = try? fileService.renameNote(note, to: newName) else {
+                onComplete?([])
+                return
             }
+            if let index = notes.firstIndex(where: { $0.id == note.id }) {
+                notes[index] = renamed
+                sortNotes()
+            }
+            Task { try? await indexer.indexNote(renamed) }
+
+            let pattern = /\[\[([^\]]+)\]\]/
+            var updatedFilenames: [String] = []
+            let snapshot = notes.filter { $0.id != note.id }
+            for var n in snapshot {
+                var mutated = false
+                let newBody = n.body.replacing(pattern) { match in
+                    let inner = match.output.1.trimmingCharacters(in: .whitespaces)
+                    guard inner.lowercased() == oldName.lowercased() else {
+                        return String(match.output.0)
+                    }
+                    mutated = true
+                    return "[[\(newName)]]"
+                }
+                guard mutated else { continue }
+                n.body = newBody
+                if let idx = notes.firstIndex(where: { $0.id == n.id }) {
+                    notes[idx] = n
+                }
+                updatedFilenames.append(n.filename)
+                try? fileService.saveNote(n)
+                Task { try? await indexer.indexNote(n) }
+            }
+            onComplete?(updatedFilenames)
         }
     }
 
@@ -296,10 +327,11 @@ public final class NoteStore {
     }
 
     public func reloadExternalChanges() async {
+        guard !isRenaming else { return }
         guard let freshNotes = try? fileService.loadAllNotes() else { return }
 
-        let currentMap = Dictionary(uniqueKeysWithValues: notes.map { ($0.id, $0) })
-        let freshMap = Dictionary(uniqueKeysWithValues: freshNotes.map { ($0.id, $0) })
+        let currentMap = Dictionary(notes.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
+        let freshMap = Dictionary(freshNotes.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
         let currentIDs = Set(currentMap.keys)
         let freshIDs = Set(freshMap.keys)
 

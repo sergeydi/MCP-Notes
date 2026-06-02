@@ -127,6 +127,30 @@ struct NoteIndexerWikilinkTests {
         #expect(backlinks.isEmpty)
     }
 
+    @Test("rename cascade: re-indexing with new filename preserves link resolution")
+    func renameCascadePreservesLinks() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
+        let target = makeNote(filename: "Old", body: "The target.")
+        let source = makeNote(filename: "Source", body: "See [[Old]] for details.")
+        try await indexer.indexAll([source, target])
+        #expect(await indexer.outgoingLinks(from: source.id) == [target.id])
+        #expect(await indexer.incomingLinks(to: target.id) == [source.id])
+
+        // Simulate NoteStore rename cascade: re-index target with new filename,
+        // then re-index source with the updated wikilink body.
+        let renamedTarget = Note(id: target.id, filename: "New", tags: [],
+                                 body: target.body, fileURL: target.fileURL, isBookmarked: false)
+        let updatedSource = Note(id: source.id, filename: "Source", tags: [],
+                                 body: "See [[New]] for details.", fileURL: source.fileURL, isBookmarked: false)
+        try await indexer.indexNote(renamedTarget)
+        try await indexer.indexNote(updatedSource)
+
+        #expect(await indexer.outgoingLinks(from: source.id) == [target.id])
+        #expect(await indexer.incomingLinks(to: target.id) == [source.id])
+    }
+
     @Test("note with no wikilinks has empty outgoing links")
     func noteWithNoWikilinksHasEmptyLinks() throws {
         let tmp = try makeTempDir()

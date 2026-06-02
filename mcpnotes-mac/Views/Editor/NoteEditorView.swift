@@ -9,13 +9,43 @@ struct NoteEditorView: View {
     @State private var showDeleteConfirmation = false
     @State private var formatProxy = TextFormatProxy()
     @State private var showWikilinkPicker = false
+    @State private var draftFilename: String = ""
+    @State private var isEditingFilename = false
+    @State private var isRenamingInProgress = false
+    @State private var wikilinkRenameCount: Int? = nil
+    @State private var renameMessageTask: Task<Void, Never>? = nil
 
     var body: some View {
         VStack(spacing: 0) {
             FrontmatterView(
+                filename: note.filename,
+                draftFilename: $draftFilename,
+                isEditingFilename: $isEditingFilename,
+                isRenamingInProgress: isRenamingInProgress,
+                wikilinkRenameCount: wikilinkRenameCount,
+                otherFilenames: store.notes.filter { $0.id != note.id }.map(\.filename),
                 tags: $viewModel.tags,
                 allTags: store.allTags,
-                onTagsChanged: viewModel.scheduleAutosave
+                onTagsChanged: viewModel.scheduleAutosave,
+                onApplyRename: {
+                    let oldName = note.filename
+                    let newName = draftFilename.trimmingCharacters(in: .whitespaces)
+                    viewModel.flushAutosave()
+                    renameMessageTask?.cancel()
+                    renameMessageTask = nil
+                    isRenamingInProgress = true
+                    wikilinkRenameCount = nil
+                    store.renameNote(note, to: newName) { updatedFilenames in
+                        isRenamingInProgress = false
+                        wikilinkRenameCount = updatedFilenames.count
+                        renameMessageTask = Task {
+                            try? await Task.sleep(for: .seconds(4))
+                            guard !Task.isCancelled else { return }
+                            wikilinkRenameCount = nil
+                            isEditingFilename = false
+                        }
+                    }
+                }
             )
 
             Divider()
@@ -36,9 +66,12 @@ struct NoteEditorView: View {
         .toolbar { editorToolbar }
         .onAppear {
             viewModel.load(note: note)
+            draftFilename = note.filename
+            let noteID = note.id
             viewModel.onSave = { [weak store] body, tags in
                 guard let store else { return }
-                var updated = note
+                guard let current = store.notes.first(where: { $0.id == noteID }) else { return }
+                var updated = current
                 updated.body = body
                 updated.tags = tags
                 store.updateNote(updated)
@@ -47,6 +80,19 @@ struct NoteEditorView: View {
         .onChange(of: note.id) { _, _ in
             viewModel.flushAutosave()
             viewModel.load(note: note)
+            draftFilename = note.filename
+            isEditingFilename = false
+            renameMessageTask?.cancel()
+            wikilinkRenameCount = nil
+            let noteID = note.id
+            viewModel.onSave = { [weak store] body, tags in
+                guard let store else { return }
+                guard let current = store.notes.first(where: { $0.id == noteID }) else { return }
+                var updated = current
+                updated.body = body
+                updated.tags = tags
+                store.updateNote(updated)
+            }
         }
         .onDisappear {
             viewModel.flushAutosave()
