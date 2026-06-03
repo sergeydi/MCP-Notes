@@ -384,6 +384,16 @@ struct NoteStoreIndexerTests {
         #expect(indexed.body == "New body")
     }
 
+    @Test func updateNotePassesUpdatedTags() async throws {
+        var note = makeNote(tags: ["old"])
+        store.notes = [note]
+        note.tags = ["new"]
+        store.updateNote(note)
+        await Task.yield()
+        let indexed = try #require(idx.indexNoteCalledWith.first)
+        #expect(indexed.tags == ["new"])
+    }
+
     @Test func updateNoteIgnoresUnknownIDDoesNotIndex() async {
         store.notes = [makeNote(filename: "Real")]
         store.updateNote(makeNote(filename: "Ghost"))
@@ -531,6 +541,17 @@ struct NoteStoreExternalChangesTests {
         #expect(idx.removeNoteCalledWith.isEmpty)
     }
 
+    @Test func updatesChangedNoteTagsCallsIndexNoteWithNewTags() async throws {
+        let note = makeNote(filename: "A", tags: ["old"])
+        store.notes = [note]
+        var updated = note
+        updated.tags = ["new"]
+        fs.stubbedNotes = [updated]
+        await store.reloadExternalChanges()
+        let indexed = try #require(idx.indexNoteCalledWith.first { $0.id == note.id })
+        #expect(indexed.tags == ["new"])
+    }
+
     @Test func updatesChangedNoteFilename() async throws {
         let note = makeNote(filename: "OldName")
         store.notes = [note]
@@ -550,6 +571,54 @@ struct NoteStoreExternalChangesTests {
         fs.stubbedNotes = [a, c, b]
         await store.reloadExternalChanges()
         #expect(store.notes.map(\.filename) == ["A", "B", "C"])
+    }
+}
+
+// MARK: - Tag grouping (byTag sidebar mode)
+
+@Suite("NoteStore – tag grouping")
+@MainActor
+struct NoteStoreTagGroupingTests {
+    let store: NoteStore
+
+    init() {
+        store = NoteStore(fileService: MockFileService(), indexer: MockNoteIndexer())
+    }
+
+    @Test func notesFilteredByTagMatchExpected() {
+        let match = makeNote(tags: ["swift"])
+        let other = makeNote(tags: ["python"])
+        store.notes = [match, other]
+        let result = store.notes.filter { $0.tags.contains("swift") }
+        #expect(result.count == 1)
+        #expect(result.first?.id == match.id)
+    }
+
+    @Test func noteWithMultipleTagsAppearsUnderEachTag() {
+        let note = makeNote(tags: ["swift", "macOS"])
+        store.notes = [note]
+        #expect(store.notes.filter { $0.tags.contains("swift") }.count == 1)
+        #expect(store.notes.filter { $0.tags.contains("macOS") }.count == 1)
+    }
+
+    @Test func untaggedNoteDoesNotAppearInAnyTagGroup() {
+        let untagged = makeNote(tags: [])
+        store.notes = [untagged]
+        for tag in store.allTags {
+            #expect(store.notes.filter { $0.tags.contains(tag) }.isEmpty)
+        }
+    }
+
+    @Test func allTagsDrivesTagGroupsCorrectly() {
+        store.notes = [
+            makeNote(tags: ["swift", "macOS"]),
+            makeNote(tags: ["swift"]),
+            makeNote(tags: []),
+        ]
+        #expect(store.allTags == ["macOS", "swift"])
+        #expect(store.notes.filter { $0.tags.contains("swift") }.count == 2)
+        #expect(store.notes.filter { $0.tags.contains("macOS") }.count == 1)
+        #expect(store.notes.filter { $0.tags.isEmpty }.count == 1)
     }
 }
 

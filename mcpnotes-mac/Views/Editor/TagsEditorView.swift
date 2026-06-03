@@ -7,14 +7,21 @@ struct TagsEditorView: View {
 
     @State private var newTagText = ""
     @FocusState private var isInputFocused: Bool
+    @State private var highlightedIndex: Int? = nil
+    @State private var textFieldHeight: CGFloat = 22
 
     private var suggestions: [String] {
         let existing = Set(tags)
         let q = newTagText.lowercased()
         return allTags.filter {
             !existing.contains($0) &&
-            (q.isEmpty || $0.lowercased().hasPrefix(q))
+            !q.isEmpty &&
+            $0.lowercased().hasPrefix(q)
         }
+    }
+
+    private var showSuggestions: Bool {
+        isInputFocused && !suggestions.isEmpty
     }
 
     var body: some View {
@@ -23,28 +30,71 @@ struct TagsEditorView: View {
                 tagCapsule(tag)
             }
 
-            HStack(spacing: 0) {
-                TextField("Add tag…", text: $newTagText)
-                    .textFieldStyle(.plain)
-                    .frame(minWidth: 60)
-                    .focused($isInputFocused)
-                    .onSubmit { commitNewTag() }
-                    .accessibilityLabel("New tag name")
-
-                if !suggestions.isEmpty {
-                    Menu {
-                        ForEach(suggestions, id: \.self) { suggestion in
-                            Button(suggestion) { addTag(suggestion) }
-                        }
-                    } label: {
-                        Image(systemName: "chevron.down")
-                            .imageScale(.small)
-                            .foregroundStyle(.secondary)
+            TextField("Add tag…", text: $newTagText)
+                .textFieldStyle(.plain)
+                .frame(minWidth: 60)
+                .focused($isInputFocused)
+                .onChange(of: newTagText) { highlightedIndex = nil }
+                .onSubmit { commitNewTag() }
+                .onKeyPress(.downArrow) {
+                    guard !suggestions.isEmpty else { return .ignored }
+                    highlightedIndex = ((highlightedIndex ?? -1) + 1) % suggestions.count
+                    return .handled
+                }
+                .onKeyPress(.upArrow) {
+                    guard !suggestions.isEmpty else { return .ignored }
+                    let count = suggestions.count
+                    highlightedIndex = ((highlightedIndex ?? count) - 1 + count) % count
+                    return .handled
+                }
+                .onKeyPress(.return) {
+                    guard let idx = highlightedIndex, idx < suggestions.count else { return .ignored }
+                    selectSuggestion(suggestions[idx])
+                    return .handled
+                }
+                .accessibilityLabel("New tag name")
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                    textFieldHeight = $0
+                }
+                .overlay(alignment: .topLeading) {
+                    if showSuggestions {
+                        suggestionsDropdown
+                            .offset(y: textFieldHeight + 2)
                     }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
+                }
+                .zIndex(10)
+        }
+    }
+
+    private var suggestionsDropdown: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(suggestions.enumerated()), id: \.element) { index, suggestion in
+                Button {
+                    selectSuggestion(suggestion)
+                } label: {
+                    Text(suggestion)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .contentShape(Rectangle())
+                        .background(
+                            highlightedIndex == index ? Color.accentColor.opacity(0.15) : Color.clear
+                        )
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    if hovering { highlightedIndex = index }
                 }
             }
+        }
+        .frame(minWidth: 150)
+        .padding(.vertical, 4)
+        .background(.background)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(.separator, lineWidth: 0.5)
         }
     }
 
@@ -64,6 +114,12 @@ struct TagsEditorView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .background(.secondary.opacity(0.15), in: Capsule())
+    }
+
+    private func selectSuggestion(_ suggestion: String) {
+        addTag(suggestion)
+        newTagText = ""
+        highlightedIndex = nil
     }
 
     private func addTag(_ tag: String) {

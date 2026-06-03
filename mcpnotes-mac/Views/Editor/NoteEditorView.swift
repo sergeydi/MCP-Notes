@@ -47,6 +47,7 @@ struct NoteEditorView: View {
                     }
                 }
             )
+            .zIndex(1)
 
             Divider()
 
