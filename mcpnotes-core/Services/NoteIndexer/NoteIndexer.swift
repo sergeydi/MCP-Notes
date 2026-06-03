@@ -3,6 +3,7 @@ import CryptoKit
 import Embeddings
 import Foundation
 import USearch
+@_implementationOnly import USearchSafeLoader
 
 /// Manages on-device vector indexing and semantic search for notes.
 /// Uses multilingual-e5-small (XLM-RoBERTa) downloaded from HuggingFace Hub on first launch.
@@ -60,12 +61,22 @@ public actor NoteIndexer: NoteIndexing {
     // MARK: - Lifecycle
 
     /// Load persisted index and key mapping. Call once on app launch after NoteStore.load().
-    public func loadFromDisk() {
+    /// Returns `true` if the index was corrupted or inconsistent and had to be reset.
+    @discardableResult
+    public func loadFromDisk() -> Bool {
         // Try current SQLite format first.
         if let storedVersion = db.intMeta("index_version"),
            storedVersion == Self.currentIndexVersion,
            FileManager.default.fileExists(atPath: indexPath) {
-            vectorIndex.load(path: indexPath)
+            var loadError: NSError?
+            guard USearchSafeLoad(vectorIndex, indexPath, &loadError) else {
+                vectorIndex = USearchIndex.make(
+                    metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32
+                )
+                vectorIndex.reserve(64)
+                db.clearAll()
+                return true
+            }
             let capacity = max(UInt32(vectorIndex.count) + 16, 64)
             vectorIndex.reserve(capacity)
             let storedNextKey = UInt64(db.intMeta("next_key") ?? 1)
@@ -78,8 +89,9 @@ public actor NoteIndexer: NoteIndexing {
                 vectorIndex = USearchIndex.make(
                     metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32
                 )
+                vectorIndex.reserve(64)
                 db.clearAll()
-                return
+                return true
             }
 
             nextKey = storedNextKey
@@ -88,11 +100,12 @@ public actor NoteIndexer: NoteIndexing {
                 uuidToKeys[uuid] = keys
                 for key in keys { keyToUUID[key] = uuid }
             }
-            return
+            return false
         }
 
         // Fresh start — clear hashes so indexAll() re-indexes everything.
         db.clearHashes()
+        return false
     }
 
     /// Persist index and mapping to disk.

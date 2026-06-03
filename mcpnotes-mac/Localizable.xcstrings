@@ -1,894 +1,105 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {
-    "%@, tags: %@" : {
-      "comment" : "Accessibility description for a note that has tags: note title, then comma-separated tags",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@, tags: %@"
+  "sourceLanguage": "en",
+  "strings": {
+    "%@, tags: %@": {
+      "comment": "Accessibility description for a note that has tags: note title, then comma-separated tags",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, tags: %@"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@, теги: %@"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, теги: %@"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@, теги: %@"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, теги: %@"
           }
         }
       }
     },
-    "%lld notes indexed" : {
-      "comment" : "Number of notes indexed by the RAG engine; supports plural forms",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld note indexed"
+    "%lld notes indexed": {
+      "comment": "Number of notes indexed by the RAG engine; supports plural forms",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld note indexed"
                 }
               },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld notes indexed"
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld notes indexed"
                 }
               }
             }
           }
         },
-        "ru" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Проиндексирована %lld заметка"
+        "ru": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Проиндексирована %lld заметка"
                 }
               },
-              "few" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Проиндексировано %lld заметки"
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Проиндексировано %lld заметки"
                 }
               },
-              "many" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Проиндексировано %lld заметок"
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Проиндексировано %lld заметок"
                 }
               },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Проиндексировано %lld заметки"
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Проиндексировано %lld заметки"
                 }
               }
             }
           }
         },
-        "uk" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Проіндексовано %lld нотатку"
+        "uk": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Проіндексовано %lld нотатку"
                 }
               },
-              "few" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Проіндексовано %lld нотатки"
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Проіндексовано %lld нотатки"
                 }
               },
-              "many" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Проіндексовано %lld нотаток"
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Проіндексовано %lld нотаток"
                 }
               },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Проіндексовано %lld нотатки"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "A note with this filename already exists" : {
-      "comment" : "Tooltip on the conflict warning icon when the entered filename matches an existing note",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A note with this filename already exists"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Заметка с таким именем уже существует"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нотатка з таким іменем вже існує"
-          }
-        }
-      }
-    },
-    "Add Bookmark" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add Bookmark"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Добавить закладку"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Додати закладку"
-          }
-        }
-      }
-    },
-    "Add bookmark" : {
-      "comment" : "Accessibility label and tooltip for the bookmark toolbar button",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add bookmark"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Добавить закладку"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Додати закладку"
-          }
-        }
-      }
-    },
-    "Add tag…" : {
-      "comment" : "Placeholder text in the tag input field",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add tag…"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Добавить тег…"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Додати тег…"
-          }
-        }
-      }
-    },
-    "All Notes" : {
-      "comment" : "Sidebar mode: show all notes",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "All Notes"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Все заметки"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Всі нотатки"
-          }
-        }
-      }
-    },
-    "Apply" : {
-      "comment" : "Button that commits a filename rename in the frontmatter editor",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apply"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Применить"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Застосувати"
-          }
-        }
-      }
-    },
-    "Back" : {
-      "comment" : "Tooltip for the navigation back button",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Back"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Назад"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Назад"
-          }
-        }
-      }
-    },
-    "Bold" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bold"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жирный"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Жирний"
-          }
-        }
-      }
-    },
-    "Bullet List" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bullet List"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Маркированный список"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Маркований список"
-          }
-        }
-      }
-    },
-    "Bullet list" : {
-      "comment" : "Tooltip for the bullet list formatting button",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bullet list"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Маркированный список"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Маркований список"
-          }
-        }
-      }
-    },
-    "By Tags" : {
-      "comment" : "Sidebar mode: group notes by tag",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "By Tags"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "По тегам"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "За тегами"
-          }
-        }
-      }
-    },
-    "Code" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Код"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Код"
-          }
-        }
-      }
-    },
-    "Content" : {
-      "comment" : "Search results section header: notes matching the search query in body or tags",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Content"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "По содержимому"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "За вмістом"
-          }
-        }
-      }
-    },
-    "Create new note" : {
-      "comment" : "Accessibility label for the new note toolbar button",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create new note"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Создать заметку"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Створити нотатку"
-          }
-        }
-      }
-    },
-    "Delete" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Видалити"
-          }
-        }
-      }
-    },
-    "Delete \"%@\"?" : {
-      "comment" : "Confirmation dialog title when deleting a note; %@ is the note filename",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete \"%@\"?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить \"%@\"?"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Видалити \"%@\"?"
-          }
-        }
-      }
-    },
-    "Delete Note" : {
-      "comment" : "Destructive toolbar button that initiates note deletion",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete Note"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить заметку"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Видалити нотатку"
-          }
-        }
-      }
-    },
-    "Delete note" : {
-      "comment" : "Tooltip for the delete note toolbar button",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete note"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Удалить заметку"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Видалити нотатку"
-          }
-        }
-      }
-    },
-    "Enable RAG" : {
-      "comment" : "Toggle label to enable Retrieval-Augmented Generation indexing",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enable RAG"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Включить RAG"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Увімкнути RAG"
-          }
-        }
-      }
-    },
-    "Favorites" : {
-      "comment" : "Sidebar mode: show bookmarked notes",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Favorites"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Избранное"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вибране"
-          }
-        }
-      }
-    },
-    "Forward" : {
-      "comment" : "Tooltip for the navigation forward button",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Forward"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вперёд"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вперед"
-          }
-        }
-      }
-    },
-    "iCloud Sync" : {
-      "comment" : "Settings section header for iCloud synchronisation",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud Sync"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Синхронизация iCloud"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Синхронізація iCloud"
-          }
-        }
-      }
-    },
-    "Indexer Status" : {
-      "comment" : "Settings section header showing RAG indexer progress",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Indexer Status"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Статус индексатора"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Стан індексатора"
-          }
-        }
-      }
-    },
-    "Indexing failed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Indexing failed"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ошибка индексирования"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Помилка індексування"
-          }
-        }
-      }
-    },
-    "Indexing notes… %lld / %lld" : {
-      "comment" : "Progress label during RAG indexing; first %lld is indexed count, second is total",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Indexing notes… %lld / %lld"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Индексирование… %lld / %lld"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Індексування… %lld / %lld"
-          }
-        }
-      }
-    },
-    "Insert Link" : {
-      "comment" : "Label for the insert wikilink toolbar button",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Insert Link"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вставить ссылку"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вставити посилання"
-          }
-        }
-      }
-    },
-    "Insert wikilink" : {
-      "comment" : "Tooltip for the insert wikilink toolbar button",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Insert wikilink"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вставить вики-ссылку"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вставити вікі-посилання"
-          }
-        }
-      }
-    },
-    "Italic" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Italic"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Курсив"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Курсив"
-          }
-        }
-      }
-    },
-    "MCP Configuration" : {
-      "comment" : "Settings section header with the MCP server JSON configuration snippet",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "MCP Configuration"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Конфигурация MCP"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Конфігурація MCP"
-          }
-        }
-      }
-    },
-    "No wikilinks updated" : {
-      "comment" : "Message shown after rename when no wikilinks in other notes referenced the old filename",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No wikilinks updated"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вики-ссылок не найдено"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вікі-посилань не знайдено"
-          }
-        }
-      }
-    },
-    "1 wikilink updated" : {
-      "comment" : "Message shown after rename when exactly one wikilink was updated in other notes",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1 wikilink updated"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1 вики-ссылка обновлена"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1 вікі-посилання оновлено"
-          }
-        }
-      }
-    },
-    "%lld wikilinks updated" : {
-      "comment" : "Message shown after rename when multiple wikilinks were updated in other notes; %lld is the count",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld wikilink updated"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld wikilinks updated"
-                }
-              }
-            }
-          }
-        },
-        "ru" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld вики-ссылка обновлена"
-                }
-              },
-              "few" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld вики-ссылки обновлены"
-                }
-              },
-              "many" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld вики-ссылок обновлено"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld вики-ссылки обновлены"
-                }
-              }
-            }
-          }
-        },
-        "uk" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld вікі-посилання оновлено"
-                }
-              },
-              "few" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld вікі-посилання оновлено"
-                }
-              },
-              "many" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld вікі-посилань оновлено"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld вікі-посилання оновлено"
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Проіндексовано %lld нотатки"
                 }
               }
             }
@@ -896,757 +107,1799 @@
         }
       }
     },
-    "New Note" : {
-      "comment" : "Toolbar button and menu item that creates a new note",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "New Note"
+    "A note with this filename already exists": {
+      "comment": "Tooltip on the conflict warning icon when the entered filename matches an existing note",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A note with this filename already exists"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Новая заметка"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Заметка с таким именем уже существует"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нова нотатка"
-          }
-        }
-      }
-    },
-    "New tag name" : {
-      "comment" : "Accessibility label for the new tag text field",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "New tag name"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Название нового тега"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Назва нового тегу"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нотатка з таким іменем вже існує"
           }
         }
       }
     },
-    "No notes found" : {
-      "comment" : "Empty state in the wikilink picker when the search yields no results",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No notes found"
+    "Add Bookmark": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Bookmark"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Заметки не найдены"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавить закладку"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нотаток не знайдено"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Додати закладку"
           }
         }
       }
     },
-    "No Note Selected" : {
-      "comment" : "Title in the empty detail pane when no note is selected",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No Note Selected"
+    "Add bookmark": {
+      "comment": "Accessibility label and tooltip for the bookmark toolbar button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add bookmark"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Заметка не выбрана"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавить закладку"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нотатку не вибрано"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Додати закладку"
           }
         }
       }
     },
-    "No Tags" : {
-      "comment" : "Sidebar section header for notes that have no tags",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No Tags"
+    "Add tag…": {
+      "comment": "Placeholder text in the tag input field",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add tag…"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Без тегов"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавить тег…"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Без тегів"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Додати тег…"
           }
         }
       }
     },
-    "Not started" : {
-      "comment" : "RAG indexer status: indexing has not begun yet",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not started"
+    "All Notes": {
+      "comment": "Sidebar mode: show all notes",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All Notes"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Не запущено"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Все заметки"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Не розпочато"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Всі нотатки"
           }
         }
       }
     },
-    "Notes Folder" : {
-      "comment" : "Settings section header showing the on-disk notes directory path",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notes Folder"
+    "Apply": {
+      "comment": "Button that commits a filename rename in the frontmatter editor",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Папка с заметками"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Применить"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Папка нотаток"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Застосувати"
           }
         }
       }
     },
-    "Numbered List" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Numbered List"
+    "Back": {
+      "comment": "Tooltip for the navigation back button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нумерованный список"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Назад"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нумерований список"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Назад"
           }
         }
       }
     },
-    "Numbered list" : {
-      "comment" : "Tooltip for the numbered list formatting button",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Numbered list"
+    "Bold": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bold"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нумерованный список"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Жирный"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нумерований список"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Жирний"
           }
         }
       }
     },
-    "Open in New Window" : {
-      "comment" : "Context menu item that opens the note in a separate window",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open in New Window"
+    "Bullet List": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bullet List"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Открыть в новом окне"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Маркированный список"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Відкрити в новому вікні"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Маркований список"
           }
         }
       }
     },
-    "Open settings" : {
-      "comment" : "Accessibility label for the settings toolbar button",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open settings"
+    "Bullet list": {
+      "comment": "Tooltip for the bullet list formatting button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bullet list"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Открыть настройки"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Маркированный список"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Відкрити налаштування"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Маркований список"
           }
         }
       }
     },
-    "RAG" : {
-      "comment" : "Settings tab label; RAG = Retrieval-Augmented Generation (technical term, kept as-is)",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "RAG"
+    "By Tags": {
+      "comment": "Sidebar mode: group notes by tag",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "By Tags"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "RAG"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "По тегам"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "RAG"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "За тегами"
           }
         }
       }
     },
-    "Re-index All Notes" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Re-index All Notes"
+    "Change Folder…": {
+      "comment": "Button that opens a folder picker to change the notes directory",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change Folder…"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Переиндексировать все заметки"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Изменить папку…"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Переіндексувати всі нотатки"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Змінити папку…"
           }
         }
       }
     },
-    "Related" : {
-      "comment" : "Search results section header: notes matched by semantic (RAG) search",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Related"
+    "Choose a folder to store your notes": {
+      "comment": "NSOpenPanel message when choosing a custom notes directory",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a folder to store your notes"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Похожие"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите папку для хранения заметок"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Схожі"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Виберіть папку для зберігання нотаток"
           }
         }
       }
     },
-    "Remove Bookmark" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove Bookmark"
+    "Code": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Убрать закладку"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Код"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Прибрати закладку"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Код"
           }
         }
       }
     },
-    "Remove bookmark" : {
-      "comment" : "Accessibility label and tooltip for the bookmark toolbar button when note is bookmarked",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove bookmark"
+    "Content": {
+      "comment": "Search results section header: notes matching the search query in body or tags",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Убрать закладку"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "По содержимому"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Прибрати закладку"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "За вмістом"
           }
         }
       }
     },
-    "Remove tag %@" : {
-      "comment" : "Accessibility label for the remove-tag button; %@ is the tag name",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove tag %@"
+    "Create new note": {
+      "comment": "Accessibility label for the new note toolbar button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create new note"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Убрать тег %@"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Создать заметку"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Прибрати тег %@"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Створити нотатку"
           }
         }
       }
     },
-    "Reveal in Finder" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reveal in Finder"
+    "Custom folder — sync depends on the chosen location.": {
+      "comment": "iCloud Sync section label when the user has selected a custom notes directory",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom folder — sync depends on the chosen location."
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Показать в Finder"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выбранная папка — синхронизация зависит от её расположения."
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Показати у Finder"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вибрана папка — синхронізація залежить від її розташування."
           }
         }
       }
     },
-    "Search" : {
-      "comment" : "Sidebar mode: full-text and semantic search; also the search text field placeholder",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Search"
+    "Delete": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Поиск"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пошук"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити"
           }
         }
       }
     },
-    "Search notes…" : {
-      "comment" : "Placeholder in the wikilink picker search field",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Search notes…"
+    "Delete \"%@\"?": {
+      "comment": "Confirmation dialog title when deleting a note; %@ is the note filename",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete \"%@\"?"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Поиск заметок…"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить \"%@\"?"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пошук нотаток…"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити \"%@\"?"
           }
         }
       }
     },
-    "Select a note from the sidebar or create a new one." : {
-      "comment" : "Subtitle in the empty detail pane when no note is selected",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select a note from the sidebar or create a new one."
+    "Delete Note": {
+      "comment": "Destructive toolbar button that initiates note deletion",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Note"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Выберите заметку на панели или создайте новую."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить заметку"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Виберіть нотатку на панелі або створіть нову."
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити нотатку"
           }
         }
       }
     },
-    "Semantic search indexes your notes locally and exposes them via MCP." : {
-      "comment" : "Caption below the Enable RAG toggle in Settings",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Semantic search indexes your notes locally and exposes them via MCP."
+    "Delete note": {
+      "comment": "Tooltip for the delete note toolbar button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete note"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Семантический поиск индексирует ваши заметки локально и открывает к ним доступ через MCP."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить заметку"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Семантичний пошук індексує ваші нотатки локально та надає до них доступ через MCP."
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Видалити нотатку"
           }
         }
       }
     },
-    "Settings" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Settings"
+    "Enable RAG": {
+      "comment": "Toggle label to enable Retrieval-Augmented Generation indexing",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable RAG"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Настройки"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Включить RAG"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Налаштування"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Увімкнути RAG"
           }
         }
       }
     },
-    "Share" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Share"
+    "Favorites": {
+      "comment": "Sidebar mode: show bookmarked notes",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorites"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Поделиться"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Избранное"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Поділитися"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вибране"
           }
         }
       }
     },
-    "Share note" : {
-      "comment" : "Tooltip for the share toolbar button",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Share note"
+    "Forward": {
+      "comment": "Tooltip for the navigation forward button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forward"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Поделиться заметкой"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вперёд"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Поділитися нотаткою"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вперед"
           }
         }
       }
     },
-    "Show Wikilink Graph" : {
-      "comment" : "Tooltip for the button that opens the wikilink graph window",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show Wikilink Graph"
+    "iCloud Sync": {
+      "comment": "Settings section header for iCloud synchronisation",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud Sync"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Показать граф вики-ссылок"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Синхронизация iCloud"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Показати граф вікі-посилань"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Синхронізація iCloud"
           }
         }
       }
     },
-    "Storage" : {
-      "comment" : "Settings tab label for storage / file system options",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Storage"
+    "Indexer Status": {
+      "comment": "Settings section header showing RAG indexer progress",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indexer Status"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Хранилище"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Статус индексатора"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сховище"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Стан індексатора"
           }
         }
       }
     },
-    "Strikethrough" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Strikethrough"
+    "Indexing failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indexing failed"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Зачёркнутый"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ошибка индексирования"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Закреслений"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Помилка індексування"
           }
         }
       }
     },
-    "Sync is managed automatically by iCloud." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync is managed automatically by iCloud."
+    "Indexing notes… %lld / %lld": {
+      "comment": "Progress label during RAG indexing; first %lld is indexed count, second is total",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indexing notes… %lld / %lld"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Синхронизация управляется автоматически через iCloud."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Индексирование… %lld / %lld"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Синхронізацію керує iCloud автоматично."
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Індексування… %lld / %lld"
           }
         }
       }
     },
-    "tags" : {
-      "comment" : "Read-only label in the note frontmatter view",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "tags"
+    "Insert Link": {
+      "comment": "Label for the insert wikilink toolbar button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Insert Link"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "теги"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вставить ссылку"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "теги"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вставити посилання"
           }
         }
       }
     },
-    "This note will be permanently deleted." : {
-      "comment" : "Message body in the delete note confirmation dialog",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This note will be permanently deleted."
+    "Insert wikilink": {
+      "comment": "Tooltip for the insert wikilink toolbar button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Insert wikilink"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Эта заметка будет удалена без возможности восстановления."
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вставить вики-ссылку"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Цю нотатку буде видалено назавжди."
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вставити вікі-посилання"
           }
         }
       }
     },
-    "Title" : {
-      "comment" : "Search results section header: notes whose filename matches the search query",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Title"
+    "Italic": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Italic"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "По названию"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Курсив"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "За назвою"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Курсив"
           }
         }
       }
     },
-    "Wikilink Graph" : {
-      "comment" : "Window title for the wikilink graph visualisation",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wikilink Graph"
+    "MCP Configuration": {
+      "comment": "Settings section header with the MCP server JSON configuration snippet",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP Configuration"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Граф вики-ссылок"
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Конфигурация MCP"
           }
         },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Граф вікі-посилань"
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Конфігурація MCP"
+          }
+        }
+      }
+    },
+    "No wikilinks updated": {
+      "comment": "Message shown after rename when no wikilinks in other notes referenced the old filename",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No wikilinks updated"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вики-ссылок не найдено"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Вікі-посилань не знайдено"
+          }
+        }
+      }
+    },
+    "1 wikilink updated": {
+      "comment": "Message shown after rename when exactly one wikilink was updated in other notes",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 wikilink updated"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 вики-ссылка обновлена"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 вікі-посилання оновлено"
+          }
+        }
+      }
+    },
+    "%lld wikilinks updated": {
+      "comment": "Message shown after rename when multiple wikilinks were updated in other notes; %lld is the count",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld wikilink updated"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld wikilinks updated"
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld вики-ссылка обновлена"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld вики-ссылки обновлены"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld вики-ссылок обновлено"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld вики-ссылки обновлены"
+                }
+              }
+            }
+          }
+        },
+        "uk": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld вікі-посилання оновлено"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld вікі-посилання оновлено"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld вікі-посилань оновлено"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld вікі-посилання оновлено"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "New Note": {
+      "comment": "Toolbar button and menu item that creates a new note",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Note"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Новая заметка"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нова нотатка"
+          }
+        }
+      }
+    },
+    "New tag name": {
+      "comment": "Accessibility label for the new tag text field",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New tag name"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Название нового тега"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Назва нового тегу"
+          }
+        }
+      }
+    },
+    "No notes found": {
+      "comment": "Empty state in the wikilink picker when the search yields no results",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No notes found"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Заметки не найдены"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нотаток не знайдено"
+          }
+        }
+      }
+    },
+    "No Note Selected": {
+      "comment": "Title in the empty detail pane when no note is selected",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Note Selected"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Заметка не выбрана"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нотатку не вибрано"
+          }
+        }
+      }
+    },
+    "No Tags": {
+      "comment": "Sidebar section header for notes that have no tags",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Tags"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Без тегов"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Без тегів"
+          }
+        }
+      }
+    },
+    "Not started": {
+      "comment": "RAG indexer status: indexing has not begun yet",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not started"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не запущено"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не розпочато"
+          }
+        }
+      }
+    },
+    "Notes Folder": {
+      "comment": "Settings section header showing the on-disk notes directory path",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes Folder"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Папка с заметками"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Папка нотаток"
+          }
+        }
+      }
+    },
+    "Numbered List": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Numbered List"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нумерованный список"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нумерований список"
+          }
+        }
+      }
+    },
+    "Numbered list": {
+      "comment": "Tooltip for the numbered list formatting button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Numbered list"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нумерованный список"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Нумерований список"
+          }
+        }
+      }
+    },
+    "Open in New Window": {
+      "comment": "Context menu item that opens the note in a separate window",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in New Window"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть в новом окне"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відкрити в новому вікні"
+          }
+        }
+      }
+    },
+    "Open settings": {
+      "comment": "Accessibility label for the settings toolbar button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open settings"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть настройки"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відкрити налаштування"
+          }
+        }
+      }
+    },
+    "RAG": {
+      "comment": "Settings tab label; RAG = Retrieval-Augmented Generation (technical term, kept as-is)",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RAG"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RAG"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RAG"
+          }
+        }
+      }
+    },
+    "Re-index All Notes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Re-index All Notes"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Переиндексировать все заметки"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Переіндексувати всі нотатки"
+          }
+        }
+      }
+    },
+    "Related": {
+      "comment": "Search results section header: notes matched by semantic (RAG) search",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Related"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Похожие"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Схожі"
+          }
+        }
+      }
+    },
+    "Reset to Default": {
+      "comment": "Button that resets the notes directory back to the iCloud or Application Support default",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset to Default"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сбросить"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скинути"
+          }
+        }
+      }
+    },
+    "Remove Bookmark": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Bookmark"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Убрать закладку"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прибрати закладку"
+          }
+        }
+      }
+    },
+    "Remove bookmark": {
+      "comment": "Accessibility label and tooltip for the bookmark toolbar button when note is bookmarked",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove bookmark"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Убрать закладку"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прибрати закладку"
+          }
+        }
+      }
+    },
+    "Remove tag %@": {
+      "comment": "Accessibility label for the remove-tag button; %@ is the tag name",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove tag %@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Убрать тег %@"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прибрати тег %@"
+          }
+        }
+      }
+    },
+    "Reveal in Finder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal in Finder"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показать в Finder"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показати у Finder"
+          }
+        }
+      }
+    },
+    "Search": {
+      "comment": "Sidebar mode: full-text and semantic search; also the search text field placeholder",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поиск"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пошук"
+          }
+        }
+      }
+    },
+    "Search notes…": {
+      "comment": "Placeholder in the wikilink picker search field",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search notes…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поиск заметок…"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пошук нотаток…"
+          }
+        }
+      }
+    },
+    "Select a note from the sidebar or create a new one.": {
+      "comment": "Subtitle in the empty detail pane when no note is selected",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a note from the sidebar or create a new one."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите заметку на панели или создайте новую."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Виберіть нотатку на панелі або створіть нову."
+          }
+        }
+      }
+    },
+    "Semantic search indexes your notes locally and exposes them via MCP.": {
+      "comment": "Caption below the Enable RAG toggle in Settings",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semantic search indexes your notes locally and exposes them via MCP."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Семантический поиск индексирует ваши заметки локально и открывает к ним доступ через MCP."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Семантичний пошук індексує ваші нотатки локально та надає до них доступ через MCP."
+          }
+        }
+      }
+    },
+    "Settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Настройки"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Налаштування"
+          }
+        }
+      }
+    },
+    "Share": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поделиться"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поділитися"
+          }
+        }
+      }
+    },
+    "Share note": {
+      "comment": "Tooltip for the share toolbar button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share note"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поделиться заметкой"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поділитися нотаткою"
+          }
+        }
+      }
+    },
+    "Show Wikilink Graph": {
+      "comment": "Tooltip for the button that opens the wikilink graph window",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Wikilink Graph"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показать граф вики-ссылок"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Показати граф вікі-посилань"
+          }
+        }
+      }
+    },
+    "Storage": {
+      "comment": "Settings tab label for storage / file system options",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Storage"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Хранилище"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сховище"
+          }
+        }
+      }
+    },
+    "Strikethrough": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Strikethrough"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Зачёркнутый"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Закреслений"
+          }
+        }
+      }
+    },
+    "Sync is managed automatically by iCloud.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync is managed automatically by iCloud."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Синхронизация управляется автоматически через iCloud."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Синхронізацію керує iCloud автоматично."
+          }
+        }
+      }
+    },
+    "tags": {
+      "comment": "Read-only label in the note frontmatter view",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tags"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "теги"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "теги"
+          }
+        }
+      }
+    },
+    "This note will be permanently deleted.": {
+      "comment": "Message body in the delete note confirmation dialog",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This note will be permanently deleted."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Эта заметка будет удалена без возможности восстановления."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Цю нотатку буде видалено назавжди."
+          }
+        }
+      }
+    },
+    "Title": {
+      "comment": "Search results section header: notes whose filename matches the search query",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "По названию"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "За назвою"
+          }
+        }
+      }
+    },
+    "Wikilink Graph": {
+      "comment": "Window title for the wikilink graph visualisation",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wikilink Graph"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Граф вики-ссылок"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Граф вікі-посилань"
+          }
+        }
+      }
+    },
+    "Search Index Rebuilt": {
+      "comment": "Alert title shown when the search index was corrupted and had to be rebuilt",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Index Rebuilt"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поисковый индекс пересоздан"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пошуковий індекс відновлено"
+          }
+        }
+      }
+    },
+    "The search index was corrupted and has been reset. Your notes are being re-indexed now.": {
+      "comment": "Alert message body shown when the search index was corrupted on launch",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The search index was corrupted and has been reset. Your notes are being re-indexed now."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поисковый индекс был повреждён и сброшен. Заметки переиндексируются."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пошуковий індекс було пошкоджено та скинуто. Нотатки переіндексовуються."
+          }
+        }
+      }
+    },
+    "Search index was corrupted and has been rebuilt from scratch.": {
+      "comment": "Warning label in Settings › Indexer Status when the index was recovered after corruption",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search index was corrupted and has been rebuilt from scratch."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Поисковый индекс был повреждён и пересоздан с нуля."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Пошуковий індекс було пошкоджено і відновлено з нуля."
+          }
+        }
+      }
+    },
+    "The path above reflects the current app location and must be updated if you reinstall or move the app.": {
+      "comment": "Caption below the MCP config snippet in Settings",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The path above reflects the current app location and must be updated if you reinstall or move the app."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Путь выше отражает текущее расположение приложения и должен быть обновлён при переустановке или перемещении."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Шлях вище відображає поточне розташування програми і має бути оновлений при перевстановленні або переміщенні."
+          }
+        }
+      }
+    },
+    "Copy": {
+      "comment": "Button that copies the MCP config snippet to the clipboard",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скопировать"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скопіювати"
+          }
+        }
+      }
+    },
+    "Copied": {
+      "comment": "Button label shown briefly after the MCP config snippet was copied to the clipboard",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скопировано"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скопійовано"
+          }
+        }
+      }
+    },
+    "MCP": {
+      "comment": "Settings tab label for MCP server configuration",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP"
           }
         }
       }
     }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }

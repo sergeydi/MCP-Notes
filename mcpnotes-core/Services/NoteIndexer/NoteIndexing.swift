@@ -1,7 +1,9 @@
 import Foundation
 
 public protocol NoteIndexing {
-    func loadFromDisk() async
+    /// Load persisted index. Returns `true` if the index was corrupted or inconsistent
+    /// and had to be reset (triggering a full re-index), `false` on a normal load or fresh start.
+    func loadFromDisk() async -> Bool
     func indexedCount() async -> Int
     func indexAll(_ notes: [Note]) async throws
     func indexNote(_ note: Note) async throws

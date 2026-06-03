@@ -3,7 +3,7 @@ import Testing
 @testable import MCPNotesCore
 @testable import mcpnotes_mac
 
-@Suite("NoteIndexer – incremental sync", .timeLimit(.minutes(5)))
+@Suite("NoteIndexer – incremental sync", .serialized, .timeLimit(.minutes(5)))
 struct NoteIndexerIncrementalSyncTests {
 
     func makeNote(id: UUID = UUID(), filename: String, body: String, tags: [String] = []) -> Note {

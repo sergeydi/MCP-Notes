@@ -3,7 +3,7 @@ import Testing
 @testable import MCPNotesCore
 @testable import mcpnotes_mac
 
-@Suite("NoteIndexer – loadFromDisk", .timeLimit(.minutes(5)))
+@Suite("NoteIndexer – loadFromDisk", .serialized, .timeLimit(.minutes(5)))
 struct NoteIndexerLoadFromDiskTests {
 
     func makeNote(id: UUID = UUID(), filename: String, body: String) -> Note {
@@ -61,7 +61,8 @@ struct NoteIndexerLoadFromDiskTests {
 
         // App restarts; "deleted" was removed from disk while the app was closed.
         let indexerB = NoteIndexer(storageDirectory: tmp)
-        await indexerB.loadFromDisk()
+        let recovered = await indexerB.loadFromDisk()
+        #expect(recovered == false, "Normal restart must not signal recovery")
         try await indexerB.indexAll([kept])
 
         #expect(await indexerB.indexedCount() == 1)
@@ -88,6 +89,34 @@ struct NoteIndexerLoadFromDiskTests {
 
         let results = try await indexerB.search(query: "machine learning neural networks", limit: 1)
         #expect(results.first == noteID, "Modified note must rank first for its new content after restart")
+    }
+
+    @Test("corrupted usearch file is recovered gracefully on loadFromDisk")
+    func corruptedUsearchFileIsRecoveredGracefully() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let note = makeNote(filename: "Hello", body: "Note indexed before corruption.")
+
+        let indexerA = NoteIndexer(storageDirectory: tmp)
+        try await indexerA.indexAll([note])
+
+        // Overwrite the usearch file with garbage to simulate corruption.
+        let usearchURL = tmp.appendingPathComponent("notes.usearch")
+        try Data(repeating: 0xFF, count: 512).write(to: usearchURL)
+
+        // loadFromDisk must not crash, must silently reset, and must signal recovery.
+        let indexerB = NoteIndexer(storageDirectory: tmp)
+        let recovered = await indexerB.loadFromDisk()
+
+        #expect(recovered == true, "loadFromDisk must return true when the usearch file is corrupted")
+        #expect(await indexerB.indexedCount() == 0, "After corrupted usearch, index should be empty")
+
+        // New notes must be indexable after recovery.
+        let newNote = makeNote(filename: "Recovery", body: "Indexing works again after corruption recovery.")
+        try await indexerB.indexNote(newNote)
+        let results = try await indexerB.search(query: "corruption recovery", limit: 1)
+        #expect(results.first == newNote.id, "New note must be searchable after corruption recovery")
     }
 
     @Test("note added while app was closed is searchable after restart")

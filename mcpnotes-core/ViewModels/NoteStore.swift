@@ -19,6 +19,9 @@ public enum IndexingState {
 public final class NoteStore {
     public var notes: [Note] = []
     public var indexingState: IndexingState = .idle
+    /// True when the search index had to be rebuilt due to corruption or inconsistency.
+    /// Cleared when the user manually triggers a full re-index.
+    public var indexWasRecovered: Bool = false
 
     // Navigation history — back/forward like a browser
     @ObservationIgnored private var navHistory: [UUID] = []
@@ -113,7 +116,8 @@ public final class NoteStore {
         } catch {
             // TODO: surface error to user
         }
-        await indexer.loadFromDisk()
+        let recovered = await indexer.loadFromDisk()
+        if recovered { indexWasRecovered = true }
         let total = notes.count
         if total > 0 {
             indexingState = .indexing(indexed: await indexer.indexedCount(), total: total)
@@ -230,8 +234,24 @@ public final class NoteStore {
         }
     }
 
+    /// Stops the directory watcher, clears in-memory state, and reloads from the current
+    /// `FileService.notesDirectoryURL`. Call after changing the notes directory.
+    public func switchDirectory() async {
+        directoryWatcher?.cancel()
+        directoryWatcher = nil
+        notes = []
+        selectedNoteID = nil
+        navHistory = []
+        navIndex = -1
+        updateNavState()
+        indexingState = .idle
+        indexWasRecovered = false
+        await load()
+    }
+
     public func reindexAll() async {
         guard !notes.isEmpty else { return }
+        indexWasRecovered = false
         await indexer.resetAndClearIndex()
         let snapshot = notes
         indexingState = .indexing(indexed: 0, total: snapshot.count)

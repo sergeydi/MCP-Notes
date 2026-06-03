@@ -5,7 +5,7 @@ import Testing
 
 /// Integration tests — download multilingual-e5-small (~115 MB) on first run.
 /// Model is cached in ~/Library/Caches/huggingface after that.
-@Suite("NoteIndexer – integration", .timeLimit(.minutes(5)))
+@Suite("NoteIndexer – integration", .serialized, .timeLimit(.minutes(5)))
 @MainActor
 struct NoteIndexerIntegrationTests {
 

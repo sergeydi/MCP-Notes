@@ -40,7 +40,8 @@ final class MockNoteIndexer: NoteIndexing {
     private(set) var removeNoteCalledWith: [UUID] = []
     private(set) var resetAndClearIndexCalled = false
 
-    func loadFromDisk() async { loadFromDiskCalled = true }
+    var stubbedRecovery = false
+    func loadFromDisk() async -> Bool { loadFromDiskCalled = true; return stubbedRecovery }
     func indexedCount() async -> Int { stubbedCount }
     func indexAll(_ notes: [Note]) async throws { indexAllCalledWith = notes }
     func indexNote(_ note: Note) async throws { indexNoteCalledWith.append(note) }

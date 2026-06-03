@@ -18,11 +18,39 @@ public struct FileService: FileServicing {
     public init() {}
 
     /// Root directory where all note files are stored.
+    /// Priority: custom user-chosen folder > iCloud Drive > Application Support.
     public static var notesDirectoryURL: URL {
+        if let url = activeCustomURL ?? resolveCustomNotesDirectory() {
+            return url
+        }
         if let icloudURL = icloudNotesURL() {
             return icloudURL
         }
         return localFallbackURL()
+    }
+
+    /// The currently active security-scoped custom directory URL, if set.
+    public static var customNotesDirectoryURL: URL? { activeCustomURL }
+
+    /// Persists `url` as a security-scoped bookmark and activates it immediately.
+    public static func setCustomNotesDirectory(_ url: URL) throws {
+        activeCustomURL?.stopAccessingSecurityScopedResource()
+        activeCustomURL = nil
+        let data = try url.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
+        UserDefaults.standard.set(data, forKey: customBookmarkKey)
+        _ = url.startAccessingSecurityScopedResource()
+        activeCustomURL = url
+    }
+
+    /// Removes the custom directory bookmark and reverts to the default location.
+    public static func clearCustomNotesDirectory() {
+        activeCustomURL?.stopAccessingSecurityScopedResource()
+        activeCustomURL = nil
+        UserDefaults.standard.removeObject(forKey: customBookmarkKey)
     }
 
     public func loadAllNotes() throws -> [Note] {
@@ -94,6 +122,24 @@ public struct FileService: FileServicing {
     }
 
     // MARK: - Private
+
+    private static let customBookmarkKey = "customNotesDirectoryBookmark"
+    private static var activeCustomURL: URL?
+
+    private static func resolveCustomNotesDirectory() -> URL? {
+        guard let data = UserDefaults.standard.data(forKey: customBookmarkKey) else { return nil }
+        var isStale = false
+        guard let url = try? URL(
+            resolvingBookmarkData: data,
+            options: .withSecurityScope,
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
+        ) else { return nil }
+        _ = url.startAccessingSecurityScopedResource()
+        if isStale { try? setCustomNotesDirectory(url) }
+        activeCustomURL = url
+        return url
+    }
 
     private static func icloudNotesURL() -> URL? {
         guard let container = FileManager.default.url(
