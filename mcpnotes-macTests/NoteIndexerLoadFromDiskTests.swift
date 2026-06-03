@@ -6,15 +6,22 @@ import Testing
 @Suite("NoteIndexer – loadFromDisk", .timeLimit(.minutes(5)))
 struct NoteIndexerLoadFromDiskTests {
 
-    func makeNote(filename: String, body: String) -> Note {
+    func makeNote(id: UUID = UUID(), filename: String, body: String) -> Note {
         Note(
-            id: UUID(),
+            id: id,
             filename: filename,
             tags: [],
             body: body,
             fileURL: URL(fileURLWithPath: "/tmp/\(filename).md"),
             isBookmarked: false
         )
+    }
+
+    func makeTempDir() throws -> URL {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        return tmp
     }
 
     /// Regression: vectorIndex.add() crashed after loadFromDisk because USearch does not
@@ -39,5 +46,68 @@ struct NoteIndexerLoadFromDiskTests {
 
         let results = try await indexerB.search(query: "updated reload", limit: 1)
         #expect(results.isEmpty == false, "Note indexed after loadFromDisk should be searchable")
+    }
+
+    @Test("note deleted while app was closed is not searchable after restart")
+    func deletedNoteNotSearchableAfterRestart() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let kept = makeNote(filename: "Cooking", body: "Italian cuisine pasta recipes and culinary techniques.")
+        let deleted = makeNote(filename: "History", body: "Ancient Roman history and the fall of the empire.")
+
+        let indexerA = NoteIndexer(storageDirectory: tmp)
+        try await indexerA.indexAll([kept, deleted])
+
+        // App restarts; "deleted" was removed from disk while the app was closed.
+        let indexerB = NoteIndexer(storageDirectory: tmp)
+        await indexerB.loadFromDisk()
+        try await indexerB.indexAll([kept])
+
+        #expect(await indexerB.indexedCount() == 1)
+        let results = try await indexerB.search(query: "Ancient Roman history empire", limit: 5)
+        #expect(results.contains(deleted.id) == false, "Note deleted while app was closed must not appear in search after restart")
+    }
+
+    @Test("note modified while app was closed returns new content after restart")
+    func modifiedNoteReturnsNewContentAfterRestart() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let noteID = UUID()
+        let original = makeNote(id: noteID, filename: "Note", body: "Astronomy telescope stargazing and night sky observation.")
+        let modified = makeNote(id: noteID, filename: "Note", body: "Machine learning neural networks and deep learning architectures.")
+
+        let indexerA = NoteIndexer(storageDirectory: tmp)
+        try await indexerA.indexAll([original])
+
+        // App restarts; the note body was edited while the app was closed.
+        let indexerB = NoteIndexer(storageDirectory: tmp)
+        await indexerB.loadFromDisk()
+        try await indexerB.indexAll([modified])
+
+        let results = try await indexerB.search(query: "machine learning neural networks", limit: 1)
+        #expect(results.first == noteID, "Modified note must rank first for its new content after restart")
+    }
+
+    @Test("note added while app was closed is searchable after restart")
+    func addedNoteSearchableAfterRestart() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let existing = makeNote(filename: "Cooking", body: "Italian cuisine pasta recipes.")
+        let added = makeNote(filename: "Physics", body: "Quantum physics and particle accelerator experiments.")
+
+        let indexerA = NoteIndexer(storageDirectory: tmp)
+        try await indexerA.indexAll([existing])
+
+        // App restarts; a new note was created while the app was closed.
+        let indexerB = NoteIndexer(storageDirectory: tmp)
+        await indexerB.loadFromDisk()
+        try await indexerB.indexAll([existing, added])
+
+        #expect(await indexerB.indexedCount() == 2)
+        let results = try await indexerB.search(query: "quantum physics particle accelerator", limit: 1)
+        #expect(results.first == added.id, "Note added while app was closed must be searchable after restart")
     }
 }
