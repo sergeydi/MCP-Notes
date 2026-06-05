@@ -5,6 +5,7 @@ import Testing
 
 /// Integration tests — download multilingual-e5-small (~115 MB) on first run.
 /// Model is cached in ~/Library/Caches/huggingface after that.
+extension NoteIndexerTests {
 @Suite("NoteIndexer – integration", .serialized, .timeLimit(.minutes(5)))
 @MainActor
 struct NoteIndexerIntegrationTests {
@@ -273,4 +274,5 @@ struct NoteIndexerIntegrationTests {
         let swiftResults = try await indexer.search(query: "Swift concurrency actors", limit: 2)
         #expect(swiftResults.first == id, "Re-indexed note should rank first for new content")
     }
+}
 }

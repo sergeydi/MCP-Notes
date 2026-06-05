@@ -3,6 +3,7 @@ import Testing
 @testable import MCPNotesCore
 @testable import mcpnotes_mac
 
+extension NoteIndexerTests {
 @Suite("NoteIndexer – BM25 search", .timeLimit(.minutes(5)))
 struct NoteIndexerBM25Tests {
 
@@ -70,4 +71,5 @@ struct NoteIndexerBM25Tests {
         let newResults = await indexer.searchBM25Ranked(query: "swift actors", limit: 5)
         #expect(newResults.first?.id == id)
     }
+}
 }

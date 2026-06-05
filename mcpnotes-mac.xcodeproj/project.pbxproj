@@ -551,7 +551,6 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26;
 				MARKETING_VERSION = 1.0;
-				OTHER_SWIFT_FLAGS = "-Xcc -fmodule-map-file=$(SRCROOT)/mcpnotes-core/Services/NoteIndexer/USearchSafeLoader.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-core";
 				PRODUCT_MODULE_NAME = MCPNotesCore;
 				PRODUCT_NAME = MCPNotesCore;
@@ -582,7 +581,6 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26;
 				MARKETING_VERSION = 1.0;
-				OTHER_SWIFT_FLAGS = "-Xcc -fmodule-map-file=$(SRCROOT)/mcpnotes-core/Services/NoteIndexer/USearchSafeLoader.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-core";
 				PRODUCT_MODULE_NAME = MCPNotesCore;
 				PRODUCT_NAME = MCPNotesCore;

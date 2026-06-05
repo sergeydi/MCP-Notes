@@ -206,7 +206,7 @@ public final class NoteStore {
                 notes[index] = renamed
                 sortNotes()
             }
-            Task { try? await indexer.indexNote(renamed) }
+            try? await indexer.indexNote(renamed)
 
             let pattern = /\[\[([^\]]+)\]\]/
             var updatedFilenames: [String] = []
@@ -228,7 +228,7 @@ public final class NoteStore {
                 }
                 updatedFilenames.append(n.filename)
                 try? fileService.saveNote(n)
-                Task { try? await indexer.indexNote(n) }
+                try? await indexer.indexNote(n)
             }
             onComplete?(updatedFilenames)
         }
@@ -340,7 +340,7 @@ public final class NoteStore {
     public func scheduleExternalReload() {
         reloadTask?.cancel()
         reloadTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(500))
+            try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled, let self else { return }
             await self.reloadExternalChanges()
         }
@@ -364,22 +364,45 @@ public final class NoteStore {
 
         guard !removedIDs.isEmpty || !addedIDs.isEmpty || !changedNotes.isEmpty else { return }
 
+        // Apply diff to in-memory notes array.
         for id in removedIDs {
             notes.removeAll { $0.id == id }
-            await indexer.removeNote(id: id)
         }
         for note in changedNotes {
-            if let idx = notes.firstIndex(where: { $0.id == note.id }) {
-                notes[idx] = note
-            }
-            try? await indexer.indexNote(note)
+            if let idx = notes.firstIndex(where: { $0.id == note.id }) { notes[idx] = note }
         }
         for id in addedIDs {
-            if let note = freshMap[id] {
-                notes.append(note)
-                try? await indexer.indexNote(note)
-            }
+            if let note = freshMap[id] { notes.append(note) }
         }
         sortNotes()
+
+        // Clean up navigation state for removed notes.
+        for id in removedIDs {
+            navHistory.removeAll { $0 == id }
+        }
+        if !removedIDs.isEmpty {
+            navIndex = navHistory.isEmpty ? -1 : min(navIndex, navHistory.count - 1)
+            updateNavState()
+            if let sel = selectedNoteID, removedIDs.contains(sel) {
+                isNavigating = true
+                selectedNoteID = navIndex >= 0 ? navHistory[navIndex] : notes.first?.id
+                isNavigating = false
+            }
+        }
+
+        // Batch-index via indexAll: handles reserve() + MD5 skip + saveToDisk atomically.
+        let snapshot = notes
+        let alreadyIndexed = await indexer.indexedCount()
+        indexingState = .indexing(indexed: alreadyIndexed, total: snapshot.count)
+        Task {
+            while case .indexing = indexingState {
+                try? await Task.sleep(for: .milliseconds(500))
+                let count = await indexer.indexedCount()
+                guard case .indexing(_, let t) = indexingState else { break }
+                indexingState = .indexing(indexed: count, total: t)
+            }
+        }
+        try? await indexer.indexAll(snapshot)
+        indexingState = .ready(count: await indexer.indexedCount())
     }
 }

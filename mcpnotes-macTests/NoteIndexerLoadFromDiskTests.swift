@@ -3,6 +3,7 @@ import Testing
 @testable import MCPNotesCore
 @testable import mcpnotes_mac
 
+extension NoteIndexerTests {
 @Suite("NoteIndexer – loadFromDisk", .serialized, .timeLimit(.minutes(5)))
 struct NoteIndexerLoadFromDiskTests {
 
@@ -139,4 +140,5 @@ struct NoteIndexerLoadFromDiskTests {
         let results = try await indexerB.search(query: "quantum physics particle accelerator", limit: 1)
         #expect(results.first == added.id, "Note added while app was closed must be searchable after restart")
     }
+}
 }

@@ -3,6 +3,7 @@ import Testing
 @testable import MCPNotesCore
 @testable import mcpnotes_mac
 
+extension NoteIndexerTests {
 @Suite("NoteIndexer – wikilink graph", .timeLimit(.minutes(5)), .serialized)
 struct NoteIndexerWikilinkTests {
 
@@ -162,4 +163,5 @@ struct NoteIndexerWikilinkTests {
         #expect(db.outgoingLinks(from: noteID).isEmpty)
         #expect(db.incomingLinks(to: noteID).isEmpty)
     }
+}
 }

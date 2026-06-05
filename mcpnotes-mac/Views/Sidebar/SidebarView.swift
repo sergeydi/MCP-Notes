@@ -313,6 +313,8 @@ struct SidebarView: View {
         }
     }
 
+    // MARK: - Helpers
+
     @ViewBuilder
     private func contextMenu(for note: Note) -> some View {
         Button("Open in New Window") {
@@ -337,9 +339,31 @@ struct SidebarView: View {
 
         ToolbarItem {
             SettingsLink {
-                Label("Settings", systemImage: "gear")
+                Image(systemName: "gear")
+                    .overlay(alignment: .bottomTrailing) {
+                        if store.indexingState.isIndexing {
+                            IndexingDot()
+                                .offset(x: 4, y: 4)
+                        }
+                    }
             }
             .accessibilityLabel("Open settings")
         }
+    }
+}
+
+private struct IndexingDot: View {
+    @State private var pulse = false
+
+    var body: some View {
+        Circle()
+            .fill(Color.accentColor)
+            .frame(width: 6, height: 6)
+            .opacity(pulse ? 1.0 : 0.3)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                    pulse = true
+                }
+            }
     }
 }

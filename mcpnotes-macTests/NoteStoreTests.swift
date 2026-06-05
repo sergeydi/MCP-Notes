@@ -473,12 +473,12 @@ struct NoteStoreExternalChangesTests {
         #expect(store.notes.contains { $0.id == added.id })
     }
 
-    @Test func addsNoteCallsIndexNote() async {
+    @Test func addsNoteCallsIndexAll() async {
         let added = makeNote(filename: "B")
         store.notes = []
         fs.stubbedNotes = [added]
         await store.reloadExternalChanges()
-        #expect(idx.indexNoteCalledWith.contains { $0.id == added.id })
+        #expect(idx.indexAllCalledWith?.contains { $0.id == added.id } == true)
     }
 
     @Test func removesNoteDeletedFromDisk() async {
@@ -491,13 +491,14 @@ struct NoteStoreExternalChangesTests {
         #expect(store.notes.contains { $0.id == removed.id } == false)
     }
 
-    @Test func removesNoteCallsRemoveNoteOnIndexer() async {
+    @Test func removesNoteExcludesFromIndexAllSnapshot() async {
         let kept = makeNote(filename: "A")
         let removed = makeNote(filename: "B")
         store.notes = [kept, removed]
         fs.stubbedNotes = [kept]
         await store.reloadExternalChanges()
-        #expect(idx.removeNoteCalledWith.contains(removed.id))
+        #expect(idx.indexAllCalledWith?.contains { $0.id == removed.id } == false)
+        #expect(idx.indexAllCalledWith?.contains { $0.id == kept.id } == true)
     }
 
     @Test func updatesChangedNoteBody() async throws {
@@ -511,14 +512,14 @@ struct NoteStoreExternalChangesTests {
         #expect(stored.body == "new body")
     }
 
-    @Test func updatesChangedNoteCallsIndexNoteWithNewContent() async throws {
+    @Test func updatesChangedNoteCallsIndexAllWithNewContent() async throws {
         let note = makeNote(filename: "A")
         store.notes = [note]
         var updated = note
         updated.body = "new body"
         fs.stubbedNotes = [updated]
         await store.reloadExternalChanges()
-        let indexed = try #require(idx.indexNoteCalledWith.first { $0.id == note.id })
+        let indexed = try #require(idx.indexAllCalledWith?.first { $0.id == note.id })
         #expect(indexed.body == "new body")
     }
 
@@ -538,18 +539,18 @@ struct NoteStoreExternalChangesTests {
         store.notes = [note]
         fs.stubbedNotes = [note]
         await store.reloadExternalChanges()
-        #expect(idx.indexNoteCalledWith.isEmpty)
+        #expect(idx.indexAllCalledWith == nil)
         #expect(idx.removeNoteCalledWith.isEmpty)
     }
 
-    @Test func updatesChangedNoteTagsCallsIndexNoteWithNewTags() async throws {
+    @Test func updatesChangedNoteTagsCallsIndexAllWithNewTags() async throws {
         let note = makeNote(filename: "A", tags: ["old"])
         store.notes = [note]
         var updated = note
         updated.tags = ["new"]
         fs.stubbedNotes = [updated]
         await store.reloadExternalChanges()
-        let indexed = try #require(idx.indexNoteCalledWith.first { $0.id == note.id })
+        let indexed = try #require(idx.indexAllCalledWith?.first { $0.id == note.id })
         #expect(indexed.tags == ["new"])
     }
 
@@ -572,6 +573,51 @@ struct NoteStoreExternalChangesTests {
         fs.stubbedNotes = [a, c, b]
         await store.reloadExternalChanges()
         #expect(store.notes.map(\.filename) == ["A", "B", "C"])
+    }
+
+    @Test func externalDeleteClearsSelectionWhenSelectedNoteRemoved() async {
+        let a = makeNote(filename: "A")
+        let b = makeNote(filename: "B")
+        store.notes = [a, b]
+        store.selectedNoteID = b.id
+        fs.stubbedNotes = [a]
+        await store.reloadExternalChanges()
+        #expect(store.selectedNoteID != b.id)
+    }
+
+    @Test func externalDeleteKeepsSelectionWhenOtherNoteRemoved() async {
+        let a = makeNote(filename: "A")
+        let b = makeNote(filename: "B")
+        store.notes = [a, b]
+        store.selectedNoteID = a.id
+        fs.stubbedNotes = [a]
+        await store.reloadExternalChanges()
+        #expect(store.selectedNoteID == a.id)
+    }
+
+    @Test func externalDeleteClearsNavHistoryEntry() async {
+        let a = makeNote(filename: "A")
+        let b = makeNote(filename: "B")
+        store.notes = [a, b]
+        store.selectedNoteID = a.id
+        store.selectedNoteID = b.id
+        fs.stubbedNotes = [a]
+        await store.reloadExternalChanges()
+        store.navigateBack()
+        #expect(store.selectedNoteID != b.id)
+    }
+
+    @Test func externalDeleteUpdatesCanNavigateState() async {
+        let a = makeNote(filename: "A")
+        let b = makeNote(filename: "B")
+        store.notes = [a, b]
+        store.selectedNoteID = a.id
+        store.selectedNoteID = b.id
+        #expect(store.canNavigateBack == true)
+        fs.stubbedNotes = [a]
+        await store.reloadExternalChanges()
+        #expect(store.canNavigateBack == false)
+        #expect(store.canNavigateForward == false)
     }
 }
 

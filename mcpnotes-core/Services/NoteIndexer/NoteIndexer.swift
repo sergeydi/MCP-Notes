@@ -3,7 +3,6 @@ import CryptoKit
 import Embeddings
 import Foundation
 import USearch
-@_implementationOnly import USearchSafeLoader
 
 /// Manages on-device vector indexing and semantic search for notes.
 /// Uses multilingual-e5-small (XLM-RoBERTa) downloaded from HuggingFace Hub on first launch.
@@ -51,6 +50,7 @@ public actor NoteIndexer: NoteIndexing {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         indexPath = dir.appendingPathComponent("notes.usearch").path
         db = IndexDatabase(url: dir.appendingPathComponent("notes-index.db"))
+        vectorIndex.reserve(64)
     }
 
     // MARK: - NoteIndexing
@@ -68,18 +68,31 @@ public actor NoteIndexer: NoteIndexing {
         if let storedVersion = db.intMeta("index_version"),
            storedVersion == Self.currentIndexVersion,
            FileManager.default.fileExists(atPath: indexPath) {
-            var loadError: NSError?
-            guard USearchSafeLoad(vectorIndex, indexPath, &loadError) else {
-                vectorIndex = USearchIndex.make(
-                    metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32
-                )
-                vectorIndex.reserve(64)
-                db.clearAll()
-                return true
-            }
-            let capacity = max(UInt32(vectorIndex.count) + 16, 64)
-            vectorIndex.reserve(capacity)
             let storedNextKey = UInt64(db.intMeta("next_key") ?? 1)
+
+            // Validate the usearch file header BEFORE loading. USearch's load() throws an
+            // NSException on corrupt input, which is uncatchable in Swift and kills the process.
+            // The index_dense_t format starts with [uint32 vector_count][uint32 bytes_per_vector].
+            // If the claimed vector count meets or exceeds storedNextKey (= max key ever assigned + 1),
+            // the file is corrupt — skip the load entirely and force a clean re-index.
+            if let fileData = FileManager.default.contents(atPath: indexPath),
+               fileData.count >= 4 {
+                let claimedCount = fileData.withUnsafeBytes { $0.load(as: UInt32.self) }
+                if UInt64(claimedCount) >= storedNextKey {
+                    vectorIndex = USearchIndex.make(
+                        metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32
+                    )
+                    vectorIndex.reserve(64)
+                    db.clearAll()
+                    return true
+                }
+            }
+
+            vectorIndex.load(path: indexPath)
+
+            let loadedCount = vectorIndex.count
+            let capacity = max(UInt32(loadedCount) + 16, 64)
+            vectorIndex.reserve(capacity)
 
             // Detect inconsistency: note_chunks has keys beyond what notes.usearch contains.
             // This happens when a previous session was interrupted mid-indexAll().

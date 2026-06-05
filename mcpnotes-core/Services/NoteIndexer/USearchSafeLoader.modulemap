@@ -1,4 +1,0 @@
-module USearchSafeLoader {
-  header "USearchSafeLoader.h"
-  export *
-}

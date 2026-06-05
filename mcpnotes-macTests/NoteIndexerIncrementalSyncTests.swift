@@ -3,6 +3,7 @@ import Testing
 @testable import MCPNotesCore
 @testable import mcpnotes_mac
 
+extension NoteIndexerTests {
 @Suite("NoteIndexer – incremental sync", .serialized, .timeLimit(.minutes(5)))
 struct NoteIndexerIncrementalSyncTests {
 
@@ -112,4 +113,5 @@ struct NoteIndexerIncrementalSyncTests {
         let results = try await indexerB.search(query: "Swift iOS programming", limit: 1)
         #expect(results.first == note.id, "Note must be indexed and searchable after clearHashStore + indexAll")
     }
+}
 }
