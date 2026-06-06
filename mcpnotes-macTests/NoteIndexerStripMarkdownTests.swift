@@ -88,7 +88,7 @@ struct NoteIndexerStripMarkdownTests {
     @Test("horizontal rules removed")
     func horizontalRulesRemoved() {
         let result = NoteIndexer.stripMarkdown("Before\n---\nAfter")
-        #expect(!result.contains("---"))
+        #expect(result.contains("---") == false)
         #expect(result.contains("Before"))
         #expect(result.contains("After"))
     }

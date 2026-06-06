@@ -327,7 +327,7 @@ struct RAGSearcherHybridTests {
         #expect(await searcher.isReady)
 
         let results = try await searcher.searchRankedHybrid(query: "swift actors", limit: 5)
-        #expect(!results.isEmpty)
+        #expect(results.isEmpty == false)
         let first = results[0]
         #expect(first.uuid == noteID)
         #expect(first.vectorRank >= 1)
@@ -366,7 +366,7 @@ struct RAGSearcherHybridTests {
         // With limit=2, old bm25 limit would be 2 → the 3rd BM25 result gets nil.
         // With limit*5=10, all 3 notes are in the BM25 pool → vector rank-1 note gets a real rank.
         let results = try await searcher.searchRankedHybrid(query: "keyword", limit: limit)
-        #expect(!results.isEmpty)
+        #expect(results.isEmpty == false)
         let target = results.first { $0.uuid == uuids[limit] }
         #expect(target != nil)
         #expect(target?.bm25Rank != nil)

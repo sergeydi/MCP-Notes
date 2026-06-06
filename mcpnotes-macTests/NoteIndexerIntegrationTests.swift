@@ -7,7 +7,6 @@ import Testing
 /// Model is cached in ~/Library/Caches/huggingface after that.
 extension NoteIndexerTests {
 @Suite("NoteIndexer – integration", .serialized, .timeLimit(.minutes(5)))
-@MainActor
 struct NoteIndexerIntegrationTests {
 
     func makeNote(filename: String, body: String, tags: [String] = []) -> Note {
@@ -21,9 +20,18 @@ struct NoteIndexerIntegrationTests {
         )
     }
 
+    func makeTempDir() throws -> URL {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        return tmp
+    }
+
     @Test("search returns the most relevant note first")
     func searchReturnsMostRelevantNoteFirst() async throws {
-        let indexer = NoteIndexer()
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
 
         let swift = makeNote(
             filename: "Swift Programming",
@@ -47,7 +55,9 @@ struct NoteIndexerIntegrationTests {
 
     @Test("search ranks cooking note above others for food query")
     func searchRanksCookingNoteForFoodQuery() async throws {
-        let indexer = NoteIndexer()
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
 
         let swift = makeNote(
             filename: "Swift",
@@ -67,7 +77,9 @@ struct NoteIndexerIntegrationTests {
 
     @Test("removeNote excludes note from subsequent searches")
     func removeNoteExcludesFromResults() async throws {
-        let indexer = NoteIndexer()
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
 
         let ai = makeNote(
             filename: "Machine Learning",
@@ -88,7 +100,9 @@ struct NoteIndexerIntegrationTests {
 
     @Test("tags boost ranking for matching queries")
     func tagsBoostRanking() async throws {
-        let indexer = NoteIndexer()
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
 
         let tagged = makeNote(
             filename: "Notes on concurrency",
@@ -109,7 +123,9 @@ struct NoteIndexerIntegrationTests {
 
     @Test("cross-lingual: Russian query finds English note")
     func crossLingualRussianQueryFindsEnglishNote() async throws {
-        let indexer = NoteIndexer()
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
 
         let swift = makeNote(
             filename: "Swift Programming",
@@ -128,7 +144,9 @@ struct NoteIndexerIntegrationTests {
 
     @Test("cross-lingual: English query finds Russian note")
     func crossLingualEnglishQueryFindsRussianNote() async throws {
-        let indexer = NoteIndexer()
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
 
         let cooking = makeNote(
             filename: "Готовим пасту",
@@ -147,7 +165,9 @@ struct NoteIndexerIntegrationTests {
 
     @Test("limit parameter caps result count")
     func limitCapsResultCount() async throws {
-        let indexer = NoteIndexer()
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
 
         let notes = (1...5).map {
             makeNote(filename: "Note \($0)", body: "Swift programming iOS macOS development note number \($0).")
@@ -160,14 +180,18 @@ struct NoteIndexerIntegrationTests {
 
     @Test("search on empty index returns empty array")
     func searchOnEmptyIndexReturnsEmpty() async throws {
-        let indexer = NoteIndexer()
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
         let results = try await indexer.search(query: "anything", limit: 5)
         #expect(results.isEmpty)
     }
 
     @Test("indexAll with empty array does not crash")
     func indexAllEmptyArrayIsNoop() async throws {
-        let indexer = NoteIndexer()
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
         try await indexer.indexAll([])
         let results = try await indexer.search(query: "test", limit: 5)
         #expect(results.isEmpty)
@@ -175,7 +199,9 @@ struct NoteIndexerIntegrationTests {
 
     @Test("re-indexing a note updates its searchable content")
     func reindexUpdatesContent() async throws {
-        let indexer = NoteIndexer()
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
 
         let id = UUID()
         let original = Note(
@@ -208,7 +234,9 @@ struct NoteIndexerIntegrationTests {
 
     @Test("chunking: note with relevant paragraph ranks above unrelated note")
     func chunkingBoostsRelevantParagraph() async throws {
-        let indexer = NoteIndexer()
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
 
         let medical = makeNote(
             filename: "Аптечка для Хайкинга",
@@ -227,7 +255,9 @@ struct NoteIndexerIntegrationTests {
 
     @Test("removeNote removes all chunk vectors from the index")
     func removeNoteRemovesAllChunkVectors() async throws {
-        let indexer = NoteIndexer()
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
 
         let note = makeNote(
             filename: "Multi-paragraph Note",
@@ -244,7 +274,9 @@ struct NoteIndexerIntegrationTests {
 
     @Test("re-indexing a multi-paragraph note replaces all old chunks")
     func reindexReplacesAllChunks() async throws {
-        let indexer = NoteIndexer()
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let indexer = NoteIndexer(storageDirectory: tmp)
 
         let id = UUID()
         let original = Note(

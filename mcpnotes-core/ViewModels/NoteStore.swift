@@ -17,7 +17,9 @@ public enum IndexingState {
 /// so every view in the hierarchy shares the same instance.
 @Observable
 public final class NoteStore {
-    public var notes: [Note] = []
+    public var notes: [Note] = [] {
+        didSet { rebuildAllTags() }
+    }
     public var indexingState: IndexingState = .idle
     /// True when the search index had to be rebuilt due to corruption or inconsistency.
     /// Cleared when the user manually triggers a full re-index.
@@ -94,7 +96,7 @@ public final class NoteStore {
 
     deinit {
         directoryWatcher?.cancel()
-        if watcherFD >= 0 { close(watcherFD) }
+        // watcherFD is closed by setCancelHandler — do not close it here
         reloadTask?.cancel()
     }
 
@@ -102,9 +104,7 @@ public final class NoteStore {
         notes.first { $0.id == selectedNoteID }
     }
 
-    public var allTags: [String] {
-        Array(Set(notes.flatMap(\.tags))).sorted()
-    }
+    public private(set) var allTags: [String] = []
 
     public var bookmarkedNotes: [Note] {
         notes.filter(\.isBookmarked)
@@ -116,7 +116,8 @@ public final class NoteStore {
         do {
             notes = try fileService.loadAllNotes()
         } catch {
-            // TODO: surface error to user
+            indexingState = .failed
+            return
         }
         let recovered = await indexer.loadFromDisk()
         if recovered { indexWasRecovered = true }
@@ -149,6 +150,7 @@ public final class NoteStore {
         var merged = updated
         merged.isBookmarked = notes[index].isBookmarked
         notes[index] = merged
+        sortNotes()
         Task {
             // TODO: surface errors to user
             try? fileService.saveNote(merged)
@@ -179,7 +181,7 @@ public final class NoteStore {
     public func renameNote(_ note: Note, to newName: String, onComplete: (@MainActor (_ updatedNoteFilenames: [String]) -> Void)? = nil) {
         guard !newName.isEmpty else { return }
         let oldName = note.filename
-        Task {
+        Task { @MainActor in
             isRenaming = true
             defer { isRenaming = false }
 
@@ -294,8 +296,7 @@ public final class NoteStore {
                 try? await self.indexer.indexNoteIfChanged(note)
                 let remaining = self.noteIndexQueue.count
                 if remaining > 0 {
-                    let indexed = await self.indexer.indexedCount()
-                    self.indexingState = .indexing(indexed: indexed, total: processed + remaining)
+                    self.indexingState = .indexing(indexed: processed, total: processed + remaining)
                 }
             }
             self.indexingState = .ready(count: await self.indexer.indexedCount())
@@ -305,6 +306,11 @@ public final class NoteStore {
 
     private func sortNotes() {
         notes.sort { $0.filename.localizedCompare($1.filename) == .orderedAscending }
+    }
+
+    private func rebuildAllTags() {
+        let rebuilt = Array(Set(notes.flatMap(\.tags))).sorted()
+        if rebuilt != allTags { allTags = rebuilt }
     }
 
     // MARK: - File watching
@@ -334,7 +340,7 @@ public final class NoteStore {
         directoryWatcher = source
     }
 
-    public func scheduleExternalReload() {
+    func scheduleExternalReload() {
         reloadTask?.cancel()
         reloadTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(1))
@@ -343,7 +349,7 @@ public final class NoteStore {
         }
     }
 
-    public func reloadExternalChanges() async {
+    func reloadExternalChanges() async {
         guard !isRenaming else { return }
         guard let freshNotes = try? fileService.loadAllNotes() else { return }
 

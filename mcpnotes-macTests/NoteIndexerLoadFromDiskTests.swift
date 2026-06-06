@@ -29,9 +29,7 @@ struct NoteIndexerLoadFromDiskTests {
     /// persist thread-slot structures to disk. reserve() must be called after load().
     @Test("indexNote does not crash after loadFromDisk (thread-slot regression)")
     func indexNoteAfterLoadFromDiskDoesNotCrash() async throws {
-        let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
 
         let note = makeNote(filename: "Regression Note", body: "USearch thread slot regression test.")

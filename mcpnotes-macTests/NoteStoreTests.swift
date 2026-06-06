@@ -721,7 +721,7 @@ struct NoteStoreRenameWikilinkTests {
     }
 
     @Test func updatesWikilinkInOtherNote() async {
-        var renamed = makeNote(filename: "Old")
+        let renamed = makeNote(filename: "Old")
         var other = makeNote(filename: "Other")
         other.body = "See [[Old]] for details"
         store.notes = [renamed, other]
@@ -732,7 +732,7 @@ struct NoteStoreRenameWikilinkTests {
     }
 
     @Test func updatesWikilinkCaseInsensitive() async {
-        var renamed = makeNote(filename: "Old")
+        let renamed = makeNote(filename: "Old")
         var other = makeNote(filename: "Other")
         other.body = "See [[old]] for details"
         store.notes = [renamed, other]
@@ -743,7 +743,7 @@ struct NoteStoreRenameWikilinkTests {
     }
 
     @Test func doesNotModifyNoteWithoutMatchingWikilink() async {
-        var renamed = makeNote(filename: "Old")
+        let renamed = makeNote(filename: "Old")
         var other = makeNote(filename: "Other")
         other.body = "No links here"
         store.notes = [renamed, other]
@@ -753,7 +753,7 @@ struct NoteStoreRenameWikilinkTests {
     }
 
     @Test func callsOnCompleteWithUpdatedFilenames() async {
-        var renamed = makeNote(filename: "Old")
+        let renamed = makeNote(filename: "Old")
         var other = makeNote(filename: "Other")
         other.body = "[[Old]]"
         store.notes = [renamed, other]
@@ -784,7 +784,7 @@ struct NoteStoreRenameWikilinkTests {
     }
 
     @Test func saveNoteCalledForEachUpdatedNote() async {
-        var renamed = makeNote(filename: "Old")
+        let renamed = makeNote(filename: "Old")
         var a = makeNote(filename: "A")
         var b = makeNote(filename: "B")
         a.body = "[[Old]]"
@@ -798,7 +798,7 @@ struct NoteStoreRenameWikilinkTests {
     }
 
     @Test func indexNoteCalledForRenamedNoteAndEachUpdatedNote() async {
-        var renamed = makeNote(filename: "Old")
+        let renamed = makeNote(filename: "Old")
         var a = makeNote(filename: "A")
         var b = makeNote(filename: "B")
         a.body = "[[Old]]"

@@ -5,10 +5,20 @@ import SwiftUI
 struct MCPNotesApp: App {
     @State private var noteStore = NoteStore()
 
+    // Skip SwiftUI UI initialization during test runs to avoid crashes in macOS 26 beta
+    // system frameworks (NSSplitView, DynamicPropertyBuffer) before the test runner connects.
+    private var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestBundlePath"] != nil
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(noteStore)
+            if isRunningTests {
+                EmptyView()
+            } else {
+                ContentView()
+                    .environment(noteStore)
+            }
         }
         .commands {
             CommandGroup(after: .newItem) {

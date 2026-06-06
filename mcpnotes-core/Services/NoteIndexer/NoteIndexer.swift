@@ -63,7 +63,7 @@ public actor NoteIndexer: NoteIndexing {
     /// Load persisted index and key mapping. Call once on app launch after NoteStore.load().
     /// Returns `true` if the index was corrupted or inconsistent and had to be reset.
     @discardableResult
-    public func loadFromDisk() -> Bool {
+    public func loadFromDisk() async -> Bool {
         // Try current SQLite format first.
         if let storedVersion = db.intMeta("index_version"),
            storedVersion == Self.currentIndexVersion,
@@ -73,6 +73,7 @@ public actor NoteIndexer: NoteIndexing {
             // Validate the usearch file header BEFORE loading. USearch's load() throws an
             // NSException on corrupt input, which is uncatchable in Swift and kills the process.
             // The index_dense_t format starts with [uint32 vector_count][uint32 bytes_per_vector].
+            // Tested against USearch 2.x — bump currentIndexVersion if the library is upgraded.
             // If the claimed vector count meets or exceeds storedNextKey (= max key ever assigned + 1),
             // the file is corrupt — skip the load entirely and force a clean re-index.
             if let fileData = FileManager.default.contents(atPath: indexPath),
@@ -125,6 +126,8 @@ public actor NoteIndexer: NoteIndexing {
     public func saveToDisk() {
         saveTask?.cancel()
         saveTask = nil
+        let storageDir = URL(fileURLWithPath: indexPath).deletingLastPathComponent()
+        guard FileManager.default.fileExists(atPath: storageDir.path) else { return }
         vectorIndex.save(path: indexPath)
         db.setMeta("index_version", Self.currentIndexVersion)
         db.setMeta("next_key", Int(nextKey))
@@ -164,7 +167,10 @@ public actor NoteIndexer: NoteIndexing {
 
         // Metadata as separate chunks: filename, tags (non-empty only).
         let metaChunks = [note.filename, tags].filter { !$0.isEmpty }
-        let chunks = metaChunks + NoteIndexer.paragraphs(cleanBody)
+        let chunks = Array((metaChunks + NoteIndexer.paragraphs(cleanBody)).prefix(Self.maxChunksPerNote))
+
+        let needed = max(UInt32(vectorIndex.count) + UInt32(chunks.count), 64)
+        vectorIndex.reserve(needed)
 
         for chunk in chunks {
             let vector = try await embed("passage: \(chunk)")
@@ -392,10 +398,10 @@ public actor NoteIndexer: NoteIndexing {
 
     private func scheduleSave() {
         saveTask?.cancel()
-        saveTask = Task { [weak self] in
+        saveTask = Task {
             try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled else { return }
-            await self?.performDeferredSave()
+            await self.performDeferredSave()
         }
     }
 
@@ -405,6 +411,7 @@ public actor NoteIndexer: NoteIndexing {
 
     // MARK: - Private: content hash
 
+    // MD5 is used here purely for change-detection, not cryptography.
     private nonisolated static func contentHash(for note: Note) -> String {
         let raw = note.body + note.tags.sorted().joined()
         let digest = Insecure.MD5.hash(data: Data(raw.utf8))

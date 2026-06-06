@@ -12,7 +12,7 @@ struct FrontmatterParserTests {
 
     // MARK: parse – happy paths
 
-    @Test func parsesUIDAndTags() {
+    @Test func parsesUIDAndTags() throws {
         let content = """
         ---
         uid: 12345678-1234-1234-1234-123456789ABC
@@ -21,14 +21,13 @@ struct FrontmatterParserTests {
 
         Hello world
         """
-        let result = FrontmatterParser.parse(content)
-        #expect(result != nil)
-        #expect(result?.uid == sampleUID)
-        #expect(result?.tags == ["swift", "macOS"])
-        #expect(result?.body == "Hello world")
+        let result = try #require(FrontmatterParser.parse(content))
+        #expect(result.uid == sampleUID)
+        #expect(result.tags == ["swift", "macOS"])
+        #expect(result.body == "Hello world")
     }
 
-    @Test func parsesEmptyTagArray() {
+    @Test func parsesEmptyTagArray() throws {
         let content = """
         ---
         uid: 12345678-1234-1234-1234-123456789ABC
@@ -37,11 +36,11 @@ struct FrontmatterParserTests {
 
         Body text
         """
-        let result = FrontmatterParser.parse(content)
-        #expect(result?.tags == [])
+        let result = try #require(FrontmatterParser.parse(content))
+        #expect(result.tags == [])
     }
 
-    @Test func parsesBodyWithMultipleLines() {
+    @Test func parsesBodyWithMultipleLines() throws {
         let content = """
         ---
         uid: 12345678-1234-1234-1234-123456789ABC
@@ -52,11 +51,11 @@ struct FrontmatterParserTests {
         Line two
         Line three
         """
-        let result = FrontmatterParser.parse(content)
-        #expect(result?.body == "Line one\nLine two\nLine three")
+        let result = try #require(FrontmatterParser.parse(content))
+        #expect(result.body == "Line one\nLine two\nLine three")
     }
 
-    @Test func parsesEmptyBody() {
+    @Test func parsesEmptyBody() throws {
         let content = """
         ---
         uid: 12345678-1234-1234-1234-123456789ABC
@@ -64,11 +63,11 @@ struct FrontmatterParserTests {
         ---
 
         """
-        let result = FrontmatterParser.parse(content)
-        #expect(result?.body == "")
+        let result = try #require(FrontmatterParser.parse(content))
+        #expect(result.body == "")
     }
 
-    @Test func trimsExtraWhitespaceInUID() {
+    @Test func trimsExtraWhitespaceInUID() throws {
         let content = """
         ---
         uid:   12345678-1234-1234-1234-123456789ABC
@@ -76,8 +75,8 @@ struct FrontmatterParserTests {
         ---
 
         """
-        let result = FrontmatterParser.parse(content)
-        #expect(result?.uid == sampleUID)
+        let result = try #require(FrontmatterParser.parse(content))
+        #expect(result.uid == sampleUID)
     }
 
     // MARK: parse – failure paths
@@ -87,19 +86,19 @@ struct FrontmatterParserTests {
         #expect(FrontmatterParser.parse(content) == nil)
     }
 
-    @Test func parsesLegacyFormatWithoutClosingDelimiter() {
+    @Test func parsesLegacyFormatWithoutClosingDelimiter() throws {
         let content = """
         ---
         uid: 12345678-1234-1234-1234-123456789ABC
         tags: []
         """
-        let result = FrontmatterParser.parse(content)
-        #expect(result?.uid == sampleUID)
-        #expect(result?.tags == [])
-        #expect(result?.body == "")
+        let result = try #require(FrontmatterParser.parse(content))
+        #expect(result.uid == sampleUID)
+        #expect(result.tags == [])
+        #expect(result.body == "")
     }
 
-    @Test func parsesLegacyBlockSequenceTags() {
+    @Test func parsesLegacyBlockSequenceTags() throws {
         let content = """
         ---
         uid: 12345678-1234-1234-1234-123456789ABC
@@ -110,12 +109,12 @@ struct FrontmatterParserTests {
 
         Body here
         """
-        let result = FrontmatterParser.parse(content)
-        #expect(result?.tags == ["swift", "macOS"])
-        #expect(result?.body == "Body here")
+        let result = try #require(FrontmatterParser.parse(content))
+        #expect(result.tags == ["swift", "macOS"])
+        #expect(result.body == "Body here")
     }
 
-    @Test func parsesLegacyBlockTagsWithoutClosingDelimiter() {
+    @Test func parsesLegacyBlockTagsWithoutClosingDelimiter() throws {
         let content = """
         ---
         tags:
@@ -123,10 +122,10 @@ struct FrontmatterParserTests {
         - claude
         uid: 12345678-1234-1234-1234-123456789ABC
         """
-        let result = FrontmatterParser.parse(content)
-        #expect(result?.uid == sampleUID)
-        #expect(result?.tags == ["remote-ide", "claude"])
-        #expect(result?.body == "")
+        let result = try #require(FrontmatterParser.parse(content))
+        #expect(result.uid == sampleUID)
+        #expect(result.tags == ["remote-ide", "claude"])
+        #expect(result.body == "")
     }
 
     @Test func returnsNilWhenUIDMissing() {
@@ -170,21 +169,21 @@ struct FrontmatterParserTests {
 
     // MARK: round-trip
 
-    @Test func roundTripPreservesData() {
+    @Test func roundTripPreservesData() throws {
         let tags = ["swift", "macOS", "mcp"]
         let body = "# Title\n\nSome markdown **content**."
         let serialized = FrontmatterParser.serialize(uid: sampleUID, tags: tags, body: body)
-        let parsed = FrontmatterParser.parse(serialized)
-        #expect(parsed?.uid == sampleUID)
-        #expect(parsed?.tags == tags)
-        #expect(parsed?.body == body)
+        let parsed = try #require(FrontmatterParser.parse(serialized))
+        #expect(parsed.uid == sampleUID)
+        #expect(parsed.tags == tags)
+        #expect(parsed.body == body)
     }
 
-    @Test func roundTripWithEmptyTags() {
+    @Test func roundTripWithEmptyTags() throws {
         let serialized = FrontmatterParser.serialize(uid: sampleUID, tags: [], body: "")
-        let parsed = FrontmatterParser.parse(serialized)
-        #expect(parsed?.tags == [])
-        #expect(parsed?.body == "")
+        let parsed = try #require(FrontmatterParser.parse(serialized))
+        #expect(parsed.tags == [])
+        #expect(parsed.body == "")
     }
 }
 
@@ -215,28 +214,11 @@ struct NoteFilenameValidatorTests {
         #expect(NoteFilenameValidator.validate(name) == .tooLong)
     }
 
-    @Test func forbiddenCharacterSlash() {
-        #expect(NoteFilenameValidator.validate("my/note") == .forbiddenCharacter)
-    }
-
-    @Test func forbiddenCharacterColon() {
-        #expect(NoteFilenameValidator.validate("note:title") == .forbiddenCharacter)
-    }
-
-    @Test func forbiddenCharacterAsterisk() {
-        #expect(NoteFilenameValidator.validate("note*") == .forbiddenCharacter)
-    }
-
-    @Test func forbiddenCharacterQuote() {
-        #expect(NoteFilenameValidator.validate("note\"title") == .forbiddenCharacter)
-    }
-
-    @Test func forbiddenCharacterBackslash() {
-        #expect(NoteFilenameValidator.validate("note\\title") == .forbiddenCharacter)
-    }
-
-    @Test func forbiddenCharacterNull() {
-        #expect(NoteFilenameValidator.validate("note\0title") == .forbiddenCharacter)
+    @Test("forbidden character is rejected", arguments: [
+        "my/note", "note:title", "note*", "note\"title", "note\\title", "note\0title",
+    ])
+    func forbiddenCharacterRejected(input: String) {
+        #expect(NoteFilenameValidator.validate(input) == .forbiddenCharacter)
     }
 
     @Test func trailingWhitespaceDoesNotMakeItEmpty() {
