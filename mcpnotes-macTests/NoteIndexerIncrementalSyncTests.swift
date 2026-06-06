@@ -121,8 +121,12 @@ struct NoteIndexerIncrementalSyncTests {
         let id = UUID()
         let original = makeNote(id: id, filename: "Note", body: "Pasta recipe with tomato sauce.")
         let updated  = makeNote(id: id, filename: "Note", body: "Swift actors and structured concurrency.")
+        // Decoy note stays in the index with pasta content, making the negative assertion meaningful:
+        // after re-indexing `id` to Swift content, pasta query must prefer the decoy over `id`.
+        let decoy = makeNote(filename: "Decoy", body: "Italian pasta with tomato and basil sauce.")
         let indexer = NoteIndexer(storageDirectory: tmp)
         try await indexer.indexNote(original)
+        try await indexer.indexNote(decoy)
         try await indexer.indexNoteIfChanged(updated)
 
         let newResults = try await indexer.search(query: "Swift concurrency actors", limit: 1)
