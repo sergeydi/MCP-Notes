@@ -1265,6 +1265,7 @@
     },
     "Open in New Window" : {
       "comment" : "Context menu item that opens the note in a separate window",
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1629,6 +1630,7 @@
       }
     },
     "Settings" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

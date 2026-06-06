@@ -58,6 +58,8 @@ public actor NoteIndexer: NoteIndexing {
     /// Returns the number of indexed notes (not chunk vectors).
     public func indexedCount() async -> Int { uuidToKeys.count }
 
+    public func allIndexedIDs() async -> Set<UUID> { Set(uuidToKeys.keys) }
+
     // MARK: - Lifecycle
 
     /// Load persisted index and key mapping. Call once on app launch after NoteStore.load().
@@ -69,6 +71,17 @@ public actor NoteIndexer: NoteIndexing {
            storedVersion == Self.currentIndexVersion,
            FileManager.default.fileExists(atPath: indexPath) {
             let storedNextKey = UInt64(db.intMeta("next_key") ?? 1)
+
+            // If the dirty flag is set, the previous save was interrupted mid-write (e.g. by
+            // an uncaught NSException from USearch). The .usearch file may be corrupt — reset.
+            if db.intMeta("index_dirty") == 1 {
+                vectorIndex = USearchIndex.make(
+                    metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32
+                )
+                vectorIndex.reserve(64)
+                db.clearAll()
+                return true
+            }
 
             // Validate the usearch file header BEFORE loading. USearch's load() throws an
             // NSException on corrupt input, which is uncatchable in Swift and kills the process.
@@ -128,7 +141,10 @@ public actor NoteIndexer: NoteIndexing {
         saveTask = nil
         let storageDir = URL(fileURLWithPath: indexPath).deletingLastPathComponent()
         guard FileManager.default.fileExists(atPath: storageDir.path) else { return }
+        // Mark dirty before writing so a crash mid-save is detected on next launch.
+        db.setMeta("index_dirty", 1)
         vectorIndex.save(path: indexPath)
+        db.setMeta("index_dirty", 0)
         db.setMeta("index_version", Self.currentIndexVersion)
         db.setMeta("next_key", Int(nextKey))
     }
@@ -145,8 +161,9 @@ public actor NoteIndexer: NoteIndexing {
     /// Index a note only if its body or tags have changed since the last indexing.
     /// Used by the per-note queue worker to skip unchanged notes during load and reload.
     public func indexNoteIfChanged(_ note: Note) async throws {
-        let hash = NoteIndexer.contentHash(for: note)
-        guard db.md5(for: note.id) != hash else { return }
+        let hashUnchanged = db.md5(for: note.id) == NoteIndexer.contentHash(for: note)
+        let filenameUnchanged = db.filenameForID(note.id) == note.filename
+        guard !hashUnchanged || !filenameUnchanged else { return }
         try await indexNoteCore(note)
         scheduleSave()
     }

@@ -150,6 +150,29 @@ struct NoteIndexerIncrementalSyncTests {
         #expect(countBefore == countAfter)
     }
 
+    @Test("indexNoteIfChanged re-indexes note when only filename changes")
+    func indexNoteIfChangedReindexesRenamedNote() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let id = UUID()
+        let original = makeNote(id: id, filename: "OldName", body: "Structured concurrency in Swift.")
+        let renamed  = makeNote(id: id, filename: "NewName", body: "Structured concurrency in Swift.")
+
+        let indexer = NoteIndexer(storageDirectory: tmp)
+        try await indexer.indexNote(original)
+        try await indexer.indexNoteIfChanged(renamed)
+
+        let count = await indexer.indexedCount()
+        #expect(count == 1, "Переименование не должно создавать дубль в индексе")
+
+        let bm25New = await indexer.searchBM25Ranked(query: "NewName", limit: 5)
+        #expect(bm25New.contains { $0.id == id }, "Заметка должна находиться по новому имени")
+
+        let bm25Old = await indexer.searchBM25Ranked(query: "OldName", limit: 5)
+        #expect(!bm25Old.contains { $0.id == id }, "Старое имя не должно совпадать после переименования")
+    }
+
     @Test("clearHashStore forces re-index on fresh indexer without loadFromDisk")
     func clearHashStoreTriggersReindexOnFreshStart() async throws {
         let tmp = try makeTempDir()

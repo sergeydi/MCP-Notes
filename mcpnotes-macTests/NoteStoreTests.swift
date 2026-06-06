@@ -42,8 +42,10 @@ final class MockNoteIndexer: NoteIndexing {
     private(set) var resetAndClearIndexCalled = false
 
     var stubbedRecovery = false
+    var stubbedIndexedIDs: Set<UUID> = []
     func loadFromDisk() async -> Bool { loadFromDiskCalled = true; return stubbedRecovery }
     func indexedCount() async -> Int { stubbedCount }
+    func allIndexedIDs() async -> Set<UUID> { stubbedIndexedIDs }
     func indexAll(_ notes: [Note]) async throws { indexAllCalledWith = notes }
     func indexNote(_ note: Note) async throws { indexNoteCalledWith.append(note) }
     func indexNoteIfChanged(_ note: Note) async throws { indexNoteIfChangedCalledWith.append(note) }
@@ -478,6 +480,18 @@ struct NoteStoreIndexerTests {
             Issue.record("Expected .ready after worker finishes, got \(store.indexingState)")
             return
         }
+    }
+
+    @Test func loadRemovesOrphanedIndexEntriesForDeletedFiles() async {
+        let staleID = UUID()
+        let liveNote = makeNote(filename: "Live")
+        fs.stubbedNotes = [liveNote]
+        // Index has one extra entry for a note deleted while the app was closed.
+        idx.stubbedIndexedIDs = [liveNote.id, staleID]
+        await store.load()
+        await Task.yield()
+        #expect(idx.removeNoteCalledWith.contains(staleID))
+        #expect(!idx.removeNoteCalledWith.contains(liveNote.id))
     }
 }
 

@@ -8,6 +8,7 @@ public protocol NoteIndexing {
     func indexAll(_ notes: [Note]) async throws
     func indexNote(_ note: Note) async throws
     func indexNoteIfChanged(_ note: Note) async throws
+    func allIndexedIDs() async -> Set<UUID>
     func removeNote(id: UUID) async
     func clearHashStore() async
     func resetAndClearIndex() async

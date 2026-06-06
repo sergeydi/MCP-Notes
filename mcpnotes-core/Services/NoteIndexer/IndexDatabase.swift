@@ -260,6 +260,17 @@ final class IndexDatabase: @unchecked Sendable {
         sqlite3_step(stmt)
     }
 
+    nonisolated func filenameForID(_ id: UUID) -> String? {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT filename FROM note_meta WHERE uuid = ?",
+                                  -1, &stmt, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, id.uuidString, -1, transient)
+        guard sqlite3_step(stmt) == SQLITE_ROW,
+              let cStr = sqlite3_column_text(stmt, 0) else { return nil }
+        return String(cString: cStr)
+    }
+
     nonisolated func searchFTS(query: String, limit: Int) -> [(UUID, Double)] {
         let sanitized = sanitizeFTSQuery(query)
         guard !sanitized.isEmpty else { return [] }

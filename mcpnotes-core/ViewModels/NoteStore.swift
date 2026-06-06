@@ -121,6 +121,12 @@ public final class NoteStore {
         }
         let recovered = await indexer.loadFromDisk()
         if recovered { indexWasRecovered = true }
+
+        // Remove index entries for notes deleted while the app was closed.
+        let loadedIDs = Set(notes.map(\.id))
+        let orphanedIDs = await indexer.allIndexedIDs().subtracting(loadedIDs)
+        for id in orphanedIDs { await indexer.removeNote(id: id) }
+
         let total = notes.count
         if total > 0 {
             indexingState = .indexing(indexed: await indexer.indexedCount(), total: total)
@@ -175,6 +181,7 @@ public final class NoteStore {
             // TODO: surface errors to user
             try? fileService.deleteNote(note)
             await indexer.removeNote(id: note.id)
+            indexingState = .ready(count: await indexer.indexedCount())
         }
     }
 
