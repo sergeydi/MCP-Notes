@@ -178,7 +178,6 @@ struct SidebarView: View {
             ForEach(visibleNotes) { note in
                 NoteListItemView(note: note)
                     .tag(note.id)
-                    .contextMenu { contextMenu(for: note) }
             }
             .onDelete { offsets in
                 offsets.forEach { store.deleteNote(visibleNotes[$0]) }
@@ -200,7 +199,6 @@ struct SidebarView: View {
                 ForEach(titleMatches) { note in
                     NoteListItemView(note: note, searchQuery: searchText)
                         .tag(note.id)
-                        .contextMenu { contextMenu(for: note) }
                 }
             } header: {
                 Text("Title").id("search-top")
@@ -210,7 +208,6 @@ struct SidebarView: View {
                     ForEach(bodyMatches) { note in
                         NoteListItemView(note: note, searchQuery: searchText)
                             .tag(note.id)
-                            .contextMenu { contextMenu(for: note) }
                     }
                 }
             }
@@ -219,7 +216,6 @@ struct SidebarView: View {
                 ForEach(bodyMatches) { note in
                     NoteListItemView(note: note, searchQuery: searchText)
                         .tag(note.id)
-                        .contextMenu { contextMenu(for: note) }
                 }
             } header: {
                 Text("Content").id("search-top")
@@ -231,7 +227,6 @@ struct SidebarView: View {
                 ForEach(semanticMatches, id: \.0.id) { note, score in
                     NoteListItemView(note: note, score: score)
                         .tag(note.id)
-                        .contextMenu { contextMenu(for: note) }
                 }
             }
         }
@@ -249,7 +244,6 @@ struct SidebarView: View {
                     ForEach(tagNotes) { note in
                         NoteListItemView(note: note)
                             .tag(note.id)
-                            .contextMenu { contextMenu(for: note) }
                     }
                 }
             } header: {
@@ -284,7 +278,6 @@ struct SidebarView: View {
                     ForEach(untagged) { note in
                         NoteListItemView(note: note)
                             .tag(note.id)
-                            .contextMenu { contextMenu(for: note) }
                     }
                 }
             } header: {
@@ -310,19 +303,6 @@ struct SidebarView: View {
                 }
                 .buttonStyle(.plain)
             }
-        }
-    }
-
-    // MARK: - Helpers
-
-    @ViewBuilder
-    private func contextMenu(for note: Note) -> some View {
-        Button("Open in New Window") {
-            openWindow(value: note.id)
-        }
-        Divider()
-        Button("Delete", role: .destructive) {
-            store.deleteNote(note)
         }
     }
 

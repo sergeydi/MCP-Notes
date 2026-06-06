@@ -96,6 +96,56 @@ struct NoteIndexerIncrementalSyncTests {
         #expect(results.isEmpty, "Search must return empty after reset")
     }
 
+    @Test("indexNoteIfChanged skips note when body and tags are unchanged")
+    func indexNoteIfChangedSkipsUnchangedNote() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let note = makeNote(filename: "Note", body: "Swift programming language for macOS.")
+        let indexer = NoteIndexer(storageDirectory: tmp)
+        try await indexer.indexNote(note)
+
+        // Second call with same content must be a no-op: index still searchable, no double-vectors.
+        try await indexer.indexNoteIfChanged(note)
+        let count = await indexer.indexedCount()
+        #expect(count == 1)
+        let results = try await indexer.search(query: "Swift macOS programming", limit: 1)
+        #expect(results.first == note.id)
+    }
+
+    @Test("indexNoteIfChanged re-indexes note when body changes")
+    func indexNoteIfChangedReindexesChangedBody() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let id = UUID()
+        let original = makeNote(id: id, filename: "Note", body: "Pasta recipe with tomato sauce.")
+        let updated  = makeNote(id: id, filename: "Note", body: "Swift actors and structured concurrency.")
+        let indexer = NoteIndexer(storageDirectory: tmp)
+        try await indexer.indexNote(original)
+        try await indexer.indexNoteIfChanged(updated)
+
+        let newResults = try await indexer.search(query: "Swift concurrency actors", limit: 1)
+        #expect(newResults.first == id, "Updated content must be searchable after indexNoteIfChanged")
+        let oldResults = try await indexer.search(query: "Pasta tomato sauce", limit: 1)
+        #expect(oldResults.first != id, "Old content must no longer rank first after re-index")
+    }
+
+    @Test("indexNoteIfChanged skips note whose body was already indexed via indexAll")
+    func indexNoteIfChangedSkipsNoteAlreadyIndexedByIndexAll() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let note = makeNote(filename: "Note", body: "Gardening tips for spring and autumn.")
+        let indexer = NoteIndexer(storageDirectory: tmp)
+        try await indexer.indexAll([note])
+        let countBefore = await indexer.indexedCount()
+
+        try await indexer.indexNoteIfChanged(note)
+        let countAfter = await indexer.indexedCount()
+        #expect(countBefore == countAfter)
+    }
+
     @Test("clearHashStore forces re-index on fresh indexer without loadFromDisk")
     func clearHashStoreTriggersReindexOnFreshStart() async throws {
         let tmp = try makeTempDir()

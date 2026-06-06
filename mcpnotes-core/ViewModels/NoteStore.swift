@@ -83,6 +83,8 @@ public final class NoteStore {
     private var directoryWatcher: DispatchSourceFileSystemObject?
     private var watcherFD: Int32 = -1
     private var reloadTask: Task<Void, Never>?
+    private var noteIndexQueue: [Note] = []
+    private var indexWorkerTask: Task<Void, Never>?
 
     public init(fileService: any FileServicing = FileService(),
                 indexer: any NoteIndexing = NoteIndexer()) {
@@ -121,23 +123,7 @@ public final class NoteStore {
         let total = notes.count
         if total > 0 {
             indexingState = .indexing(indexed: await indexer.indexedCount(), total: total)
-            let snapshot = notes
-            Task {
-                do {
-                    try await indexer.indexAll(snapshot)
-                    indexingState = .ready(count: await indexer.indexedCount())
-                } catch {
-                    indexingState = .failed
-                }
-            }
-            Task {
-                while case .indexing = indexingState {
-                    try? await Task.sleep(for: .milliseconds(500))
-                    let count = await indexer.indexedCount()
-                    guard case .indexing(_, let t) = indexingState else { break }
-                    indexingState = .indexing(indexed: count, total: t)
-                }
-            }
+            enqueueNotes(notes)
         } else {
             indexingState = .ready(count: 0)
         }
@@ -253,24 +239,8 @@ public final class NoteStore {
         guard !notes.isEmpty else { return }
         indexWasRecovered = false
         await indexer.resetAndClearIndex()
-        let snapshot = notes
-        indexingState = .indexing(indexed: 0, total: snapshot.count)
-        Task {
-            do {
-                try await indexer.indexAll(snapshot)
-                indexingState = .ready(count: await indexer.indexedCount())
-            } catch {
-                indexingState = .failed
-            }
-        }
-        Task {
-            while case .indexing = indexingState {
-                try? await Task.sleep(for: .milliseconds(500))
-                let count = await indexer.indexedCount()
-                guard case .indexing(_, let t) = indexingState else { break }
-                indexingState = .indexing(indexed: count, total: t)
-            }
-        }
+        indexingState = .indexing(indexed: 0, total: notes.count)
+        enqueueNotes(notes)
     }
 
     // MARK: - Search
@@ -305,6 +275,33 @@ public final class NoteStore {
     }
 
     // MARK: - Private
+
+    /// Appends notes to the per-note index queue, deduplicating by ID, and starts the
+    /// worker task if it is not already running. The worker calls indexNoteIfChanged()
+    /// so notes whose body and tags haven't changed are skipped without ML inference.
+    private func enqueueNotes(_ notes: [Note]) {
+        for note in notes {
+            noteIndexQueue.removeAll { $0.id == note.id }
+            noteIndexQueue.append(note)
+        }
+        guard indexWorkerTask == nil else { return }
+        indexWorkerTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            var processed = 0
+            while !self.noteIndexQueue.isEmpty {
+                let note = self.noteIndexQueue.removeFirst()
+                processed += 1
+                try? await self.indexer.indexNoteIfChanged(note)
+                let remaining = self.noteIndexQueue.count
+                if remaining > 0 {
+                    let indexed = await self.indexer.indexedCount()
+                    self.indexingState = .indexing(indexed: indexed, total: processed + remaining)
+                }
+            }
+            self.indexingState = .ready(count: await self.indexer.indexedCount())
+            self.indexWorkerTask = nil
+        }
+    }
 
     private func sortNotes() {
         notes.sort { $0.filename.localizedCompare($1.filename) == .orderedAscending }
@@ -390,19 +387,17 @@ public final class NoteStore {
             }
         }
 
-        // Batch-index via indexAll: handles reserve() + MD5 skip + saveToDisk atomically.
-        let snapshot = notes
-        let alreadyIndexed = await indexer.indexedCount()
-        indexingState = .indexing(indexed: alreadyIndexed, total: snapshot.count)
-        Task {
-            while case .indexing = indexingState {
-                try? await Task.sleep(for: .milliseconds(500))
-                let count = await indexer.indexedCount()
-                guard case .indexing(_, let t) = indexingState else { break }
-                indexingState = .indexing(indexed: count, total: t)
-            }
+        // Remove deleted notes from the index directly (fast, no ML inference).
+        for id in removedIDs { await indexer.removeNote(id: id) }
+
+        // Enqueue only added and changed notes; unchanged notes are skipped by indexNoteIfChanged.
+        let toIndex = addedIDs.compactMap { freshMap[$0] } + changedNotes
+        if !toIndex.isEmpty {
+            let indexed = await indexer.indexedCount()
+            indexingState = .indexing(indexed: indexed, total: indexed + toIndex.count)
+            enqueueNotes(toIndex)
+        } else if !removedIDs.isEmpty {
+            indexingState = .ready(count: await indexer.indexedCount())
         }
-        try? await indexer.indexAll(snapshot)
-        indexingState = .ready(count: await indexer.indexedCount())
     }
 }

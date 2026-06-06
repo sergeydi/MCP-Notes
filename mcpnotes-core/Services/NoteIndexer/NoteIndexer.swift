@@ -139,6 +139,15 @@ public actor NoteIndexer: NoteIndexing {
         scheduleSave()
     }
 
+    /// Index a note only if its body or tags have changed since the last indexing.
+    /// Used by the per-note queue worker to skip unchanged notes during load and reload.
+    public func indexNoteIfChanged(_ note: Note) async throws {
+        let hash = NoteIndexer.contentHash(for: note)
+        guard db.md5(for: note.id) != hash else { return }
+        try await indexNoteCore(note)
+        scheduleSave()
+    }
+
     // Core indexing without triggering a save — used by indexAll() to avoid mid-batch saves.
     private func indexNoteCore(_ note: Note) async throws {
         // Remove all existing chunk keys for this note before re-indexing.

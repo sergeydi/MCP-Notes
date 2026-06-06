@@ -37,6 +37,7 @@ final class MockNoteIndexer: NoteIndexing {
     private(set) var loadFromDiskCalled = false
     private(set) var indexAllCalledWith: [Note]?
     private(set) var indexNoteCalledWith: [Note] = []
+    private(set) var indexNoteIfChangedCalledWith: [Note] = []
     private(set) var removeNoteCalledWith: [UUID] = []
     private(set) var resetAndClearIndexCalled = false
 
@@ -45,6 +46,7 @@ final class MockNoteIndexer: NoteIndexing {
     func indexedCount() async -> Int { stubbedCount }
     func indexAll(_ notes: [Note]) async throws { indexAllCalledWith = notes }
     func indexNote(_ note: Note) async throws { indexNoteCalledWith.append(note) }
+    func indexNoteIfChanged(_ note: Note) async throws { indexNoteIfChangedCalledWith.append(note) }
     func removeNote(id: UUID) async { removeNoteCalledWith.append(id) }
     func clearHashStore() async {}
     func resetAndClearIndex() async { resetAndClearIndexCalled = true }
@@ -331,33 +333,29 @@ struct NoteStoreIndexerTests {
         #expect(idx.loadFromDiskCalled)
     }
 
-    @Test func loadCallsIndexAllWhenIndexIsEmpty() async {
+    @Test func loadEnqueuesAllNotesForIndexing() async {
         fs.stubbedNotes = [makeNote(filename: "A")]
         idx.stubbedCount = 0
         await store.load()
         await Task.yield()
-        #expect(idx.indexAllCalledWith != nil)
-        #expect(idx.indexAllCalledWith?.count == fs.stubbedNotes.count)
+        #expect(idx.indexNoteIfChangedCalledWith.count == fs.stubbedNotes.count)
     }
 
-    @Test func loadAlwaysCallsIndexAllForIncrementalSync() async {
-        // indexAll is always called so NoteIndexer can do incremental hash-based sync internally.
+    @Test func loadEnqueuesAllNotesWhenIndexFull() async {
         let notes = [makeNote(filename: "A"), makeNote(filename: "B")]
         fs.stubbedNotes = notes
         idx.stubbedCount = 2
         await store.load()
         await Task.yield()
-        #expect(idx.indexAllCalledWith != nil)
-        #expect(idx.indexAllCalledWith?.count == fs.stubbedNotes.count)
+        #expect(idx.indexNoteIfChangedCalledWith.count == fs.stubbedNotes.count)
     }
 
-    @Test func loadReindexesWhenIndexIsPartial() async {
+    @Test func loadEnqueuesNotesWhenIndexIsPartial() async {
         fs.stubbedNotes = [makeNote(filename: "A"), makeNote(filename: "B"), makeNote(filename: "C")]
         idx.stubbedCount = 1
         await store.load()
         await Task.yield()
-        #expect(idx.indexAllCalledWith != nil)
-        #expect(idx.indexAllCalledWith?.count == fs.stubbedNotes.count)
+        #expect(idx.indexNoteIfChangedCalledWith.count == fs.stubbedNotes.count)
     }
 
     @Test func createNoteCallsIndexNote() async {
@@ -429,7 +427,7 @@ struct NoteStoreIndexerTests {
         await store.reindexAll()
         await Task.yield()
         #expect(idx.resetAndClearIndexCalled == false)
-        #expect(idx.indexAllCalledWith == nil)
+        #expect(idx.indexNoteIfChangedCalledWith.isEmpty)
     }
 
     @Test func reindexAllCallsResetAndClearIndex() async {
@@ -439,12 +437,47 @@ struct NoteStoreIndexerTests {
         #expect(idx.resetAndClearIndexCalled)
     }
 
-    @Test func reindexAllCallsIndexAll() async {
+    @Test func reindexAllEnqueuesAllNotes() async {
         store.notes = [makeNote()]
         await store.reindexAll()
         await Task.yield()
-        #expect(idx.indexAllCalledWith != nil)
-        #expect(idx.indexAllCalledWith?.count == 1)
+        #expect(idx.indexNoteIfChangedCalledWith.count == 1)
+    }
+
+    @Test func loadTransitionsIndexingStateToReady() async {
+        fs.stubbedNotes = [makeNote(filename: "A")]
+        await store.load()
+        await Task.yield()
+        guard case .ready = store.indexingState else {
+            Issue.record("Expected .ready, got \(store.indexingState)")
+            return
+        }
+    }
+
+    @Test func reindexAllTransitionsIndexingStateToReady() async {
+        store.notes = [makeNote()]
+        await store.reindexAll()
+        await Task.yield()
+        guard case .ready = store.indexingState else {
+            Issue.record("Expected .ready, got \(store.indexingState)")
+            return
+        }
+    }
+
+    @Test func loadSetsIndexingBeforeEnqueuing() async {
+        fs.stubbedNotes = [makeNote(filename: "A"), makeNote(filename: "B")]
+        idx.stubbedCount = 0
+        // indexingState must be .indexing immediately after load() returns,
+        // before the worker task has a chance to run.
+        let loadTask = Task { await self.store.load() }
+        await loadTask.value
+        // At this point the worker may or may not have run yet —
+        // but it must have moved to .ready by the time we yield.
+        await Task.yield()
+        guard case .ready = store.indexingState else {
+            Issue.record("Expected .ready after worker finishes, got \(store.indexingState)")
+            return
+        }
     }
 }
 
@@ -473,12 +506,13 @@ struct NoteStoreExternalChangesTests {
         #expect(store.notes.contains { $0.id == added.id })
     }
 
-    @Test func addsNoteCallsIndexAll() async {
+    @Test func addsNoteEnqueuesNoteForIndexing() async {
         let added = makeNote(filename: "B")
         store.notes = []
         fs.stubbedNotes = [added]
         await store.reloadExternalChanges()
-        #expect(idx.indexAllCalledWith?.contains { $0.id == added.id } == true)
+        await Task.yield()
+        #expect(idx.indexNoteIfChangedCalledWith.contains { $0.id == added.id })
     }
 
     @Test func removesNoteDeletedFromDisk() async {
@@ -491,14 +525,14 @@ struct NoteStoreExternalChangesTests {
         #expect(store.notes.contains { $0.id == removed.id } == false)
     }
 
-    @Test func removesNoteExcludesFromIndexAllSnapshot() async {
+    @Test func removesNoteCallsRemoveNoteOnIndexer() async {
         let kept = makeNote(filename: "A")
         let removed = makeNote(filename: "B")
         store.notes = [kept, removed]
         fs.stubbedNotes = [kept]
         await store.reloadExternalChanges()
-        #expect(idx.indexAllCalledWith?.contains { $0.id == removed.id } == false)
-        #expect(idx.indexAllCalledWith?.contains { $0.id == kept.id } == true)
+        #expect(idx.removeNoteCalledWith.contains(removed.id))
+        #expect(idx.indexNoteIfChangedCalledWith.isEmpty)
     }
 
     @Test func updatesChangedNoteBody() async throws {
@@ -512,14 +546,15 @@ struct NoteStoreExternalChangesTests {
         #expect(stored.body == "new body")
     }
 
-    @Test func updatesChangedNoteCallsIndexAllWithNewContent() async throws {
+    @Test func updatesChangedNoteEnqueuesNoteWithNewContent() async throws {
         let note = makeNote(filename: "A")
         store.notes = [note]
         var updated = note
         updated.body = "new body"
         fs.stubbedNotes = [updated]
         await store.reloadExternalChanges()
-        let indexed = try #require(idx.indexAllCalledWith?.first { $0.id == note.id })
+        await Task.yield()
+        let indexed = try #require(idx.indexNoteIfChangedCalledWith.first { $0.id == note.id })
         #expect(indexed.body == "new body")
     }
 
@@ -539,18 +574,19 @@ struct NoteStoreExternalChangesTests {
         store.notes = [note]
         fs.stubbedNotes = [note]
         await store.reloadExternalChanges()
-        #expect(idx.indexAllCalledWith == nil)
+        #expect(idx.indexNoteIfChangedCalledWith.isEmpty)
         #expect(idx.removeNoteCalledWith.isEmpty)
     }
 
-    @Test func updatesChangedNoteTagsCallsIndexAllWithNewTags() async throws {
+    @Test func updatesChangedNoteTagsEnqueuesNoteWithNewTags() async throws {
         let note = makeNote(filename: "A", tags: ["old"])
         store.notes = [note]
         var updated = note
         updated.tags = ["new"]
         fs.stubbedNotes = [updated]
         await store.reloadExternalChanges()
-        let indexed = try #require(idx.indexAllCalledWith?.first { $0.id == note.id })
+        await Task.yield()
+        let indexed = try #require(idx.indexNoteIfChangedCalledWith.first { $0.id == note.id })
         #expect(indexed.tags == ["new"])
     }
 
