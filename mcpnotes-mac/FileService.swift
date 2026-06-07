@@ -1,25 +1,18 @@
 import Foundation
-
-public protocol FileServicing {
-    func loadAllNotes() throws -> [Note]
-    func saveNote(_ note: Note) throws
-    func createNote(baseName: String) throws -> Note
-    func deleteNote(_ note: Note) throws
-    func renameNote(_ note: Note, to newName: String) throws -> Note
-}
+import MCPNotesCore
 
 /// Handles reading and writing note files from the notes directory.
 ///
 /// Notes are stored as flat `.md` files — no subdirectories. The preferred
 /// location is the app's iCloud Drive container; the local Application Support
 /// directory is used as a fallback during development without iCloud configured.
-public struct FileService: FileServicing {
+struct FileService: FileServicing {
 
-    public init() {}
+    init() {}
 
     /// Root directory where all note files are stored.
     /// Priority: custom user-chosen folder > iCloud Drive > Application Support.
-    public static var notesDirectoryURL: URL {
+    static var notesDirectoryURL: URL {
         if let url = activeCustomURL ?? resolveCustomNotesDirectory() {
             return url
         }
@@ -30,10 +23,10 @@ public struct FileService: FileServicing {
     }
 
     /// The currently active security-scoped custom directory URL, if set.
-    public static var customNotesDirectoryURL: URL? { activeCustomURL }
+    static var customNotesDirectoryURL: URL? { activeCustomURL }
 
     /// Persists `url` as a security-scoped bookmark and activates it immediately.
-    public static func setCustomNotesDirectory(_ url: URL) throws {
+    static func setCustomNotesDirectory(_ url: URL) throws {
         activeCustomURL?.stopAccessingSecurityScopedResource()
         activeCustomURL = nil
         let data = try url.bookmarkData(
@@ -47,13 +40,13 @@ public struct FileService: FileServicing {
     }
 
     /// Removes the custom directory bookmark and reverts to the default location.
-    public static func clearCustomNotesDirectory() {
+    static func clearCustomNotesDirectory() {
         activeCustomURL?.stopAccessingSecurityScopedResource()
         activeCustomURL = nil
         UserDefaults.standard.removeObject(forKey: customBookmarkKey)
     }
 
-    public func loadAllNotes() throws -> [Note] {
+    func loadAllNotes() throws -> [Note] {
         let dir = Self.notesDirectoryURL
         let files = try FileManager.default.contentsOfDirectory(
             at: dir,
@@ -84,13 +77,13 @@ public struct FileService: FileServicing {
         }.sorted { $0.filename.localizedCompare($1.filename) == .orderedAscending }
     }
 
-    public func saveNote(_ note: Note) throws {
+    func saveNote(_ note: Note) throws {
         let content = FrontmatterParser.serialize(uid: note.id, tags: note.tags, isBookmarked: note.isBookmarked, body: note.body)
         try content.write(to: note.fileURL, atomically: true, encoding: .utf8)
     }
 
     /// Creates a new note file, appending a numeric suffix to avoid name collisions.
-    public func createNote(baseName: String = "New Note") throws -> Note {
+    func createNote(baseName: String = "New Note") throws -> Note {
         let dir = Self.notesDirectoryURL
         var filename = baseName
         var url = dir.appendingPathComponent("\(filename).md")
@@ -105,12 +98,12 @@ public struct FileService: FileServicing {
         return note
     }
 
-    public func deleteNote(_ note: Note) throws {
+    func deleteNote(_ note: Note) throws {
         try FileManager.default.trashItem(at: note.fileURL, resultingItemURL: nil)
     }
 
     /// Renames the note file on disk and returns an updated `Note` value.
-    public func renameNote(_ note: Note, to newName: String) throws -> Note {
+    func renameNote(_ note: Note, to newName: String) throws -> Note {
         let newURL = note.fileURL
             .deletingLastPathComponent()
             .appendingPathComponent("\(newName).md")

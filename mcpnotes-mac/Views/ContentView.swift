@@ -36,5 +36,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .environment(NoteStore())
+        .environment(NoteStore(indexer: NoteIndexer()))
 }

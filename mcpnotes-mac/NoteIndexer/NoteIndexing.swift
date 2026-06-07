@@ -1,6 +1,7 @@
 import Foundation
+import MCPNotesCore
 
-public protocol NoteIndexing {
+protocol NoteIndexing {
     /// Load persisted index. Returns `true` if the index was corrupted or inconsistent
     /// and had to be reset (triggering a full re-index), `false` on a normal load or fresh start.
     func loadFromDisk() async -> Bool

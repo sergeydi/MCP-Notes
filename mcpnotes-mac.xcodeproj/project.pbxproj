@@ -7,11 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AA11000000000000000000AE /* Embeddings in Frameworks */ = {isa = PBXBuildFile; productRef = AA11000000000000000000AB /* Embeddings */; };
-		AA11000000000000000000AF /* MLTensorUtils in Frameworks */ = {isa = PBXBuildFile; productRef = AA11000000000000000000AC /* MLTensorUtils */; };
-		AA11000000000000000000B0 /* USearch in Frameworks */ = {isa = PBXBuildFile; productRef = AA11000000000000000000AD /* USearch */; };
 		AA11000000000000000000B3 /* mcpnotes-core.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA11000000000000000000A1 /* mcpnotes-core.framework */; };
 		AA11000000000000000000B5 /* mcpnotes-core.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = AA11000000000000000000A1 /* mcpnotes-core.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		AABB000000000004 /* Embeddings in Frameworks */ = {isa = PBXBuildFile; productRef = AABB000000000001 /* Embeddings */; };
+		AABB000000000005 /* MLTensorUtils in Frameworks */ = {isa = PBXBuildFile; productRef = AABB000000000002 /* MLTensorUtils */; };
+		AABB000000000006 /* USearch in Frameworks */ = {isa = PBXBuildFile; productRef = AABB000000000003 /* USearch */; };
 		E29098AA2FA7341600C4C0FD /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = E29098A92FA7341600C4C0FD /* MCP */; };
 		E290A00B2FA72B6C00C4C0FD /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = E290A00A2FA72B6C00C4C0FD /* MCP */; };
 		E290C0042FA72B6C00C4C0FD /* Embeddings in Frameworks */ = {isa = PBXBuildFile; productRef = E290C0012FA72B6C00C4C0FD /* Embeddings */; };
@@ -115,9 +115,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AA11000000000000000000AE /* Embeddings in Frameworks */,
-				AA11000000000000000000AF /* MLTensorUtils in Frameworks */,
-				AA11000000000000000000B0 /* USearch in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -127,6 +124,9 @@
 			files = (
 				E29098AA2FA7341600C4C0FD /* MCP in Frameworks */,
 				AA11000000000000000000B3 /* mcpnotes-core.framework in Frameworks */,
+				AABB000000000004 /* Embeddings in Frameworks */,
+				AABB000000000005 /* MLTensorUtils in Frameworks */,
+				AABB000000000006 /* USearch in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -223,9 +223,6 @@
 			);
 			name = "mcpnotes-core";
 			packageProductDependencies = (
-				AA11000000000000000000AB /* Embeddings */,
-				AA11000000000000000000AC /* MLTensorUtils */,
-				AA11000000000000000000AD /* USearch */,
 			);
 			productName = "mcpnotes-core";
 			productReference = AA11000000000000000000A1 /* mcpnotes-core.framework */;
@@ -251,6 +248,9 @@
 			name = "mcpnotes-mac";
 			packageProductDependencies = (
 				E29098A92FA7341600C4C0FD /* MCP */,
+				AABB000000000001 /* Embeddings */,
+				AABB000000000002 /* MLTensorUtils */,
+				AABB000000000003 /* USearch */,
 			);
 			productName = "mcpnotes-mac";
 			productReference = E290987E2FA72B6C00C4C0FD /* mcpnotes-mac.app */;
@@ -1040,17 +1040,17 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		AA11000000000000000000AB /* Embeddings */ = {
+		AABB000000000001 /* Embeddings */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E29098AF2FA7345500C4C0FD /* XCRemoteSwiftPackageReference "swift-embeddings" */;
 			productName = Embeddings;
 		};
-		AA11000000000000000000AC /* MLTensorUtils */ = {
+		AABB000000000002 /* MLTensorUtils */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E29098AF2FA7345500C4C0FD /* XCRemoteSwiftPackageReference "swift-embeddings" */;
 			productName = MLTensorUtils;
 		};
-		AA11000000000000000000AD /* USearch */ = {
+		AABB000000000003 /* USearch */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E29098F72FA9BC7C00C4C0FD /* XCRemoteSwiftPackageReference "USearch" */;
 			productName = USearch;

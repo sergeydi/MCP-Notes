@@ -3,7 +3,7 @@ import SwiftUI
 
 @main
 struct MCPNotesApp: App {
-    @State private var noteStore = NoteStore()
+    @State private var noteStore = NoteStore(indexer: NoteIndexer())
 
     // Skip SwiftUI UI initialization during test runs to avoid crashes in macOS 26 beta
     // system frameworks (NSSplitView, DynamicPropertyBuffer) before the test runner connects.

@@ -1,13 +1,14 @@
 import Foundation
+import MCPNotesCore
 import Observation
 
-public enum IndexingState {
+enum IndexingState {
     case idle
     case indexing(indexed: Int, total: Int)
     case ready(count: Int)
     case failed
 
-    public var isIndexing: Bool {
+    var isIndexing: Bool {
         if case .indexing = self { return true }
         return false
     }
@@ -16,14 +17,14 @@ public enum IndexingState {
 /// Central data store for all notes. Injected as an environment object
 /// so every view in the hierarchy shares the same instance.
 @Observable
-public final class NoteStore {
-    public var notes: [Note] = [] {
+final class NoteStore {
+    var notes: [Note] = [] {
         didSet { rebuildAllTags() }
     }
-    public var indexingState: IndexingState = .idle
+    var indexingState: IndexingState = .idle
     /// True when the search index had to be rebuilt due to corruption or inconsistency.
     /// Cleared when the user manually triggers a full re-index.
-    public var indexWasRecovered: Bool = false
+    var indexWasRecovered: Bool = false
 
     // Navigation history — back/forward like a browser
     @ObservationIgnored private var navHistory: [UUID] = []
@@ -31,11 +32,11 @@ public final class NoteStore {
     @ObservationIgnored private var isNavigating: Bool = false
     @ObservationIgnored private var isRenaming: Bool = false
 
-    public private(set) var canNavigateBack: Bool = false
-    public private(set) var canNavigateForward: Bool = false
+    private(set) var canNavigateBack: Bool = false
+    private(set) var canNavigateForward: Bool = false
 
     @ObservationIgnored private var _selectedNoteID: UUID?
-    public var selectedNoteID: UUID? {
+    var selectedNoteID: UUID? {
         get {
             access(keyPath: \.selectedNoteID)
             return _selectedNoteID
@@ -56,7 +57,7 @@ public final class NoteStore {
         }
     }
 
-    public func navigateBack() {
+    func navigateBack() {
         guard canNavigateBack else { return }
         isNavigating = true
         navIndex -= 1
@@ -65,7 +66,7 @@ public final class NoteStore {
         updateNavState()
     }
 
-    public func navigateForward() {
+    func navigateForward() {
         guard canNavigateForward else { return }
         isNavigating = true
         navIndex += 1
@@ -88,8 +89,8 @@ public final class NoteStore {
     private var noteIndexQueue: [Note] = []
     private var indexWorkerTask: Task<Void, Never>?
 
-    public init(fileService: any FileServicing = FileService(),
-                indexer: any NoteIndexing = NoteIndexer()) {
+    init(fileService: any FileServicing = FileService(),
+                indexer: any NoteIndexing) {
         self.fileService = fileService
         self.indexer = indexer
     }
@@ -100,19 +101,19 @@ public final class NoteStore {
         reloadTask?.cancel()
     }
 
-    public var selectedNote: Note? {
+    var selectedNote: Note? {
         notes.first { $0.id == selectedNoteID }
     }
 
-    public private(set) var allTags: [String] = []
+    private(set) var allTags: [String] = []
 
-    public var bookmarkedNotes: [Note] {
+    var bookmarkedNotes: [Note] {
         notes.filter(\.isBookmarked)
     }
 
     // MARK: - Loading
 
-    public func load() async {
+    func load() async {
         do {
             notes = try fileService.loadAllNotes()
         } catch {
@@ -139,7 +140,7 @@ public final class NoteStore {
 
     // MARK: - CRUD
 
-    public func createNote() async {
+    func createNote() async {
         do {
             let note = try fileService.createNote(baseName: "New Note")
             notes.append(note)
@@ -151,7 +152,7 @@ public final class NoteStore {
         }
     }
 
-    public func updateNote(_ updated: Note) {
+    func updateNote(_ updated: Note) {
         guard let index = notes.firstIndex(where: { $0.id == updated.id }) else { return }
         var merged = updated
         merged.isBookmarked = notes[index].isBookmarked
@@ -164,7 +165,7 @@ public final class NoteStore {
         }
     }
 
-    public func deleteNote(_ note: Note) {
+    func deleteNote(_ note: Note) {
         notes.removeAll { $0.id == note.id }
 
         navHistory.removeAll { $0 == note.id }
@@ -185,7 +186,7 @@ public final class NoteStore {
         }
     }
 
-    public func renameNote(_ note: Note, to newName: String, onComplete: (@MainActor (_ updatedNoteFilenames: [String]) -> Void)? = nil) {
+    func renameNote(_ note: Note, to newName: String, onComplete: (@MainActor (_ updatedNoteFilenames: [String]) -> Void)? = nil) {
         guard !newName.isEmpty else { return }
         let oldName = note.filename
         Task { @MainActor in
@@ -231,7 +232,7 @@ public final class NoteStore {
 
     /// Stops the directory watcher, clears in-memory state, and reloads from the current
     /// `FileService.notesDirectoryURL`. Call after changing the notes directory.
-    public func switchDirectory() async {
+    func switchDirectory() async {
         directoryWatcher?.cancel()
         directoryWatcher = nil
         notes = []
@@ -244,7 +245,7 @@ public final class NoteStore {
         await load()
     }
 
-    public func reindexAll() async {
+    func reindexAll() async {
         guard !notes.isEmpty else { return }
         indexWasRecovered = false
         await indexer.resetAndClearIndex()
@@ -254,29 +255,29 @@ public final class NoteStore {
 
     // MARK: - Search
 
-    public func search(query: String, limit: Int = 10) async throws -> [UUID] {
+    func search(query: String, limit: Int = 10) async throws -> [UUID] {
         try await indexer.search(query: query, limit: limit)
     }
 
-    public func searchRanked(query: String, limit: Int = 10) async throws -> [(id: UUID, score: Float)] {
+    func searchRanked(query: String, limit: Int = 10) async throws -> [(id: UUID, score: Float)] {
         try await indexer.searchRanked(query: query, limit: limit)
     }
 
-    public func outgoingLinks(from noteID: UUID) async -> [UUID] {
+    func outgoingLinks(from noteID: UUID) async -> [UUID] {
         await indexer.outgoingLinks(from: noteID)
     }
 
-    public func incomingLinks(to noteID: UUID) async -> [UUID] {
+    func incomingLinks(to noteID: UUID) async -> [UUID] {
         await indexer.incomingLinks(to: noteID)
     }
 
-    public func allWikilinkEdges() async -> [(source: UUID, target: UUID)] {
+    func allWikilinkEdges() async -> [(source: UUID, target: UUID)] {
         await indexer.allLinks()
     }
 
     // MARK: - Bookmarks
 
-    public func toggleBookmark(for noteID: UUID) {
+    func toggleBookmark(for noteID: UUID) {
         guard let index = notes.firstIndex(where: { $0.id == noteID }) else { return }
         notes[index].isBookmarked.toggle()
         let note = notes[index]
