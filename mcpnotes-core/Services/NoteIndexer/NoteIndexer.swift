@@ -105,6 +105,19 @@ public actor NoteIndexer: NoteIndexing {
             vectorIndex.load(path: indexPath)
 
             let loadedCount = vectorIndex.count
+
+            // If the loaded index has no active vectors, the HNSW entry-point may still
+            // reference a soft-deleted node (USearch does not reset it on remove()).
+            // Calling add() on such an index throws an uncatchable NSException. Reset.
+            if loadedCount == 0 {
+                vectorIndex = USearchIndex.make(
+                    metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32
+                )
+                vectorIndex.reserve(64)
+                db.clearAll()
+                return true
+            }
+
             let capacity = max(UInt32(loadedCount) + 16, 64)
             vectorIndex.reserve(capacity)
 
@@ -127,11 +140,53 @@ public actor NoteIndexer: NoteIndexing {
                 uuidToKeys[uuid] = keys
                 for key in keys { keyToUUID[key] = uuid }
             }
+
+            // Detect the inverse inconsistency: usearch has active vectors but the DB has
+            // no chunk mappings. This happens when removeNote() cleared the DB synchronously
+            // but the deferred save (scheduleSave) was cancelled by app termination before
+            // it could write the updated usearch file to disk.
+            if loadedCount > 0, uuidToKeys.isEmpty {
+                vectorIndex = USearchIndex.make(
+                    metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32
+                )
+                vectorIndex.reserve(64)
+                db.clearAll()
+                return true
+            }
+
+            // Apply removes recorded synchronously by removeNote() whose deferred usearch save
+            // (scheduleSave) never completed — e.g. the app quit within the 3-second window.
+            // Pending keys are NOT cleared here; saveToDisk() clears them after persisting the
+            // updated usearch file, making the application idempotent across crashes.
+            let pendingKeys = db.pendingRemoveKeys()
+            for key in pendingKeys {
+                vectorIndex.remove(key: key)
+                keyToUUID.removeValue(forKey: key)
+            }
+
+            // Verify consistency after applying pending removes.
+            // A remaining mismatch indicates genuine corruption — reset and force re-index.
+            let totalDBKeys = uuidToKeys.values.reduce(0) { $0 + $1.count }
+            if vectorIndex.count != totalDBKeys {
+                vectorIndex = USearchIndex.make(
+                    metric: .cos, dimensions: Self.dimensions, connectivity: 16, quantization: .F32
+                )
+                vectorIndex.reserve(64)
+                uuidToKeys = [:]
+                keyToUUID = [:]
+                nextKey = 1
+                db.clearAll()
+                return true
+            }
+
             return false
         }
 
-        // Fresh start — clear hashes so indexAll() re-indexes everything.
-        db.clearHashes()
+        // Fresh start: version mismatch or missing usearch file.
+        // clearAll() instead of clearHashes() prevents stale note_chunks / FTS / meta entries
+        // from an older schema surviving into the new session, which would cause a false
+        // count mismatch on the next cold start and trigger an unnecessary full reset.
+        db.clearAll()
         return false
     }
 
@@ -147,6 +202,7 @@ public actor NoteIndexer: NoteIndexing {
         db.setMeta("index_dirty", 0)
         db.setMeta("index_version", Self.currentIndexVersion)
         db.setMeta("next_key", Int(nextKey))
+        db.clearPendingRemoves()
     }
 
     // MARK: - Indexing
@@ -225,6 +281,7 @@ public actor NoteIndexer: NoteIndexing {
         db.removeMeta(for: id)
         db.removeLinks(source: id)
         db.removeLinksTo(target: id)
+        db.addPendingRemoves(keys: keys)
         scheduleSave()
     }
 

@@ -43,6 +43,9 @@ final class IndexDatabase: @unchecked Sendable {
                 target_uid TEXT NOT NULL,
                 PRIMARY KEY (source_uid, target_uid)
             );
+            CREATE TABLE IF NOT EXISTS pending_removes (
+                chunk_key INTEGER PRIMARY KEY
+            );
             """, nil, nil, nil)
         let linksVersion = intMeta("links_schema_version") ?? 0
         if linksVersion < 1 {
@@ -302,8 +305,37 @@ final class IndexDatabase: @unchecked Sendable {
 
     nonisolated func clearAll() {
         sqlite3_exec(db,
-            "DELETE FROM note_chunks; DELETE FROM file_hashes; DELETE FROM meta; DELETE FROM notes_fts; DELETE FROM note_tags; DELETE FROM note_meta; DELETE FROM note_links",
+            "DELETE FROM note_chunks; DELETE FROM file_hashes; DELETE FROM meta; DELETE FROM notes_fts; DELETE FROM note_tags; DELETE FROM note_meta; DELETE FROM note_links; DELETE FROM pending_removes",
             nil, nil, nil)
+    }
+
+    // MARK: pending_removes
+
+    nonisolated func addPendingRemoves(keys: [UInt64]) {
+        guard !keys.isEmpty else { return }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "INSERT OR IGNORE INTO pending_removes (chunk_key) VALUES (?)", -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        for key in keys {
+            sqlite3_bind_int64(stmt, 1, Int64(bitPattern: key))
+            sqlite3_step(stmt)
+            sqlite3_reset(stmt)
+        }
+    }
+
+    nonisolated func pendingRemoveKeys() -> [UInt64] {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT chunk_key FROM pending_removes", -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        var keys: [UInt64] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            keys.append(UInt64(bitPattern: sqlite3_column_int64(stmt, 0)))
+        }
+        return keys
+    }
+
+    nonisolated func clearPendingRemoves() {
+        sqlite3_exec(db, "DELETE FROM pending_removes", nil, nil, nil)
     }
 
     // MARK: note_links

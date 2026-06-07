@@ -118,6 +118,105 @@ struct NoteIndexerLoadFromDiskTests {
         #expect(results.first == newNote.id, "New note must be searchable after corruption recovery")
     }
 
+    /// Regression: all notes deleted while app runs → 3-second debounced save fires → usearch
+    /// saved with 0 active vectors but a stale HNSW entry-point. On the next cold start with
+    /// notes restored, vectorIndex.add() threw an uncatchable NSException.
+    @Test("cold start survives after all-deleted usearch file was saved")
+    func coldStartAfterAllDeletedUsearchDoesNotCrash() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let noteA = makeNote(filename: "CrashNote1", body: "Unique term zephyr1 content for crash regression test.")
+        let noteB = makeNote(filename: "CrashNote2", body: "Unique term zephyr2 content for crash regression test.")
+        let noteC = makeNote(filename: "CrashNote3", body: "Unique term zephyr3 content for crash regression test.")
+
+        let indexerA = NoteIndexer(storageDirectory: tmp)
+        try await indexerA.indexAll([noteA, noteB, noteC])
+
+        // Simulate: all notes removed while app was running, deferred save fired before quit.
+        await indexerA.removeNote(id: noteA.id)
+        await indexerA.removeNote(id: noteB.id)
+        await indexerA.removeNote(id: noteC.id)
+        await indexerA.saveToDisk()
+
+        let indexerB = NoteIndexer(storageDirectory: tmp)
+        let recovered = await indexerB.loadFromDisk()
+        #expect(recovered == true, "loadFromDisk must signal recovery for an all-deleted usearch")
+        #expect(await indexerB.indexedCount() == 0)
+
+        try await indexerB.indexAll([noteA, noteB, noteC])
+        #expect(await indexerB.indexedCount() == 3)
+        let expectedID = noteA.id
+        let results = try await indexerB.search(query: "zephyr1 crash regression", limit: 1)
+        #expect(results.first == expectedID)
+    }
+
+    /// Regression: all notes deleted while app runs → app quit before the 3-second deferred save
+    /// → usearch file retains the original N active vectors while note_chunks was cleared.
+    /// On the next cold start, the stale usearch/DB mismatch was not detected.
+    @Test("cold start survives when usearch has stale vectors and DB was cleared")
+    func coldStartWithStaleUsearchAndEmptyDBDoesNotCrash() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let noteA = makeNote(filename: "StaleNote1", body: "Unique term quasar1 stale vector regression test.")
+        let noteB = makeNote(filename: "StaleNote2", body: "Unique term quasar2 stale vector regression test.")
+        let noteC = makeNote(filename: "StaleNote3", body: "Unique term quasar3 stale vector regression test.")
+
+        let indexerA = NoteIndexer(storageDirectory: tmp)
+        try await indexerA.indexAll([noteA, noteB, noteC])
+
+        // Simulate "app quit before deferred save": removeNote clears SQLite synchronously
+        // (note_chunks, file_hashes, etc.) but only schedules the usearch save after 3 seconds.
+        // We proceed immediately so the usearch file on disk still has N active vectors from
+        // indexAll's saveToDisk, creating the stale-usearch / empty-DB inconsistency.
+        await indexerA.removeNote(id: noteA.id)
+        await indexerA.removeNote(id: noteB.id)
+        await indexerA.removeNote(id: noteC.id)
+
+        let indexerB = NoteIndexer(storageDirectory: tmp)
+        let recovered = await indexerB.loadFromDisk()
+        #expect(recovered == true, "loadFromDisk must signal recovery when usearch has stale vectors but DB is empty")
+        #expect(await indexerB.indexedCount() == 0)
+
+        try await indexerB.indexAll([noteA, noteB, noteC])
+        #expect(await indexerB.indexedCount() == 3)
+        let expectedID = noteB.id
+        let results = try await indexerB.search(query: "quasar2 stale vector", limit: 1)
+        #expect(results.first == expectedID)
+    }
+
+    @Test("partial deletion before debounced save is applied without full re-index on restart")
+    func partialDeletionBeforeDebounceIsRecoveredOnRestart() async throws {
+        let tmp = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let noteA = makeNote(filename: "PartialA", body: "Unique term nebula1 partial orphan regression test.")
+        let noteB = makeNote(filename: "PartialB", body: "Unique term nebula2 partial orphan regression test.")
+        let noteC = makeNote(filename: "PartialC", body: "Unique term nebula3 partial orphan regression test.")
+
+        let indexerA = NoteIndexer(storageDirectory: tmp)
+        try await indexerA.indexAll([noteA, noteB, noteC])
+
+        // Simulate "app quit before deferred save": removeNote clears SQLite synchronously and
+        // records pending removes, but does not update the usearch file on disk.
+        await indexerA.removeNote(id: noteC.id)
+
+        let indexerB = NoteIndexer(storageDirectory: tmp)
+        let recovered = await indexerB.loadFromDisk()
+        // Pending removes are applied in place — no full re-index needed.
+        #expect(recovered == false, "loadFromDisk must apply pending removes without triggering full recovery")
+        #expect(await indexerB.indexedCount() == 2, "noteA and noteB remain indexed after pending removes applied")
+
+        // noteA and noteB must be searchable without calling indexAll.
+        let resultsA = try await indexerB.search(query: "nebula1 partial orphan", limit: 1)
+        #expect(resultsA.first == noteA.id, "noteA must be searchable after pending removes applied")
+
+        // noteC's vectors were soft-deleted — it must not appear in search results.
+        let resultsC = try await indexerB.search(query: "nebula3 partial orphan", limit: 5)
+        #expect(resultsC.contains(noteC.id) == false, "noteC must not be searchable after its vectors were removed")
+    }
+
     @Test("note added while app was closed is searchable after restart")
     func addedNoteSearchableAfterRestart() async throws {
         let tmp = try makeTempDir()
