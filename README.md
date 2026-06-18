@@ -2,6 +2,11 @@
 
 A native macOS Markdown note-taking app with built-in semantic search and an [MCP](https://modelcontextprotocol.io) server — so AI tools like Claude can read, search, and edit your notes directly.
 
+[![Download on the App Store](https://upload.wikimedia.org/wikipedia/commons/0/0e/Download_on_the_Mac_App_Store_Badge_US-UK_RGB_wht.svg)](https://apps.apple.com/app/mcp-notes/id6762989069)
+
+<img width="1600" height="1200" alt="ezgif-59b0a59764651c27" src="https://github.com/user-attachments/assets/eefa8b6c-22bc-4c17-87f9-adecf78764ac" />
+
+
 ## Features
 
 - **Plain Markdown files** — every note is a `.md` file with a YAML frontmatter block (`uid`, `tags`). No proprietary format, no lock-in.
