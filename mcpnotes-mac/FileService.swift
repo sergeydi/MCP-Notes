@@ -11,7 +11,7 @@ struct FileService: FileServicing {
     init() {}
 
     /// Root directory where all note files are stored.
-    /// Priority: custom user-chosen folder > iCloud Drive > Application Support.
+    /// Priority: custom user-chosen folder > iCloud Drive > ~/Documents/MCP Notes.
     static var notesDirectoryURL: URL {
         if let url = activeCustomURL ?? resolveCustomNotesDirectory() {
             return url
@@ -144,9 +144,9 @@ struct FileService: FileServicing {
     }
 
     private static func localFallbackURL() -> URL {
-        let appSupport = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let url = appSupport.appendingPathComponent("MCP Notes/Notes")
+        let documents = FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let url = documents.appendingPathComponent("MCP Notes")
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
