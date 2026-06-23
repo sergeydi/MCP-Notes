@@ -147,6 +147,7 @@ final class NoteStore {
             sortNotes()
             selectedNoteID = note.id
             try? await indexer.indexNote(note)
+            indexingState = .ready(count: await indexer.indexedCount())
         } catch {
             // TODO: surface error to user
         }
@@ -162,6 +163,7 @@ final class NoteStore {
             // TODO: surface errors to user
             try? fileService.saveNote(merged)
             try? await indexer.indexNote(merged)
+            indexingState = .ready(count: await indexer.indexedCount())
         }
     }
 
@@ -226,6 +228,7 @@ final class NoteStore {
                 try? fileService.saveNote(n)
                 try? await indexer.indexNote(n)
             }
+            indexingState = .ready(count: await indexer.indexedCount())
             onComplete?(updatedFilenames)
         }
     }

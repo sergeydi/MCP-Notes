@@ -248,6 +248,8 @@ actor NoteIndexer: NoteIndexing {
 
         for chunk in chunks {
             let vector = try await embed("passage: \(chunk)")
+            // Re-check after await: note may have been deleted while embedding was running.
+            guard uuidToKeys[note.id] != nil else { return }
             let key = nextKey
             nextKey += 1
             uuidToKeys[note.id]!.append(key)
