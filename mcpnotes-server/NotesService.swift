@@ -58,6 +58,7 @@ struct NotesService: Sendable {
                 id: parsed.uid,
                 filename: filename,
                 tags: parsed.tags,
+                isBookmarked: parsed.bookmarked,
                 body: parsed.body,
                 fileURL: url
             )
@@ -72,7 +73,7 @@ struct NotesService: Sendable {
         guard let existing = note(uid: uid) else {
             throw NotesServiceError.notFound(uid)
         }
-        let content = FrontmatterParser.serialize(uid: existing.id, tags: existing.tags, body: body)
+        let content = FrontmatterParser.serialize(uid: existing.id, tags: existing.tags, isBookmarked: existing.isBookmarked, body: body)
         try content.write(to: existing.fileURL, atomically: true, encoding: .utf8)
     }
 
@@ -88,7 +89,7 @@ struct NotesService: Sendable {
         let uid = UUID()
         let content = FrontmatterParser.serialize(uid: uid, tags: tags, body: body)
         try content.write(to: url, atomically: true, encoding: .utf8)
-        return Note(id: uid, filename: filename, tags: tags, body: body, fileURL: url)
+        return Note(id: uid, filename: filename, tags: tags, isBookmarked: false, body: body, fileURL: url)
     }
 
     // MARK: - Private

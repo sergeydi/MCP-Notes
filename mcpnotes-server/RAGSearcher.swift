@@ -150,12 +150,8 @@ actor RAGSearcher: RAGSearching {
     }
 
     private static var ragDirectory: URL {
-        let sandboxPath = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(
-                "Library/Containers/mcp-notes/Data/Library/Application Support/mcpnotes/rag"
-            )
-        if FileManager.default.fileExists(atPath: sandboxPath.path) {
-            return sandboxPath
+        if let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.mcp-notes") {
+            return group.appendingPathComponent("mcpnotes/rag")
         }
         let appSupport = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

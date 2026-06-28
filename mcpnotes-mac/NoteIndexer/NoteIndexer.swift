@@ -43,10 +43,9 @@ actor NoteIndexer: NoteIndexing {
         if let custom = storageDirectory {
             dir = custom
         } else {
-            let appSupport = FileManager.default.urls(
-                for: .applicationSupportDirectory, in: .userDomainMask
-            ).first!
-            dir = appSupport.appendingPathComponent("mcpnotes/rag", isDirectory: true)
+            let base = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.mcp-notes")
+                ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            dir = base.appendingPathComponent("mcpnotes/rag", isDirectory: true)
         }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         indexPath = dir.appendingPathComponent("notes.usearch").path
