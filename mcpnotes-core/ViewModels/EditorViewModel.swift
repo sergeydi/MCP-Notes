@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Observation
 
@@ -12,8 +13,20 @@ public final class EditorViewModel {
     public var onSave: ((_ body: String, _ tags: [String]) -> Void)?
 
     private var autosaveTask: Task<Void, Never>?
+    private var _loadedHash: Insecure.MD5Digest?
+
+    private var isDirty: Bool {
+        contentHash(body: body, tags: tags) != _loadedHash
+    }
 
     public init() {}
+
+    private func contentHash(body: String, tags: [String]) -> Insecure.MD5Digest {
+        var hasher = Insecure.MD5()
+        hasher.update(data: Data(body.utf8))
+        for tag in tags { hasher.update(data: Data(tag.utf8)) }
+        return hasher.finalize()
+    }
 
     /// Loads a note into the editor, resetting any pending autosave.
     public func load(note: Note) {
@@ -21,11 +34,13 @@ public final class EditorViewModel {
         noteID = note.id
         body = note.body
         tags = note.tags
+        _loadedHash = contentHash(body: note.body, tags: note.tags)
     }
 
     /// Resets the autosave timer. Call this whenever `body` or `tags` change.
     public func scheduleAutosave() {
         autosaveTask?.cancel()
+        guard isDirty else { return }
         autosaveTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(1))
             guard let self, !Task.isCancelled else { return }
@@ -37,6 +52,7 @@ public final class EditorViewModel {
     public func flushAutosave() {
         autosaveTask?.cancel()
         autosaveTask = nil
+        guard isDirty else { return }
         onSave?(body, tags)
     }
 
