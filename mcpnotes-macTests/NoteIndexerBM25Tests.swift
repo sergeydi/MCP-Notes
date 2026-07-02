@@ -4,7 +4,7 @@ import Testing
 @testable import mcpnotes_mac
 
 extension NoteIndexerTests {
-@Suite("NoteIndexer – BM25 search", .timeLimit(.minutes(5)))
+@Suite("NoteIndexer – BM25 search")
 struct NoteIndexerBM25Tests {
 
     private func makeNote(filename: String, body: String, tags: [String] = []) -> Note {
@@ -23,7 +23,7 @@ struct NoteIndexerBM25Tests {
     func bm25ReturnsKeywordMatch() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         let swift = makeNote(filename: "Swift", body: "Swift actors and structured concurrency.")
         let recipe = makeNote(filename: "Pasta", body: "Boil water and add tomato sauce to spaghetti.")
         try await indexer.indexAll([swift, recipe])
@@ -35,7 +35,7 @@ struct NoteIndexerBM25Tests {
     func bm25EmptyForOperatorOnlyQuery() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         let note = makeNote(filename: "Note", body: "Some content here.")
         try await indexer.indexAll([note])
         let results = await indexer.searchBM25Ranked(query: "***---", limit: 5)
@@ -46,7 +46,7 @@ struct NoteIndexerBM25Tests {
     func removeNoteRemovesFTSEntry() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         let note = makeNote(filename: "Removable", body: "unique-keyword-xyzzy content")
         try await indexer.indexAll([note])
         await indexer.removeNote(id: note.id)
@@ -58,7 +58,7 @@ struct NoteIndexerBM25Tests {
     func reindexUpdatesFTSContent() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         let id = UUID()
         let original = Note(id: id, filename: "Note", tags: [], body: "cooking pasta tomato",
                             fileURL: URL(fileURLWithPath: "/tmp/Note.md"), isBookmarked: false)

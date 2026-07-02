@@ -1,5 +1,3 @@
-import CoreML
-import Embeddings
 import Foundation
 import SQLite3
 import USearch
@@ -26,18 +24,16 @@ protocol RAGSearching: Actor {
 /// The index lives in the sandboxed app container — this actor finds it automatically.
 actor RAGSearcher: RAGSearching {
 
-    private static let modelID = "intfloat/multilingual-e5-small"
     private static let dimensions: UInt32 = 384
     private static let currentIndexVersion = 8
 
     nonisolated(unsafe) private var vectorIndex: USearchIndex = .make(metric: .cos, dimensions: 384, connectivity: 16, quantization: .F32)
     nonisolated(unsafe) private var keyToUUID: [UInt64: UUID] = [:]
-    private var modelBundle: XLMRoberta.ModelBundle?
     private let indexPath: String
     private let dbURL: URL
     nonisolated(unsafe) private var indexModDate: Date?
-    /// When set, replaces real model inference. Lets tests pass a fixed vector without loading CoreML.
     private let customEmbedder: ((String) async throws -> [Float])?
+    private var xpcConnection: NSXPCConnection?
 
     init() {
         let dir = Self.ragDirectory
@@ -279,26 +275,46 @@ actor RAGSearcher: RAGSearching {
 
     // MARK: - Private: embedding
 
-    private func loadedModel() async throws -> XLMRoberta.ModelBundle {
-        if let bundle = modelBundle { return bundle }
-        let bundle = try await XLMRoberta.loadModelBundle(from: Self.modelID)
-        modelBundle = bundle
-        return bundle
-    }
-
     private func embed(_ text: String) async throws -> [Float] {
         if let custom = customEmbedder { return try await custom(text) }
-        let bundle = try await loadedModel()
-        let tokens = try bundle.tokenizer.tokenizeText(text, maxLength: 512)
-        let seqLen = tokens.count
-        let inputIds = MLTensor(shape: [1, seqLen], scalars: tokens)
-        let attentionMask = MLTensor(ones: [1, seqLen], scalarType: Float32.self)
-        let output = bundle.model(inputIds: inputIds, attentionMask: attentionMask)
-        let pooled = output.sequenceOutput.mean(alongAxes: 1, keepRank: false)
-        var vector = await pooled.cast(to: Float.self).shapedArray(of: Float.self).scalars
-        let norm = sqrt(vector.reduce(0) { $0 + $1 * $1 })
-        if norm > 0 { vector = vector.map { $0 / norm } }
-        return vector
+        return try await xpcEmbed(text)
+    }
+
+    private func xpcEmbed(_ text: String) async throws -> [Float] {
+        let conn = activeXPCConnection()
+        return try await withCheckedThrowingContinuation { cont in
+            let rawProxy = conn.remoteObjectProxyWithErrorHandler { error in
+                cont.resume(throwing: error)
+            }
+            guard let proxy = rawProxy as? any EmbeddingXPCProtocol else {
+                cont.resume(throwing: EmbeddingError.xpcFailed)
+                return
+            }
+            proxy.embed(text: text) { data in
+                guard let data else {
+                    cont.resume(throwing: EmbeddingError.xpcFailed)
+                    return
+                }
+                let floats = data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+                cont.resume(returning: floats)
+            }
+        }
+    }
+
+    private func activeXPCConnection() -> NSXPCConnection {
+        if let conn = xpcConnection { return conn }
+        let conn = NSXPCConnection(serviceName: "mcpnotes-embeddings")
+        conn.remoteObjectInterface = NSXPCInterface(with: EmbeddingXPCProtocol.self)
+        conn.invalidationHandler = { [weak self] in
+            Task { [weak self] in await self?.handleXPCInvalidated() }
+        }
+        conn.resume()
+        xpcConnection = conn
+        return conn
+    }
+
+    private func handleXPCInvalidated() {
+        xpcConnection = nil
     }
 
 }

@@ -4,7 +4,7 @@ import Testing
 @testable import mcpnotes_mac
 
 extension NoteIndexerTests {
-@Suite("NoteIndexer – wikilink graph", .timeLimit(.minutes(5)), .serialized)
+@Suite("NoteIndexer – wikilink graph", .serialized)
 struct NoteIndexerWikilinkTests {
 
     private func makeNote(filename: String, body: String) -> Note {
@@ -23,7 +23,7 @@ struct NoteIndexerWikilinkTests {
     func outgoingLinksResolvedByIndexAll() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         let target = makeNote(filename: "Swift Concurrency", body: "Actors and structured tasks.")
         let source = makeNote(filename: "Intro", body: "See [[Swift Concurrency]] for details.")
         try await indexer.indexAll([source, target])
@@ -35,7 +35,7 @@ struct NoteIndexerWikilinkTests {
     func incomingLinksResolvedByIndexAll() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         let target = makeNote(filename: "Concurrency", body: "Swift concurrency concepts.")
         let source = makeNote(filename: "Overview", body: "See [[Concurrency]] for more.")
         try await indexer.indexAll([source, target])
@@ -47,7 +47,7 @@ struct NoteIndexerWikilinkTests {
     func linkResolutionIsCaseInsensitive() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         let target = makeNote(filename: "Swift Concurrency", body: "Actors.")
         let source = makeNote(filename: "Intro", body: "See [[swift concurrency]] here.")
         try await indexer.indexAll([source, target])
@@ -86,7 +86,7 @@ struct NoteIndexerWikilinkTests {
     func reindexReplacesLinks() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         let noteA = makeNote(filename: "A", body: "No links here.")
         let noteB = makeNote(filename: "B", body: "Target B content.")
         let noteC = makeNote(filename: "C", body: "Target C content.")
@@ -104,7 +104,7 @@ struct NoteIndexerWikilinkTests {
     func removeNoteClearsOutgoingLinks() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         let target = makeNote(filename: "Target", body: "Target content.")
         let source = makeNote(filename: "Source", body: "Links to [[Target]].")
         try await indexer.indexAll([source, target])
@@ -118,7 +118,7 @@ struct NoteIndexerWikilinkTests {
     func removeNoteClearsIncomingLinks() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         let target = makeNote(filename: "Target", body: "Target content.")
         let source = makeNote(filename: "Source", body: "Links to [[Target]].")
         try await indexer.indexAll([source, target])
@@ -132,7 +132,7 @@ struct NoteIndexerWikilinkTests {
     func renameCascadePreservesLinks() async throws {
         let tmp = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         let target = makeNote(filename: "Old", body: "The target.")
         let source = makeNote(filename: "Source", body: "See [[Old]] for details.")
         try await indexer.indexAll([source, target])

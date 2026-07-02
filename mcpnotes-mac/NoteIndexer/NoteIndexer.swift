@@ -1,6 +1,4 @@
-import CoreML
 import CryptoKit
-import Embeddings
 import Foundation
 import MCPNotesCore
 import USearch
@@ -12,7 +10,6 @@ actor NoteIndexer: NoteIndexing {
 
     // MARK: - Constants
 
-    private nonisolated static let modelID = "intfloat/multilingual-e5-small"
     /// multilingual-e5-small hidden size.
     private nonisolated static let dimensions: UInt32 = 384
     /// Bump when the chunking strategy or index format changes to force a full re-index.
@@ -22,8 +19,7 @@ actor NoteIndexer: NoteIndexing {
 
     // MARK: - State
 
-    private var modelBundle: XLMRoberta.ModelBundle?
-    private var modelLoadTask: Task<XLMRoberta.ModelBundle, Error>?
+    private let embedder: any NoteEmbedding
     private var vectorIndex: USearchIndex = .make(metric: .cos, dimensions: 384, connectivity: 16, quantization: .F32)
     /// Maps each note UUID to the keys of all its indexed chunks.
     private var uuidToKeys: [UUID: [UInt64]] = [:]
@@ -38,7 +34,8 @@ actor NoteIndexer: NoteIndexing {
 
     // MARK: - Init
 
-    init(storageDirectory: URL? = nil) {
+    init(storageDirectory: URL? = nil, embedder: (any NoteEmbedding)? = nil) {
+        self.embedder = embedder ?? XPCNoteEmbedder()
         let dir: URL
         if let custom = storageDirectory {
             dir = custom
@@ -380,37 +377,8 @@ actor NoteIndexer: NoteIndexing {
 
     // MARK: - Private: embedding
 
-    private func loadedModel() async throws -> XLMRoberta.ModelBundle {
-        if let bundle = modelBundle { return bundle }
-        if let task = modelLoadTask { return try await task.value }
-        let task = Task { try await XLMRoberta.loadModelBundle(from: Self.modelID) }
-        modelLoadTask = task
-        do {
-            let bundle = try await task.value
-            modelBundle = bundle
-            modelLoadTask = nil
-            return bundle
-        } catch {
-            modelLoadTask = nil
-            throw error
-        }
-    }
-
-    /// Embed text using mean pooling + L2 normalization (E5 recipe).
     private func embed(_ text: String) async throws -> [Float] {
-        let bundle = try await loadedModel()
-        let tokens = try bundle.tokenizer.tokenizeText(text, maxLength: 512)
-        let seqLen = tokens.count
-        let inputIds = MLTensor(shape: [1, seqLen], scalars: tokens)
-        let attentionMask = MLTensor(ones: [1, seqLen], scalarType: Float32.self)
-        let output = bundle.model(inputIds: inputIds, attentionMask: attentionMask)
-        // Mean pool over the sequence dimension: [1, seq_len, 384] → [1, 384]
-        let pooled = output.sequenceOutput.mean(alongAxes: 1, keepRank: false)
-        var vector = await pooled.cast(to: Float.self).shapedArray(of: Float.self).scalars
-        // L2 normalize so cosine similarity equals dot product
-        let norm = sqrt(vector.reduce(0) { $0 + $1 * $1 })
-        if norm > 0 { vector = vector.map { $0 / norm } }
-        return vector
+        try await embedder.embed(text)
     }
 
     // MARK: - Link graph

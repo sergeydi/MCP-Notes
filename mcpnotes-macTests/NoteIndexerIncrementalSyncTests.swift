@@ -4,7 +4,7 @@ import Testing
 @testable import mcpnotes_mac
 
 extension NoteIndexerTests {
-@Suite("NoteIndexer – incremental sync", .serialized, .timeLimit(.minutes(5)))
+@Suite("NoteIndexer – incremental sync", .serialized, .timeLimit(.minutes(2)))
 struct NoteIndexerIncrementalSyncTests {
 
     func makeNote(id: UUID = UUID(), filename: String, body: String, tags: [String] = []) -> Note {
@@ -31,7 +31,7 @@ struct NoteIndexerIncrementalSyncTests {
         defer { try? FileManager.default.removeItem(at: tmp) }
 
         let note = makeNote(filename: "Unchanged", body: "Swift programming language for macOS.")
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         try await indexer.indexAll([note])
         let countAfterFirst = await indexer.indexedCount()
 
@@ -53,7 +53,7 @@ struct NoteIndexerIncrementalSyncTests {
         let original = makeNote(id: id, filename: "My Note", body: "Pasta recipe with tomato sauce.")
         let updated = makeNote(id: id, filename: "My Note", body: "Swift actors and structured concurrency.")
 
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         try await indexer.indexAll([original])
         try await indexer.indexAll([updated])
 
@@ -69,7 +69,7 @@ struct NoteIndexerIncrementalSyncTests {
         let kept = makeNote(filename: "Kept", body: "Gardening and composting tips for spring.")
         let removed = makeNote(filename: "Removed", body: "Swift programming with generics and protocols.")
 
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         try await indexer.indexAll([kept, removed])
         try await indexer.indexAll([kept])
 
@@ -85,7 +85,7 @@ struct NoteIndexerIncrementalSyncTests {
         defer { try? FileManager.default.removeItem(at: tmp) }
 
         let note = makeNote(filename: "Note", body: "Swift language features and protocols.")
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         try await indexer.indexAll([note])
         #expect(await indexer.indexedCount() == 1)
 
@@ -102,7 +102,7 @@ struct NoteIndexerIncrementalSyncTests {
         defer { try? FileManager.default.removeItem(at: tmp) }
 
         let note = makeNote(filename: "Note", body: "Swift programming language for macOS.")
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         try await indexer.indexNote(note)
 
         // Second call with same content must be a no-op: index still searchable, no double-vectors.
@@ -141,7 +141,7 @@ struct NoteIndexerIncrementalSyncTests {
         defer { try? FileManager.default.removeItem(at: tmp) }
 
         let note = makeNote(filename: "Note", body: "Gardening tips for spring and autumn.")
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         try await indexer.indexAll([note])
         let countBefore = await indexer.indexedCount()
 
@@ -159,7 +159,7 @@ struct NoteIndexerIncrementalSyncTests {
         let original = makeNote(id: id, filename: "OldName", body: "Structured concurrency in Swift.")
         let renamed  = makeNote(id: id, filename: "NewName", body: "Structured concurrency in Swift.")
 
-        let indexer = NoteIndexer(storageDirectory: tmp)
+        let indexer = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         try await indexer.indexNote(original)
         try await indexer.indexNoteIfChanged(renamed)
 
@@ -180,10 +180,10 @@ struct NoteIndexerIncrementalSyncTests {
 
         let note = makeNote(filename: "Note", body: "Swift programming language for iOS.")
 
-        let indexerA = NoteIndexer(storageDirectory: tmp)
+        let indexerA = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         try await indexerA.indexAll([note])
 
-        let indexerB = NoteIndexer(storageDirectory: tmp)
+        let indexerB = NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())
         await indexerB.clearHashStore()
         try await indexerB.indexAll([note])
 

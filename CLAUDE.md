@@ -30,10 +30,11 @@ MVVM with strict layer separation: **Views → ViewModels → Models/Services**.
 
 ### Module structure
 
-The project has three targets that share code via a framework:
+The project has four main code targets:
 
 - **`mcpnotes-core`** — shared framework (`import MCPNotesCore`). Contains only truly platform-agnostic types: `Note`, `SidebarMode`, `FileServicing` protocol, `FrontmatterParser`, markdown utilities (`MarkdownToken`, `MarkdownPatterns`, `MarkdownListContinuation`), `NoteFilenameValidator`, `EditorViewModel`. All public.
 - **`mcpnotes-mac`** — main SwiftUI app. Imports `MCPNotesCore`. Contains all Mac-specific code: `NoteStore`, `FileService`, `NoteIndexer`/`NoteIndexing`/`IndexDatabase`, `MarkdownHighlighter`, `MarkdownTextView`, all Views.
+- **`mcpnotes-embeddings`** — XPC Service. Runs in a separate process inside `Contents/XPCServices/`. Loads multilingual-e5-small via the `Embeddings` package and exposes `EmbeddingXPCProtocol`. The main app connects on first embed call and disconnects after 60 s of idle (`exit(0)` on invalidation), so CoreML/Metal memory is fully released by the OS between indexing sessions.
 - **`mcpnotes-server`** — MCP server executable. Does **not** import `MCPNotesCore`; bundles its own local copies of `Note` and `FrontmatterParser`.
 
 ### Data flow
@@ -60,6 +61,12 @@ WikilinkGraphView        ← separate Window scene ("wikilink-graph")
     ├── GraphSKView      ← SKView subclass; restarts SpriteKit display link on reopen
     └── GraphSKScene     ← force-directed graph simulation (repulsion + spring + damping)
 ```
+
+### Embeddings XPC service
+
+`mcpnotes-embeddings` is a sandboxed XPC Service that lives at `Contents/XPCServices/mcpnotes-embeddings.xpc`. It loads multilingual-e5-small (XLM-RoBERTa, 384-dim) using the `Embeddings` Swift package and exposes `EmbeddingXPCProtocol` over `NSXPCConnection`. The main app (`XPCNoteEmbedder`) connects on first embed call; after 60 s of idle it invalidates the connection, which triggers `exit(0)` in the service — the OS fully reclaims all CoreML/Metal memory (~450 MB). On the next embed call the connection is re-established and the model reloads from the CoreML cache (fast, no re-download).
+
+Key files: `mcpnotes-embeddings/mcpnotes_embeddings.swift`, `mcpnotes-embeddings/main.swift`, `mcpnotes-embeddings/mcpnotes_embeddingsProtocol.swift`. The protocol (`EmbeddingXPCProtocol`) is duplicated in both the service and `mcpnotes-mac/NoteIndexer/EmbeddingXPCProtocol.swift` (NSXPCConnection requires `@objc protocol`).
 
 ### MCP server
 
@@ -92,7 +99,9 @@ Markdown body…
 | `EditorViewModel` | `@Observable` class in `mcpnotes-core`. One instance per `NoteEditorView`. Owns autosave `Task`. |
 | `FileService` | `struct` in `mcpnotes-mac` conforming to `FileServicing`. Uses iCloud Drive, security-scoped bookmarks for custom directories, falls back to Application Support. |
 | `NoteFilenameValidator` | `struct` in `mcpnotes-core`. Allowlist: Unicode letters, digits, space, hyphen, underscore, period. `maxLength = 200`. Returns `ValidationResult`: `.valid`, `.empty`, `.tooLong`, `.forbiddenCharacter`. |
-| `NoteIndexer` | `actor` in `mcpnotes-mac`. Hybrid search: USearch vectors (multilingual-e5-small, 384-dim cosine) + SQLite FTS5 BM25. MD5-based incremental sync. `pending_removes`: `removeNote()` writes here synchronously; `loadFromDisk()` applies them on cold start + runs six integrity checks (returns `true` → full re-index needed); `saveToDisk()` clears them — idempotent across crashes. Files: `mcpnotes-mac/NoteIndexer/`. |
+| `NoteIndexer` | `actor` in `mcpnotes-mac`. Hybrid search: USearch vectors (multilingual-e5-small, 384-dim cosine) + SQLite FTS5 BM25. MD5-based incremental sync. `pending_removes`: `removeNote()` writes here synchronously; `loadFromDisk()` applies them on cold start + runs six integrity checks (returns `true` → full re-index needed); `saveToDisk()` clears them — idempotent across crashes. Embedding is delegated to an injected `any NoteEmbedding` (default: `XPCNoteEmbedder`). Files: `mcpnotes-mac/NoteIndexer/`. |
+| `NoteEmbedding` | `protocol` in `mcpnotes-mac`. Single method `embed(_:) async throws -> [Float]`. Conformances: `XPCNoteEmbedder` (production), `MockNoteEmbedder` (tests). |
+| `XPCNoteEmbedder` | `actor` in `mcpnotes-mac`. Manages `NSXPCConnection` to `mcpnotes-embeddings` service. Cancels idle timer on each call; schedules 60 s close via `scheduleConnectionClose()`. |
 | `IndexDatabase` | Private SQLite wrapper. Tables: chunk→key mappings, MD5 hashes, FTS5 full-text, tag index, note metadata, `pending_removes`. Used only by `NoteIndexer`. |
 | `GraphSKView` | `SKView` subclass. Observes `NSWindow.didChangeOcclusionStateNotification` to restart SpriteKit's display link on reopen (SpriteKit stops it without going through `isPaused`). |
 | `GraphSKScene` | `SKScene` subclass. Force-directed: O(n²) repulsion, spring edges, center gravity, `simAlpha` damping. |
@@ -119,5 +128,6 @@ On macOS 26, `automation.apple-events` alone fails without a provisioning profil
 - Public types in `mcpnotes-core` get DocC `///` comments.
 - Tests use **Swift Testing** (`import Testing`, `@Test`, `#expect`), not XCTest — except UI tests.
 - Use `@Suite` to group tests. One suite per component.
-- `NoteIndexerIntegrationTests.swift` downloads the ML model (~115 MB); requires `.timeLimit(.minutes(5))`.
+- `NoteIndexerIntegrationTests.swift` uses real ML via XPC; model (~115 MB) is cached after first download. Requires `.timeLimit(.minutes(5))`.
+- All other `NoteIndexer*Tests` suites inject `MockNoteEmbedder` — deterministic hash-based unit vectors, no ML, runs in milliseconds. Pass `NoteIndexer(storageDirectory: tmp, embedder: MockNoteEmbedder())`. Exception: `indexNoteIfChangedReindexesChangedBody` in `NoteIndexerIncrementalSyncTests` uses the XPC default (tests semantic ranking between two notes).
 - `NoteStoreTests.swift` uses `MockFileService` and `MockNoteIndexer` (same file, no disk I/O). `MockNoteIndexer` tracks calls via `indexNoteCalledWith`, `indexNoteIfChangedCalledWith`, `removeNoteCalledWith`, `indexAllCalledWith`.
