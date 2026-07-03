@@ -34,6 +34,7 @@ actor RAGSearcher: RAGSearching {
     nonisolated(unsafe) private var indexModDate: Date?
     private let customEmbedder: ((String) async throws -> [Float])?
     private var xpcConnection: NSXPCConnection?
+    private var idleCloseTask: Task<Void, Never>?
 
     init() {
         let dir = Self.ragDirectory
@@ -302,6 +303,7 @@ actor RAGSearcher: RAGSearching {
     }
 
     private func activeXPCConnection() -> NSXPCConnection {
+        scheduleConnectionClose()
         if let conn = xpcConnection { return conn }
         let conn = NSXPCConnection(serviceName: "mcpnotes-embeddings")
         conn.remoteObjectInterface = NSXPCInterface(with: EmbeddingXPCProtocol.self)
@@ -313,8 +315,23 @@ actor RAGSearcher: RAGSearching {
         return conn
     }
 
+    private func scheduleConnectionClose() {
+        idleCloseTask?.cancel()
+        idleCloseTask = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(60)) } catch { return }
+            await self?.closeXPCConnection()
+        }
+    }
+
+    private func closeXPCConnection() {
+        xpcConnection?.invalidate()
+        xpcConnection = nil
+        idleCloseTask = nil
+    }
+
     private func handleXPCInvalidated() {
         xpcConnection = nil
+        idleCloseTask = nil
     }
 
 }
