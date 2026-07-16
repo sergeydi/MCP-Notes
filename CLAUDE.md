@@ -8,20 +8,20 @@ Open `mcpnotes-mac.xcodeproj` in Xcode 26+. All commands below use `xcodebuild`.
 
 ```bash
 # Build main app
-xcodebuild -project mcpnotes-mac.xcodeproj -scheme mcpnotes-mac -destination 'platform=macOS' build
+xcodebuild -project mcpnotes-mac.xcodeproj -scheme mcpnotes-app -destination 'platform=macOS' build
 
 # Run unit tests (Swift Testing)
-xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-macTests -destination 'platform=macOS'
+xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-appTests -destination 'platform=macOS'
 
 # Run MCP server tests
 xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-serverTests -destination 'platform=macOS'
 
 # Run a single test by name
-xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-macTests \
-  -destination 'platform=macOS' -only-testing:mcpnotes-macTests/MyTestSuite/myTestMethod
+xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-appTests \
+  -destination 'platform=macOS' -only-testing:mcpnotes-appTests/MyTestSuite/myTestMethod
 
 # Run UI tests
-xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-macUITests -destination 'platform=macOS'
+xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-appUITests -destination 'platform=macOS'
 ```
 
 ## Architecture
@@ -30,12 +30,11 @@ MVVM with strict layer separation: **Views → ViewModels → Models/Services**.
 
 ### Module structure
 
-The project has four main code targets:
+The project has three main code targets:
 
-- **`mcpnotes-core`** — shared framework (`import MCPNotesCore`). Contains only truly platform-agnostic types: `Note`, `SidebarMode`, `FileServicing` protocol, `FrontmatterParser`, markdown utilities (`MarkdownToken`, `MarkdownPatterns`, `MarkdownListContinuation`), `NoteFilenameValidator`, `EditorViewModel`. All public.
-- **`mcpnotes-mac`** — main SwiftUI app. Imports `MCPNotesCore`. Contains all Mac-specific code: `NoteStore`, `FileService`, `NoteIndexer`/`NoteIndexing`/`IndexDatabase`, `MarkdownHighlighter`, `MarkdownTextView`, all Views.
+- **`mcpnotes-app`** — main SwiftUI app (target/module name `mcpnotes_app`). Contains everything: `Note`, `SidebarMode`, `FileServicing` protocol, `FrontmatterParser`, markdown utilities (`MarkdownToken`, `MarkdownPatterns`, `MarkdownListContinuation`), `NoteFilenameValidator`, `EditorViewModel`, `NoteStore`, `FileService`, `NoteIndexer`/`NoteIndexing`/`IndexDatabase`, `MarkdownHighlighter`, `MarkdownTextView`, all Views. There is no separate shared framework — everything lives in this one target.
 - **`mcpnotes-embeddings`** — XPC Service. Runs in a separate process inside `Contents/XPCServices/`. Loads multilingual-e5-small via the `Embeddings` package and exposes `EmbeddingXPCProtocol`. The main app connects on first embed call and disconnects after 60 s of idle (`exit(0)` on invalidation), so CoreML/Metal memory is fully released by the OS between indexing sessions.
-- **`mcpnotes-server`** — MCP server executable. Does **not** import `MCPNotesCore`; bundles its own local copies of `Note` and `FrontmatterParser`.
+- **`mcpnotes-server`** — MCP server executable. Does **not** depend on `mcpnotes-app`; it bundles its own private copies of `Note` and `FrontmatterParser`.
 
 ### Data flow
 
@@ -66,11 +65,11 @@ WikilinkGraphView        ← separate Window scene ("wikilink-graph")
 
 `mcpnotes-embeddings` is a sandboxed XPC Service that lives at `Contents/XPCServices/mcpnotes-embeddings.xpc`. It loads multilingual-e5-small (XLM-RoBERTa, 384-dim) using the `Embeddings` Swift package and exposes `EmbeddingXPCProtocol` over `NSXPCConnection`. The main app (`XPCNoteEmbedder`) connects on first embed call; after 60 s of idle it invalidates the connection, which triggers `exit(0)` in the service — the OS fully reclaims all CoreML/Metal memory (~450 MB). On the next embed call the connection is re-established and the model reloads from the CoreML cache (fast, no re-download).
 
-Key files: `mcpnotes-embeddings/mcpnotes_embeddings.swift`, `mcpnotes-embeddings/main.swift`, `mcpnotes-embeddings/mcpnotes_embeddingsProtocol.swift`. The protocol (`EmbeddingXPCProtocol`) is duplicated in both the service and `mcpnotes-mac/NoteIndexer/EmbeddingXPCProtocol.swift` (NSXPCConnection requires `@objc protocol`).
+Key files: `mcpnotes-embeddings/mcpnotes_embeddings.swift`, `mcpnotes-embeddings/main.swift`, `mcpnotes-embeddings/mcpnotes_embeddingsProtocol.swift`. The protocol (`EmbeddingXPCProtocol`) is duplicated in both the service and `mcpnotes-app/NoteIndexer/EmbeddingXPCProtocol.swift` (NSXPCConnection requires `@objc protocol`).
 
 ### MCP server
 
-Separate executable target `mcpnotes-server` in the same Xcode project. The app launches it via `Process` and communicates over `StdioTransport` (stdio MCP protocol). The server is a stateless reader/writer — it accesses the same notes directory and RAG index that the main app writes. It does **not** depend on `mcpnotes-core`; it bundles its own private copies of `Note` and `FrontmatterParser`.
+Separate executable target `mcpnotes-server` in the same Xcode project. The app launches it via `Process` and communicates over `StdioTransport` (stdio MCP protocol). The server is a stateless reader/writer — it accesses the same notes directory and RAG index that the main app writes. It does **not** depend on `mcpnotes-app`; it bundles its own private copies of `Note` and `FrontmatterParser`.
 
 Tools exposed: `list_notes`, `list_notes_by_tag`, `list_tags`, `find_note`, `search_notes`, `get_note`, `update_note`, `create_note`, `rag_search`, `get_note_links`.
 
@@ -94,14 +93,14 @@ Markdown body…
 
 | Type | Role |
 |---|---|
-| `NoteStore` | `@Observable` class in `mcpnotes-mac`. Indexing uses `noteIndexQueue` processed by `indexWorkerTask` via `enqueueNotes(_:)` — no concurrent `indexAll`, progressive indexing; `createNote`/`updateNote`/`renameNote` call `indexNote` directly. Browser-style navigation: `canNavigateBack`/`canNavigateForward`. External changes via `scheduleExternalReload`/`reloadExternalChanges`. |
-| `SidebarMode` | `enum` in `mcpnotes-core`. In `.search` mode results split into: **Title** (filename match), **Content** (body/tag match), **Related** (RAG semantic matches with score %). |
-| `EditorViewModel` | `@Observable` class in `mcpnotes-core`. One instance per `NoteEditorView`. Owns autosave `Task`. |
-| `FileService` | `struct` in `mcpnotes-mac` conforming to `FileServicing`. Uses iCloud Drive, security-scoped bookmarks for custom directories, falls back to Application Support. |
-| `NoteFilenameValidator` | `struct` in `mcpnotes-core`. Allowlist: Unicode letters, digits, space, hyphen, underscore, period. `maxLength = 200`. Returns `ValidationResult`: `.valid`, `.empty`, `.tooLong`, `.forbiddenCharacter`. |
-| `NoteIndexer` | `actor` in `mcpnotes-mac`. Hybrid search: USearch vectors (multilingual-e5-small, 384-dim cosine) + SQLite FTS5 BM25. MD5-based incremental sync. `pending_removes`: `removeNote()` writes here synchronously; `loadFromDisk()` applies them on cold start + runs six integrity checks (returns `true` → full re-index needed); `saveToDisk()` clears them — idempotent across crashes. Embedding is delegated to an injected `any NoteEmbedding` (default: `XPCNoteEmbedder`). Files: `mcpnotes-mac/NoteIndexer/`. |
-| `NoteEmbedding` | `protocol` in `mcpnotes-mac`. Single method `embed(_:) async throws -> [Float]`. Conformances: `XPCNoteEmbedder` (production), `MockNoteEmbedder` (tests). |
-| `XPCNoteEmbedder` | `actor` in `mcpnotes-mac`. Manages `NSXPCConnection` to `mcpnotes-embeddings` service. Cancels idle timer on each call; schedules 60 s close via `scheduleConnectionClose()`. |
+| `NoteStore` | `@Observable` class in `mcpnotes-app`. Indexing uses `noteIndexQueue` processed by `indexWorkerTask` via `enqueueNotes(_:)` — no concurrent `indexAll`, progressive indexing; `createNote`/`updateNote`/`renameNote` call `indexNote` directly. Browser-style navigation: `canNavigateBack`/`canNavigateForward`. External changes via `scheduleExternalReload`/`reloadExternalChanges`. |
+| `SidebarMode` | `enum` in `mcpnotes-app`. In `.search` mode results split into: **Title** (filename match), **Content** (body/tag match), **Related** (RAG semantic matches with score %). |
+| `EditorViewModel` | `@Observable` class in `mcpnotes-app`. One instance per `NoteEditorView`. Owns autosave `Task`. |
+| `FileService` | `struct` in `mcpnotes-app` conforming to `FileServicing`. Uses iCloud Drive, security-scoped bookmarks for custom directories, falls back to Application Support. |
+| `NoteFilenameValidator` | `struct` in `mcpnotes-app`. Allowlist: Unicode letters, digits, space, hyphen, underscore, period. `maxLength = 200`. Returns `ValidationResult`: `.valid`, `.empty`, `.tooLong`, `.forbiddenCharacter`. |
+| `NoteIndexer` | `actor` in `mcpnotes-app`. Hybrid search: USearch vectors (multilingual-e5-small, 384-dim cosine) + SQLite FTS5 BM25. MD5-based incremental sync. `pending_removes`: `removeNote()` writes here synchronously; `loadFromDisk()` applies them on cold start + runs six integrity checks (returns `true` → full re-index needed); `saveToDisk()` clears them — idempotent across crashes. Embedding is delegated to an injected `any NoteEmbedding` (default: `XPCNoteEmbedder`). Files: `mcpnotes-app/NoteIndexer/`. |
+| `NoteEmbedding` | `protocol` in `mcpnotes-app`. Single method `embed(_:) async throws -> [Float]`. Conformances: `XPCNoteEmbedder` (production), `MockNoteEmbedder` (tests). |
+| `XPCNoteEmbedder` | `actor` in `mcpnotes-app`. Manages `NSXPCConnection` to `mcpnotes-embeddings` service. Cancels idle timer on each call; schedules 60 s close via `scheduleConnectionClose()`. |
 | `IndexDatabase` | Private SQLite wrapper. Tables: chunk→key mappings, MD5 hashes, FTS5 full-text, tag index, note metadata, `pending_removes`. Used only by `NoteIndexer`. |
 | `GraphSKView` | `SKView` subclass. Observes `NSWindow.didChangeOcclusionStateNotification` to restart SpriteKit's display link on reopen (SpriteKit stops it without going through `isPaused`). |
 | `GraphSKScene` | `SKScene` subclass. Force-directed: O(n²) repulsion, spring edges, center gravity, `simAlpha` damping. |
@@ -117,15 +116,14 @@ Markdown body…
 
 ### Apple Events from sandbox (macOS 26)
 
-On macOS 26, `automation.apple-events` alone fails without a provisioning profile (error -600). `temporary-exception.apple-events` with `["com.apple.Notes", "com.apple.finder"]` works without a profile and correctly triggers the TCC dialog — both keys are required in `mcpnotes-mac.entitlements`.
+On macOS 26, `automation.apple-events` alone fails without a provisioning profile (error -600). `temporary-exception.apple-events` with `["com.apple.Notes", "com.apple.finder"]` works without a profile and correctly triggers the TCC dialog — both keys are required in `mcpnotes-app.entitlements`.
 
 `NSAppleScript` must run on the main thread. Target Notes by bundle ID (`tell application id "com.apple.Notes"`), not by name.
 
 ## Swift conventions
 
 - No force-unwrap (`!`) outside of tests.
-- `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and `SWIFT_APPROACHABLE_CONCURRENCY = YES` on app + core targets — all types implicitly `@MainActor`. File I/O in `NoteStore` uses `Task { }` (suspends on main actor).
-- Public types in `mcpnotes-core` get DocC `///` comments.
+- `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and `SWIFT_APPROACHABLE_CONCURRENCY = YES` on the app target — all types implicitly `@MainActor`. File I/O in `NoteStore` uses `Task { }` (suspends on main actor).
 - Tests use **Swift Testing** (`import Testing`, `@Test`, `#expect`), not XCTest — except UI tests.
 - Use `@Suite` to group tests. One suite per component.
 - `NoteIndexerIntegrationTests.swift` uses real ML via XPC; model (~115 MB) is cached after first download. Requires `.timeLimit(.minutes(5))`.

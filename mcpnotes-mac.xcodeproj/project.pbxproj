@@ -7,12 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AA11000000000000000000B3 /* MCPNotesCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA11000000000000000000A1 /* MCPNotesCore.framework */; };
-		AA11000000000000000000B5 /* MCPNotesCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = AA11000000000000000000A1 /* MCPNotesCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		AABB000000000004 /* Embeddings in Frameworks */ = {isa = PBXBuildFile; productRef = AABB000000000001 /* Embeddings */; };
 		AABB000000000005 /* MLTensorUtils in Frameworks */ = {isa = PBXBuildFile; productRef = AABB000000000002 /* MLTensorUtils */; };
 		AABB000000000006 /* USearch in Frameworks */ = {isa = PBXBuildFile; productRef = AABB000000000003 /* USearch */; };
-		E205F3472FF4E70400A61BEB /* mcpnotes-embeddings.xpc in Embed XPC Services */ = {isa = PBXBuildFile; fileRef = E205F33C2FF4E70400A61BEB /* mcpnotes-embeddings.xpc */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		E205F3532FF4E9B900A61BEB /* Embeddings in Frameworks */ = {isa = PBXBuildFile; productRef = E205F3522FF4E9B900A61BEB /* Embeddings */; };
 		E205F3572FF4EC5B00A61BEB /* mcpnotes-embeddings.xpc in CopyFiles */ = {isa = PBXBuildFile; fileRef = E205F33C2FF4E70400A61BEB /* mcpnotes-embeddings.xpc */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		E29098AA2FA7341600C4C0FD /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = E29098A92FA7341600C4C0FD /* MCP */; };
@@ -26,20 +23,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		AA11000000000000000000B1 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = E29098762FA72B6C00C4C0FD /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = AA11000000000000000000AA;
-			remoteInfo = "mcpnotes-core";
-		};
-		E205F3452FF4E70400A61BEB /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = E29098762FA72B6C00C4C0FD /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = E205F33B2FF4E70400A61BEB;
-			remoteInfo = "mcpnotes-embeddings";
-		};
 		E205F3542FF4EB1700A61BEB /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = E29098762FA72B6C00C4C0FD /* Project object */;
@@ -52,14 +35,14 @@
 			containerPortal = E29098762FA72B6C00C4C0FD /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = E290987D2FA72B6C00C4C0FD;
-			remoteInfo = "mcpnotes-mac";
+			remoteInfo = "mcpnotes-app";
 		};
 		E29098962FA72B6E00C4C0FD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = E29098762FA72B6C00C4C0FD /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = E290987D2FA72B6C00C4C0FD;
-			remoteInfo = "mcpnotes-mac";
+			remoteInfo = "mcpnotes-app";
 		};
 		E290D00B2FA72B6C00C4C0FD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -78,28 +61,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		AA11000000000000000000B4 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				AA11000000000000000000B5 /* MCPNotesCore.framework in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		E205F3482FF4E70400A61BEB /* Embed XPC Services */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "$(CONTENTS_FOLDER_PATH)/XPCServices";
-			dstSubfolderSpec = 16;
-			files = (
-				E205F3472FF4E70400A61BEB /* mcpnotes-embeddings.xpc in Embed XPC Services */,
-			);
-			name = "Embed XPC Services";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		E205F3562FF4EC2C00A61BEB /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -124,11 +85,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		AA11000000000000000000A1 /* MCPNotesCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = MCPNotesCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		E205F33C2FF4E70400A61BEB /* mcpnotes-embeddings.xpc */ = {isa = PBXFileReference; explicitFileType = "wrapper.xpc-service"; includeInIndex = 0; path = "mcpnotes-embeddings.xpc"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E290987E2FA72B6C00C4C0FD /* MCP Notes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "MCP Notes.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		E290988B2FA72B6E00C4C0FD /* mcpnotes-macTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "mcpnotes-macTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		E29098952FA72B6E00C4C0FD /* mcpnotes-macUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "mcpnotes-macUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E290988B2FA72B6E00C4C0FD /* mcpnotes-appTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "mcpnotes-appTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E29098952FA72B6E00C4C0FD /* mcpnotes-appUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "mcpnotes-appUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E290A0012FA72B6C00C4C0FD /* mcpnotes-server */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "mcpnotes-server"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E290D0012FA72B6C00C4C0FD /* mcpnotes-serverTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "mcpnotes-serverTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -144,11 +104,6 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		AA11000000000000000000A2 /* mcpnotes-core */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "mcpnotes-core";
-			sourceTree = "<group>";
-		};
 		E205F33D2FF4E70400A61BEB /* mcpnotes-embeddings */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -157,19 +112,19 @@
 			path = "mcpnotes-embeddings";
 			sourceTree = "<group>";
 		};
-		E29098802FA72B6C00C4C0FD /* mcpnotes-mac */ = {
+		E29098802FA72B6C00C4C0FD /* mcpnotes-app */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "mcpnotes-mac";
+			path = "mcpnotes-app";
 			sourceTree = "<group>";
 		};
-		E290988E2FA72B6E00C4C0FD /* mcpnotes-macTests */ = {
+		E290988E2FA72B6E00C4C0FD /* mcpnotes-appTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "mcpnotes-macTests";
+			path = "mcpnotes-appTests";
 			sourceTree = "<group>";
 		};
-		E29098982FA72B6E00C4C0FD /* mcpnotes-macUITests */ = {
+		E29098982FA72B6E00C4C0FD /* mcpnotes-appUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "mcpnotes-macUITests";
+			path = "mcpnotes-appUITests";
 			sourceTree = "<group>";
 		};
 		E290A0022FA72B6C00C4C0FD /* mcpnotes-server */ = {
@@ -185,13 +140,6 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		AA11000000000000000000A4 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		E205F3392FF4E70400A61BEB /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -205,7 +153,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				E29098AA2FA7341600C4C0FD /* MCP in Frameworks */,
-				AA11000000000000000000B3 /* MCPNotesCore.framework in Frameworks */,
 				AABB000000000004 /* Embeddings in Frameworks */,
 				AABB000000000005 /* MLTensorUtils in Frameworks */,
 				AABB000000000006 /* USearch in Frameworks */,
@@ -252,11 +199,10 @@
 		E29098752FA72B6C00C4C0FD = {
 			isa = PBXGroup;
 			children = (
-				AA11000000000000000000A2 /* mcpnotes-core */,
-				E29098802FA72B6C00C4C0FD /* mcpnotes-mac */,
+				E29098802FA72B6C00C4C0FD /* mcpnotes-app */,
 				E290A0022FA72B6C00C4C0FD /* mcpnotes-server */,
-				E290988E2FA72B6E00C4C0FD /* mcpnotes-macTests */,
-				E29098982FA72B6E00C4C0FD /* mcpnotes-macUITests */,
+				E290988E2FA72B6E00C4C0FD /* mcpnotes-appTests */,
+				E29098982FA72B6E00C4C0FD /* mcpnotes-appUITests */,
 				E290D0022FA72B6C00C4C0FD /* mcpnotes-serverTests */,
 				E205F33D2FF4E70400A61BEB /* mcpnotes-embeddings */,
 				E29098F42FA9BA6A00C4C0FD /* Frameworks */,
@@ -267,12 +213,11 @@
 		E290987F2FA72B6C00C4C0FD /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				AA11000000000000000000A1 /* MCPNotesCore.framework */,
 				E290987E2FA72B6C00C4C0FD /* MCP Notes.app */,
 				E290A0012FA72B6C00C4C0FD /* mcpnotes-server */,
 				E290D0012FA72B6C00C4C0FD /* mcpnotes-serverTests.xctest */,
-				E290988B2FA72B6E00C4C0FD /* mcpnotes-macTests.xctest */,
-				E29098952FA72B6E00C4C0FD /* mcpnotes-macUITests.xctest */,
+				E290988B2FA72B6E00C4C0FD /* mcpnotes-appTests.xctest */,
+				E29098952FA72B6E00C4C0FD /* mcpnotes-appUITests.xctest */,
 				E205F33C2FF4E70400A61BEB /* mcpnotes-embeddings.xpc */,
 			);
 			name = Products;
@@ -288,30 +233,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		AA11000000000000000000AA /* mcpnotes-core */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = AA11000000000000000000A9 /* Build configuration list for PBXNativeTarget "mcpnotes-core" */;
-			buildPhases = (
-				AA11000000000000000000A3 /* Sources */,
-				AA11000000000000000000A4 /* Frameworks */,
-				AA11000000000000000000A6 /* Resources */,
-				E205F3482FF4E70400A61BEB /* Embed XPC Services */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				E205F3462FF4E70400A61BEB /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				AA11000000000000000000A2 /* mcpnotes-core */,
-			);
-			name = "mcpnotes-core";
-			packageProductDependencies = (
-			);
-			productName = "mcpnotes-core";
-			productReference = AA11000000000000000000A1 /* MCPNotesCore.framework */;
-			productType = "com.apple.product-type.framework";
-		};
 		E205F33B2FF4E70400A61BEB /* mcpnotes-embeddings */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = E205F34C2FF4E70400A61BEB /* Build configuration list for PBXNativeTarget "mcpnotes-embeddings" */;
@@ -335,14 +256,13 @@
 			productReference = E205F33C2FF4E70400A61BEB /* mcpnotes-embeddings.xpc */;
 			productType = "com.apple.product-type.xpc-service";
 		};
-		E290987D2FA72B6C00C4C0FD /* mcpnotes-mac */ = {
+		E290987D2FA72B6C00C4C0FD /* mcpnotes-app */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E290989F2FA72B6E00C4C0FD /* Build configuration list for PBXNativeTarget "mcpnotes-mac" */;
+			buildConfigurationList = E290989F2FA72B6E00C4C0FD /* Build configuration list for PBXNativeTarget "mcpnotes-app" */;
 			buildPhases = (
 				E290987A2FA72B6C00C4C0FD /* Sources */,
 				E290987B2FA72B6C00C4C0FD /* Frameworks */,
 				E290987C2FA72B6C00C4C0FD /* Resources */,
-				AA11000000000000000000B4 /* Embed Frameworks */,
 				E290F0022FA72B6C00C4C0FD /* Copy Server Executable */,
 				E205F3562FF4EC2C00A61BEB /* CopyFiles */,
 			);
@@ -350,26 +270,25 @@
 			);
 			dependencies = (
 				E205F3552FF4EB1700A61BEB /* PBXTargetDependency */,
-				AA11000000000000000000B2 /* PBXTargetDependency */,
 				E290F0042FA72B6C00C4C0FD /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				E29098802FA72B6C00C4C0FD /* mcpnotes-mac */,
+				E29098802FA72B6C00C4C0FD /* mcpnotes-app */,
 			);
-			name = "mcpnotes-mac";
+			name = "mcpnotes-app";
 			packageProductDependencies = (
 				E29098A92FA7341600C4C0FD /* MCP */,
 				AABB000000000001 /* Embeddings */,
 				AABB000000000002 /* MLTensorUtils */,
 				AABB000000000003 /* USearch */,
 			);
-			productName = "mcpnotes-mac";
+			productName = "mcpnotes-app";
 			productReference = E290987E2FA72B6C00C4C0FD /* MCP Notes.app */;
 			productType = "com.apple.product-type.application";
 		};
-		E290988A2FA72B6E00C4C0FD /* mcpnotes-macTests */ = {
+		E290988A2FA72B6E00C4C0FD /* mcpnotes-appTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E29098A22FA72B6E00C4C0FD /* Build configuration list for PBXNativeTarget "mcpnotes-macTests" */;
+			buildConfigurationList = E29098A22FA72B6E00C4C0FD /* Build configuration list for PBXNativeTarget "mcpnotes-appTests" */;
 			buildPhases = (
 				E29098872FA72B6E00C4C0FD /* Sources */,
 				E29098882FA72B6E00C4C0FD /* Frameworks */,
@@ -381,18 +300,18 @@
 				E290988D2FA72B6E00C4C0FD /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				E290988E2FA72B6E00C4C0FD /* mcpnotes-macTests */,
+				E290988E2FA72B6E00C4C0FD /* mcpnotes-appTests */,
 			);
-			name = "mcpnotes-macTests";
+			name = "mcpnotes-appTests";
 			packageProductDependencies = (
 			);
-			productName = "mcpnotes-macTests";
-			productReference = E290988B2FA72B6E00C4C0FD /* mcpnotes-macTests.xctest */;
+			productName = "mcpnotes-appTests";
+			productReference = E290988B2FA72B6E00C4C0FD /* mcpnotes-appTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		E29098942FA72B6E00C4C0FD /* mcpnotes-macUITests */ = {
+		E29098942FA72B6E00C4C0FD /* mcpnotes-appUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E29098A52FA72B6E00C4C0FD /* Build configuration list for PBXNativeTarget "mcpnotes-macUITests" */;
+			buildConfigurationList = E29098A52FA72B6E00C4C0FD /* Build configuration list for PBXNativeTarget "mcpnotes-appUITests" */;
 			buildPhases = (
 				E29098912FA72B6E00C4C0FD /* Sources */,
 				E29098922FA72B6E00C4C0FD /* Frameworks */,
@@ -404,13 +323,13 @@
 				E29098972FA72B6E00C4C0FD /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				E29098982FA72B6E00C4C0FD /* mcpnotes-macUITests */,
+				E29098982FA72B6E00C4C0FD /* mcpnotes-appUITests */,
 			);
-			name = "mcpnotes-macUITests";
+			name = "mcpnotes-appUITests";
 			packageProductDependencies = (
 			);
-			productName = "mcpnotes-macUITests";
-			productReference = E29098952FA72B6E00C4C0FD /* mcpnotes-macUITests.xctest */;
+			productName = "mcpnotes-appUITests";
+			productReference = E29098952FA72B6E00C4C0FD /* mcpnotes-appUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 		E290A0032FA72B6C00C4C0FD /* mcpnotes-server */ = {
@@ -475,9 +394,6 @@
 				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
-					AA11000000000000000000AA = {
-						CreatedOnToolsVersion = 26.3;
-					};
 					E205F33B2FF4E70400A61BEB = {
 						CreatedOnToolsVersion = 26.5;
 					};
@@ -520,25 +436,17 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				AA11000000000000000000AA /* mcpnotes-core */,
-				E290987D2FA72B6C00C4C0FD /* mcpnotes-mac */,
+				E290987D2FA72B6C00C4C0FD /* mcpnotes-app */,
 				E290A0032FA72B6C00C4C0FD /* mcpnotes-server */,
 				E290D0032FA72B6C00C4C0FD /* mcpnotes-serverTests */,
-				E290988A2FA72B6E00C4C0FD /* mcpnotes-macTests */,
-				E29098942FA72B6E00C4C0FD /* mcpnotes-macUITests */,
+				E290988A2FA72B6E00C4C0FD /* mcpnotes-appTests */,
+				E29098942FA72B6E00C4C0FD /* mcpnotes-appUITests */,
 				E205F33B2FF4E70400A61BEB /* mcpnotes-embeddings */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		AA11000000000000000000A6 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		E205F33A2FF4E70400A61BEB /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -584,13 +492,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		AA11000000000000000000A3 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		E205F3382FF4E70400A61BEB /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -636,16 +537,6 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		AA11000000000000000000B2 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = AA11000000000000000000AA /* mcpnotes-core */;
-			targetProxy = AA11000000000000000000B1 /* PBXContainerItemProxy */;
-		};
-		E205F3462FF4E70400A61BEB /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = E205F33B2FF4E70400A61BEB /* mcpnotes-embeddings */;
-			targetProxy = E205F3452FF4E70400A61BEB /* PBXContainerItemProxy */;
-		};
 		E205F3552FF4EB1700A61BEB /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = E205F33B2FF4E70400A61BEB /* mcpnotes-embeddings */;
@@ -653,12 +544,12 @@
 		};
 		E290988D2FA72B6E00C4C0FD /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = E290987D2FA72B6C00C4C0FD /* mcpnotes-mac */;
+			target = E290987D2FA72B6C00C4C0FD /* mcpnotes-app */;
 			targetProxy = E290988C2FA72B6E00C4C0FD /* PBXContainerItemProxy */;
 		};
 		E29098972FA72B6E00C4C0FD /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = E290987D2FA72B6C00C4C0FD /* mcpnotes-mac */;
+			target = E290987D2FA72B6C00C4C0FD /* mcpnotes-app */;
 			targetProxy = E29098962FA72B6E00C4C0FD /* PBXContainerItemProxy */;
 		};
 		E290D00A2FA72B6C00C4C0FD /* PBXTargetDependency */ = {
@@ -674,66 +565,6 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		AA11000000000000000000A7 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
-				DEFINES_MODULE = YES;
-				DEVELOPMENT_TEAM = 49MFG3MK9T;
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
-				DYLIB_INSTALL_NAME_BASE = "@rpath";
-				GENERATE_INFOPLIST_FILE = YES;
-				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-					"@loader_path/Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 26;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-core";
-				PRODUCT_MODULE_NAME = MCPNotesCore;
-				PRODUCT_NAME = MCPNotesCore;
-				SKIP_INSTALL = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Debug;
-		};
-		AA11000000000000000000A8 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
-				DEFINES_MODULE = YES;
-				DEVELOPMENT_TEAM = 49MFG3MK9T;
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
-				DYLIB_INSTALL_NAME_BASE = "@rpath";
-				GENERATE_INFOPLIST_FILE = YES;
-				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-					"@loader_path/Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 26;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-core";
-				PRODUCT_MODULE_NAME = MCPNotesCore;
-				PRODUCT_NAME = MCPNotesCore;
-				SKIP_INSTALL = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
 		E205F3492FF4E70400A61BEB /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -915,12 +746,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "mcpnotes-mac/mcpnotes-mac.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "mcpnotes-app/mcpnotes-app.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 49MFG3MK9T;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -936,9 +767,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26;
-				MARKETING_VERSION = 2.0.1;
+				MARKETING_VERSION = 2.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes";
-				PRODUCT_MODULE_NAME = mcpnotes_mac;
+				PRODUCT_MODULE_NAME = mcpnotes_app;
 				PRODUCT_NAME = "MCP Notes";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -956,12 +787,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "mcpnotes-mac/mcpnotes-mac.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "mcpnotes-app/mcpnotes-app.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 49MFG3MK9T;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -977,9 +808,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26;
-				MARKETING_VERSION = 2.0.1;
+				MARKETING_VERSION = 2.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes";
-				PRODUCT_MODULE_NAME = mcpnotes_mac;
+				PRODUCT_MODULE_NAME = mcpnotes_app;
 				PRODUCT_NAME = "MCP Notes";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -1002,7 +833,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-macTests";
+				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-appTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -1023,7 +854,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-macTests";
+				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-appTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -1042,14 +873,14 @@
 				DEVELOPMENT_TEAM = 49MFG3MK9T;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-macUITests";
+				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-appUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = "mcpnotes-mac";
+				TEST_TARGET_NAME = "mcpnotes-app";
 			};
 			name = Debug;
 		};
@@ -1061,14 +892,14 @@
 				DEVELOPMENT_TEAM = 49MFG3MK9T;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-macUITests";
+				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-appUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = "mcpnotes-mac";
+				TEST_TARGET_NAME = "mcpnotes-app";
 			};
 			name = Release;
 		};
@@ -1155,15 +986,6 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		AA11000000000000000000A9 /* Build configuration list for PBXNativeTarget "mcpnotes-core" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				AA11000000000000000000A7 /* Debug */,
-				AA11000000000000000000A8 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		E205F34C2FF4E70400A61BEB /* Build configuration list for PBXNativeTarget "mcpnotes-embeddings" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1182,7 +1004,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E290989F2FA72B6E00C4C0FD /* Build configuration list for PBXNativeTarget "mcpnotes-mac" */ = {
+		E290989F2FA72B6E00C4C0FD /* Build configuration list for PBXNativeTarget "mcpnotes-app" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E29098A02FA72B6E00C4C0FD /* Debug */,
@@ -1191,7 +1013,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E29098A22FA72B6E00C4C0FD /* Build configuration list for PBXNativeTarget "mcpnotes-macTests" */ = {
+		E29098A22FA72B6E00C4C0FD /* Build configuration list for PBXNativeTarget "mcpnotes-appTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E29098A32FA72B6E00C4C0FD /* Debug */,
@@ -1200,7 +1022,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E29098A52FA72B6E00C4C0FD /* Build configuration list for PBXNativeTarget "mcpnotes-macUITests" */ = {
+		E29098A52FA72B6E00C4C0FD /* Build configuration list for PBXNativeTarget "mcpnotes-appUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E29098A62FA72B6E00C4C0FD /* Debug */,

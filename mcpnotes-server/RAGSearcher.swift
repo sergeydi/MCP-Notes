@@ -35,6 +35,7 @@ actor RAGSearcher: RAGSearching {
     private let customEmbedder: ((String) async throws -> [Float])?
     private var xpcConnection: NSXPCConnection?
     private var idleCloseTask: Task<Void, Never>?
+    private var preferMachService = true
 
     init() {
         let dir = Self.ragDirectory
@@ -278,7 +279,14 @@ actor RAGSearcher: RAGSearching {
 
     private func embed(_ text: String) async throws -> [Float] {
         if let custom = customEmbedder { return try await custom(text) }
-        return try await xpcEmbed(text)
+        do {
+            return try await xpcEmbed(text)
+        } catch {
+            guard preferMachService else { throw error }
+            preferMachService = false
+            closeXPCConnection()
+            return try await xpcEmbed(text)
+        }
     }
 
     private func xpcEmbed(_ text: String) async throws -> [Float] {
@@ -305,7 +313,9 @@ actor RAGSearcher: RAGSearching {
     private func activeXPCConnection() -> NSXPCConnection {
         scheduleConnectionClose()
         if let conn = xpcConnection { return conn }
-        let conn = NSXPCConnection(serviceName: "mcpnotes-embeddings")
+        let conn = preferMachService
+            ? NSXPCConnection(machServiceName: "group.mcp-notes.embeddings")
+            : NSXPCConnection(serviceName: "mcpnotes-embeddings")
         conn.remoteObjectInterface = NSXPCInterface(with: EmbeddingXPCProtocol.self)
         conn.invalidationHandler = { [weak self] in
             Task { [weak self] in await self?.handleXPCInvalidated() }
@@ -332,6 +342,7 @@ actor RAGSearcher: RAGSearching {
     private func handleXPCInvalidated() {
         xpcConnection = nil
         idleCloseTask = nil
+        preferMachService = true
     }
 
 }

@@ -3,17 +3,33 @@ import Embeddings
 import Foundation
 
 final class ServiceDelegate: NSObject, NSXPCListenerDelegate {
+    private let sharedState = ModelState()
+    private var activeConnections = 0
+    private let lock = NSLock()
+
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
+        lock.withLock { activeConnections += 1 }
         newConnection.exportedInterface = NSXPCInterface(with: EmbeddingXPCProtocol.self)
-        newConnection.exportedObject = EmbeddingServiceImpl()
-        newConnection.invalidationHandler = { exit(0) }
+        newConnection.exportedObject = EmbeddingServiceImpl(state: sharedState)
+        newConnection.invalidationHandler = { [weak self] in
+            guard let self else { exit(0); return }
+            let remaining = self.lock.withLock { () -> Int in
+                self.activeConnections -= 1
+                return self.activeConnections
+            }
+            if remaining == 0 { exit(0) }
+        }
         newConnection.resume()
         return true
     }
 }
 
 final class EmbeddingServiceImpl: NSObject, EmbeddingXPCProtocol {
-    private let state = ModelState()
+    private let state: ModelState
+
+    init(state: ModelState) {
+        self.state = state
+    }
 
     func embed(text: String, reply: @escaping (Data?) -> Void) {
         Task {
