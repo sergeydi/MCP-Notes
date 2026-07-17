@@ -1,4 +1,13 @@
 import SwiftUI
+#if canImport(AppKit)
+import AppKit
+typealias PlatformFont = NSFont
+typealias PlatformColor = NSColor
+#elseif canImport(UIKit)
+import UIKit
+typealias PlatformFont = UIFont
+typealias PlatformColor = UIColor
+#endif
 
 /// Applies TextKit 2 rendering attributes for CommonMark + GFM syntax highlighting.
 ///
@@ -20,13 +29,24 @@ struct MarkdownHighlighter {
               let contentStorage = textView.textContentStorage,
               let textStorage = contentStorage.textStorage else { return }
 
+        applyHighlights(layoutManager: layoutManager, contentStorage: contentStorage, textStorage: textStorage)
+        textView.needsDisplay = true
+    }
+
+    /// Core highlighting logic, independent of the hosting text view type —
+    /// operates only on TextKit 2 objects shared between AppKit and UIKit.
+    private func applyHighlights(
+        layoutManager: NSTextLayoutManager,
+        contentStorage: NSTextContentStorage,
+        textStorage: NSTextStorage
+    ) {
         let str = textStorage.string
         let nsStr = str as NSString
         let fullRange = NSRange(location: 0, length: nsStr.length)
         let docRange = layoutManager.documentRange
-        let monoFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-        let boldFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .bold)
-        let italicFont = NSFont(descriptor: monoFont.fontDescriptor.withSymbolicTraits(.italic), size: monoFont.pointSize) ?? monoFont
+        let monoFont = PlatformFont.monospacedSystemFont(ofSize: PlatformFont.systemFontSize, weight: .regular)
+        let boldFont = PlatformFont.monospacedSystemFont(ofSize: PlatformFont.systemFontSize, weight: .bold)
+        let italicFont = PlatformFont(descriptor: monoFont.fontDescriptor.withSymbolicTraits(.italic), size: monoFont.pointSize) ?? monoFont
 
         for key: NSAttributedString.Key in [.foregroundColor, .backgroundColor] {
             layoutManager.removeRenderingAttribute(key, for: docRange)
@@ -44,17 +64,17 @@ struct MarkdownHighlighter {
             return NSTextRange(location: s, end: e)
         }
 
-        func addFg(_ color: NSColor, _ r: NSRange) {
+        func addFg(_ color: PlatformColor, _ r: NSRange) {
             guard let range = tr(r) else { return }
             layoutManager.addRenderingAttribute(.foregroundColor, value: color, for: range)
         }
 
-        func addBg(_ color: NSColor, _ r: NSRange) {
+        func addBg(_ color: PlatformColor, _ r: NSRange) {
             guard let range = tr(r) else { return }
             layoutManager.addRenderingAttribute(.backgroundColor, value: color, for: range)
         }
 
-        func setFont(_ font: NSFont, _ r: NSRange) {
+        func setFont(_ font: PlatformFont, _ r: NSRange) {
             guard r.location != NSNotFound, r.length > 0,
                   r.location + r.length <= nsStr.length else { return }
             textStorage.addAttribute(.font, value: font, range: r)
@@ -114,7 +134,5 @@ struct MarkdownHighlighter {
                 addFg(.controlAccentColor, token.range)
             }
         }
-
-        textView.needsDisplay = true
     }
 }
