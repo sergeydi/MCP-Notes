@@ -1,5 +1,3 @@
-import AppKit
-
 /// Routes formatting actions from the toolbar to the active NSTextView.
 /// The coordinator registers its handlers once in makeNSView; toolbar buttons call them directly.
 final class TextFormatProxy {
