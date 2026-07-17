@@ -1,4 +1,4 @@
-import AppKit
+import SwiftUI
 
 /// Applies TextKit 2 rendering attributes for CommonMark + GFM syntax highlighting.
 ///
