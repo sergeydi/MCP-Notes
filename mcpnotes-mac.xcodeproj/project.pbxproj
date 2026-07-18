@@ -7,12 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AABB000000000004 /* Embeddings in Frameworks */ = {isa = PBXBuildFile; productRef = AABB000000000001 /* Embeddings */; };
-		AABB000000000005 /* MLTensorUtils in Frameworks */ = {isa = PBXBuildFile; productRef = AABB000000000002 /* MLTensorUtils */; };
-		AABB000000000006 /* USearch in Frameworks */ = {isa = PBXBuildFile; productRef = AABB000000000003 /* USearch */; };
+		AABB000000000004 /* Embeddings in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = AABB000000000001 /* Embeddings */; };
+		AABB000000000005 /* MLTensorUtils in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = AABB000000000002 /* MLTensorUtils */; };
+		AABB000000000006 /* USearch in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = AABB000000000003 /* USearch */; };
 		E205F3532FF4E9B900A61BEB /* Embeddings in Frameworks */ = {isa = PBXBuildFile; productRef = E205F3522FF4E9B900A61BEB /* Embeddings */; };
 		E205F3572FF4EC5B00A61BEB /* mcpnotes-embeddings.xpc in CopyFiles */ = {isa = PBXBuildFile; fileRef = E205F33C2FF4E70400A61BEB /* mcpnotes-embeddings.xpc */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		E29098AA2FA7341600C4C0FD /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = E29098A92FA7341600C4C0FD /* MCP */; };
+		E29098AA2FA7341600C4C0FD /* MCP in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = E29098A92FA7341600C4C0FD /* MCP */; };
 		E290A00B2FA72B6C00C4C0FD /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = E290A00A2FA72B6C00C4C0FD /* MCP */; };
 		E290C0062FA72B6C00C4C0FD /* USearch in Frameworks */ = {isa = PBXBuildFile; productRef = E290C0032FA72B6C00C4C0FD /* USearch */; };
 		E290E0022FA72B6C00C4C0FD /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = E290E0062FA72B6C00C4C0FD /* MCP */; };
@@ -101,6 +101,40 @@
 			);
 			target = E205F33B2FF4E70400A61BEB /* mcpnotes-embeddings */;
 		};
+		E2FFA165300B68BC00464C62 /* Exceptions for "mcpnotes-app" folder in "mcpnotes-app" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			platformFiltersByRelativePath = {
+				NoteIndexer/EmbeddingXPCProtocol.swift = (macos, );
+				NoteIndexer/IndexDatabase.swift = (macos, );
+				NoteIndexer/NoteEmbedding.swift = (macos, );
+				NoteIndexer/NoteIndexer.swift = (macos, );
+				NoteIndexer/XPCNoteEmbedder.swift = (macos, );
+				"Views/Editor/MarkdownTextViewRepresentable+iOS.swift" = (ios, );
+				"Views/Editor/MarkdownTextViewRepresentable+macOS.swift" = (macos, );
+				Views/Settings/ImportSettingsView.swift = (macos, );
+				Views/Settings/MCPSettingsView.swift = (macos, );
+				Views/Settings/RAGSettingsView.swift = (macos, );
+				Views/Settings/SettingsView.swift = (macos, );
+				Views/Settings/StorageSettingsView.swift = (macos, );
+				Views/WikilinkGraph/GraphSKScene.swift = (macos, );
+				Views/WikilinkGraph/GraphSKView.swift = (macos, );
+				Views/WikilinkGraph/WikilinkGraphView.swift = (macos, );
+			};
+			target = E290987D2FA72B6C00C4C0FD /* mcpnotes-app */;
+		};
+		E2FFA166300B68BC00464C63 /* Exceptions for "mcpnotes-appTests" folder in "mcpnotes-appTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			platformFiltersByRelativePath = {
+				MockNoteEmbedder.swift = (macos, );
+				NoteIndexerBM25Tests.swift = (macos, );
+				NoteIndexerIncrementalSyncTests.swift = (macos, );
+				NoteIndexerIntegrationTests.swift = (macos, );
+				NoteIndexerLoadFromDiskTests.swift = (macos, );
+				NoteIndexerTests.swift = (macos, );
+				NoteIndexerWikilinkTests.swift = (macos, );
+			};
+			target = E290988A2FA72B6E00C4C0FD /* mcpnotes-appTests */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -114,11 +148,17 @@
 		};
 		E29098802FA72B6C00C4C0FD /* mcpnotes-app */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E2FFA165300B68BC00464C62 /* Exceptions for "mcpnotes-app" folder in "mcpnotes-app" target */,
+			);
 			path = "mcpnotes-app";
 			sourceTree = "<group>";
 		};
 		E290988E2FA72B6E00C4C0FD /* mcpnotes-appTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E2FFA166300B68BC00464C63 /* Exceptions for "mcpnotes-appTests" folder in "mcpnotes-appTests" target */,
+			);
 			path = "mcpnotes-appTests";
 			sourceTree = "<group>";
 		};
@@ -747,6 +787,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "mcpnotes-app/mcpnotes-app.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "mcpnotes-app/mcpnotes-app-iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "mcpnotes-app/mcpnotes-app-iOS.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
@@ -762,23 +804,29 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "MCP Notes needs access to Apple Notes to import your notes directly.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26;
-				MARKETING_VERSION = 2.1;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes";
 				PRODUCT_MODULE_NAME = mcpnotes_app;
 				PRODUCT_NAME = "MCP Notes";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
 			};
 			name = Debug;
 		};
@@ -788,6 +836,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "mcpnotes-app/mcpnotes-app.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "mcpnotes-app/mcpnotes-app-iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "mcpnotes-app/mcpnotes-app-iOS.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
@@ -803,23 +853,29 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "MCP Notes needs access to Apple Notes to import your notes directly.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26;
-				MARKETING_VERSION = 2.1;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes";
 				PRODUCT_MODULE_NAME = mcpnotes_app;
 				PRODUCT_NAME = "MCP Notes";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
 			};
 			name = Release;
 		};
@@ -831,15 +887,18 @@
 				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 49MFG3MK9T;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-appTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MCP Notes.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/MCP Notes";
 			};
 			name = Debug;
@@ -852,15 +911,18 @@
 				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 49MFG3MK9T;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes.mcpnotes-appTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MCP Notes.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/MCP Notes";
 			};
 			name = Release;

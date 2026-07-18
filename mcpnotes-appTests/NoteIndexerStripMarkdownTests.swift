@@ -8,7 +8,7 @@ struct NoteIndexerStripMarkdownTests {
     @Test("plain text is unchanged")
     func plainTextUnchanged() {
         let input = "Hello world.\nThis is a plain note."
-        #expect(NoteIndexer.stripMarkdown(input) == input)
+        #expect(MarkdownPatterns.stripMarkdown(input) == input)
     }
 
     @Test("ATX headings: # markers removed, text kept", arguments: [
@@ -18,43 +18,43 @@ struct NoteIndexerStripMarkdownTests {
         ("###### H6", "H6"),
     ])
     func headingsStripped(input: String, expected: String) {
-        #expect(NoteIndexer.stripMarkdown(input) == expected)
+        #expect(MarkdownPatterns.stripMarkdown(input) == expected)
     }
 
     @Test("bold **text** markers removed")
     func boldAsteriskStripped() {
-        #expect(NoteIndexer.stripMarkdown("This is **bold** text.") == "This is bold text.")
+        #expect(MarkdownPatterns.stripMarkdown("This is **bold** text.") == "This is bold text.")
     }
 
     @Test("bold __text__ markers removed")
     func boldUnderscoreStripped() {
-        #expect(NoteIndexer.stripMarkdown("This is __bold__ text.") == "This is bold text.")
+        #expect(MarkdownPatterns.stripMarkdown("This is __bold__ text.") == "This is bold text.")
     }
 
     @Test("italic *text* markers removed")
     func italicAsteriskStripped() {
-        #expect(NoteIndexer.stripMarkdown("This is *italic* text.") == "This is italic text.")
+        #expect(MarkdownPatterns.stripMarkdown("This is *italic* text.") == "This is italic text.")
     }
 
     @Test("italic _text_ markers removed")
     func italicUnderscoreStripped() {
-        #expect(NoteIndexer.stripMarkdown("This is _italic_ text.") == "This is italic text.")
+        #expect(MarkdownPatterns.stripMarkdown("This is _italic_ text.") == "This is italic text.")
     }
 
     @Test("strikethrough ~~text~~ markers removed")
     func strikethroughStripped() {
-        #expect(NoteIndexer.stripMarkdown("~~deleted text~~") == "deleted text")
+        #expect(MarkdownPatterns.stripMarkdown("~~deleted text~~") == "deleted text")
     }
 
     @Test("inline code: backticks removed, content kept")
     func inlineCodeContentKept() {
-        #expect(NoteIndexer.stripMarkdown("Use `await` here.") == "Use await here.")
+        #expect(MarkdownPatterns.stripMarkdown("Use `await` here.") == "Use await here.")
     }
 
     @Test("fenced code block: fence markers removed, code content kept")
     func codeFenceContentKept() {
         let input = "```swift\nlet x = 42\nprint(x)\n```"
-        let result = NoteIndexer.stripMarkdown(input)
+        let result = MarkdownPatterns.stripMarkdown(input)
         #expect(result.contains("let x = 42"))
         #expect(result.contains("print(x)"))
         #expect(result.contains("```") == false)
@@ -62,7 +62,7 @@ struct NoteIndexerStripMarkdownTests {
 
     @Test("images removed entirely")
     func imagesRemoved() {
-        let result = NoteIndexer.stripMarkdown("See ![diagram](diagram.png) for reference.")
+        let result = MarkdownPatterns.stripMarkdown("See ![diagram](diagram.png) for reference.")
         #expect(result.contains("![") == false)
         #expect(result.contains("diagram.png") == false)
         #expect(result.contains("See"))
@@ -71,22 +71,22 @@ struct NoteIndexerStripMarkdownTests {
 
     @Test("markdown links: URL removed, link text kept")
     func linksTextKept() {
-        #expect(NoteIndexer.stripMarkdown("Read [the docs](https://example.com).") == "Read the docs.")
+        #expect(MarkdownPatterns.stripMarkdown("Read [the docs](https://example.com).") == "Read the docs.")
     }
 
     @Test("wikilinks: brackets removed, target name kept")
     func wikilinksNameKept() {
-        #expect(NoteIndexer.stripMarkdown("See [[Swift Concurrency]] for details.") == "See Swift Concurrency for details.")
+        #expect(MarkdownPatterns.stripMarkdown("See [[Swift Concurrency]] for details.") == "See Swift Concurrency for details.")
     }
 
     @Test("blockquote > markers removed")
     func blockquotesStripped() {
-        #expect(NoteIndexer.stripMarkdown("> A quoted line.") == "A quoted line.")
+        #expect(MarkdownPatterns.stripMarkdown("> A quoted line.") == "A quoted line.")
     }
 
     @Test("horizontal rules removed")
     func horizontalRulesRemoved() {
-        let result = NoteIndexer.stripMarkdown("Before\n---\nAfter")
+        let result = MarkdownPatterns.stripMarkdown("Before\n---\nAfter")
         #expect(result.contains("---") == false)
         #expect(result.contains("Before"))
         #expect(result.contains("After"))
@@ -98,7 +98,7 @@ struct NoteIndexerStripMarkdownTests {
         ("- [X] Deploy", "Deploy"),
     ])
     func taskListMarkersStripped(input: String, expected: String) {
-        #expect(NoteIndexer.stripMarkdown(input) == expected)
+        #expect(MarkdownPatterns.stripMarkdown(input) == expected)
     }
 
     @Test("HTML tags removed", arguments: [
@@ -106,7 +106,7 @@ struct NoteIndexerStripMarkdownTests {
         ("<br>", ""),
     ])
     func htmlTagsRemoved(input: String, expected: String) {
-        #expect(NoteIndexer.stripMarkdown(input) == expected)
+        #expect(MarkdownPatterns.stripMarkdown(input) == expected)
     }
 
     @Test("mixed markdown document: all markers stripped, content preserved")
@@ -121,7 +121,7 @@ struct NoteIndexerStripMarkdownTests {
 
         See [WWDC talk](https://developer.apple.com) for details.
         """
-        let result = NoteIndexer.stripMarkdown(input)
+        let result = MarkdownPatterns.stripMarkdown(input)
         #expect(result.contains("Meeting Notes"))
         #expect(result.contains("Action items"))
         #expect(result.contains("next sprint"))

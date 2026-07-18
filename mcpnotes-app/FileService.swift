@@ -29,7 +29,7 @@ struct FileService: FileServicing {
         activeCustomURL?.stopAccessingSecurityScopedResource()
         activeCustomURL = nil
         let data = try url.bookmarkData(
-            options: .withSecurityScope,
+            options: bookmarkCreationOptions,
             includingResourceValuesForKeys: nil,
             relativeTo: nil
         )
@@ -118,12 +118,30 @@ struct FileService: FileServicing {
     private static let customBookmarkKey = "customNotesDirectoryBookmark"
     private static var activeCustomURL: URL?
 
+    // `.withSecurityScope` bookmarks are a macOS-only concept (iOS apps are always
+    // sandboxed to their container, so plain bookmarks are sufficient there).
+    private static var bookmarkCreationOptions: URL.BookmarkCreationOptions {
+        #if os(macOS)
+        return .withSecurityScope
+        #else
+        return []
+        #endif
+    }
+
+    private static var bookmarkResolutionOptions: URL.BookmarkResolutionOptions {
+        #if os(macOS)
+        return .withSecurityScope
+        #else
+        return []
+        #endif
+    }
+
     private static func resolveCustomNotesDirectory() -> URL? {
         guard let data = UserDefaults.standard.data(forKey: customBookmarkKey) else { return nil }
         var isStale = false
         guard let url = try? URL(
             resolvingBookmarkData: data,
-            options: .withSecurityScope,
+            options: bookmarkResolutionOptions,
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         ) else { return nil }

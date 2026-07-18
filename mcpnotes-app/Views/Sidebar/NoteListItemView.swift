@@ -55,7 +55,7 @@ struct NoteListItemView: View {
 
     private var bodySnippet: AttributedString? {
         guard let query = searchQuery, !query.isEmpty else { return nil }
-        let stripped = NoteIndexer.stripMarkdown(note.body)
+        let stripped = MarkdownPatterns.stripMarkdown(note.body)
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
@@ -89,7 +89,7 @@ struct NoteListItemView: View {
     }
 
     private var bodyPreview: String {
-        NoteIndexer.stripMarkdown(note.body)
+        MarkdownPatterns.stripMarkdown(note.body)
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }

@@ -34,6 +34,11 @@ struct ContentView: View {
 }
 
 #Preview {
+#if os(macOS)
     ContentView()
         .environment(NoteStore(indexer: NoteIndexer()))
+#else
+    ContentView()
+        .environment(NoteStore(indexer: NoOpNoteIndexer()))
+#endif
 }

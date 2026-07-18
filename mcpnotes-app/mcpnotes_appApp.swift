@@ -2,7 +2,11 @@ import SwiftUI
 
 @main
 struct MCPNotesApp: App {
+#if os(macOS)
     @State private var noteStore = NoteStore(indexer: NoteIndexer())
+#else
+    @State private var noteStore = NoteStore(indexer: NoOpNoteIndexer())
+#endif
 
     // Skip SwiftUI UI initialization during test runs to avoid crashes in macOS 26 beta
     // system frameworks (NSSplitView, DynamicPropertyBuffer) before the test runner connects.
@@ -37,6 +41,7 @@ struct MCPNotesApp: App {
             }
         }
 
+#if os(macOS)
         Window("Wikilink Graph", id: "wikilink-graph") {
             WikilinkGraphView()
                 .environment(noteStore)
@@ -49,5 +54,6 @@ struct MCPNotesApp: App {
             SettingsView()
                 .environment(noteStore)
         }
+#endif
     }
 }

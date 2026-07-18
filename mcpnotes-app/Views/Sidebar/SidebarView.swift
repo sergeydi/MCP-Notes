@@ -2,7 +2,9 @@ import SwiftUI
 
 struct SidebarView: View {
     @Environment(NoteStore.self) private var store
+#if os(macOS)
     @Environment(\.openWindow) private var openWindow
+#endif
     @AppStorage("ragEnabled") private var ragEnabled = false
 
     @State private var mode: SidebarMode = .all
@@ -68,6 +70,7 @@ struct SidebarView: View {
                     .accessibilityLabel(m.label)
                     Spacer(minLength: 0)
                 }
+#if os(macOS)
                 Divider()
                     .frame(height: 18)
                 Spacer(minLength: 0)
@@ -83,6 +86,7 @@ struct SidebarView: View {
                 .buttonStyle(.plain)
                 .help("Show Wikilink Graph")
                 Spacer(minLength: 0)
+#endif
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -316,6 +320,7 @@ struct SidebarView: View {
             .accessibilityLabel("Create new note")
         }
 
+#if os(macOS)
         ToolbarItem {
             SettingsLink {
                 Image(systemName: "gear")
@@ -328,9 +333,11 @@ struct SidebarView: View {
             }
             .accessibilityLabel("Open settings")
         }
+#endif
     }
 }
 
+#if os(macOS)
 private struct IndexingDot: View {
     @State private var pulse = false
 
@@ -346,3 +353,4 @@ private struct IndexingDot: View {
             }
     }
 }
+#endif

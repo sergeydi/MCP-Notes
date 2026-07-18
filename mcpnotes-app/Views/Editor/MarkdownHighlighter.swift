@@ -3,10 +3,23 @@ import SwiftUI
 import AppKit
 typealias PlatformFont = NSFont
 typealias PlatformColor = NSColor
+private let italicSymbolicTraits: NSFontDescriptor.SymbolicTraits = .italic
 #elseif canImport(UIKit)
 import UIKit
 typealias PlatformFont = UIFont
 typealias PlatformColor = UIColor
+private let italicSymbolicTraits: UIFontDescriptor.SymbolicTraits = .traitItalic
+
+// AppKit-style semantic color names used by the shared highlighting logic below,
+// so `applyHighlights` doesn't need per-platform branching.
+extension UIColor {
+    static var labelColor: UIColor { .label }
+    static var secondaryLabelColor: UIColor { .secondaryLabel }
+    static var tertiaryLabelColor: UIColor { .tertiaryLabel }
+    static var quaternaryLabelColor: UIColor { .quaternaryLabel }
+    static var separatorColor: UIColor { .separator }
+    static var controlAccentColor: UIColor { .tintColor }
+}
 #endif
 
 /// Applies TextKit 2 rendering attributes for CommonMark + GFM syntax highlighting.
@@ -24,6 +37,7 @@ struct MarkdownHighlighter {
         codeFenceFullRanges = result.full
     }
 
+#if canImport(AppKit)
     func applyHighlights(to textView: NSTextView) {
         guard let layoutManager = textView.textLayoutManager,
               let contentStorage = textView.textContentStorage,
@@ -32,6 +46,16 @@ struct MarkdownHighlighter {
         applyHighlights(layoutManager: layoutManager, contentStorage: contentStorage, textStorage: textStorage)
         textView.needsDisplay = true
     }
+#elseif canImport(UIKit)
+    func applyHighlights(to textView: UITextView) {
+        guard let layoutManager = textView.textLayoutManager,
+              let contentStorage = layoutManager.textContentManager as? NSTextContentStorage,
+              let textStorage = contentStorage.textStorage else { return }
+
+        applyHighlights(layoutManager: layoutManager, contentStorage: contentStorage, textStorage: textStorage)
+        textView.setNeedsDisplay()
+    }
+#endif
 
     /// Core highlighting logic, independent of the hosting text view type —
     /// operates only on TextKit 2 objects shared between AppKit and UIKit.
@@ -46,7 +70,12 @@ struct MarkdownHighlighter {
         let docRange = layoutManager.documentRange
         let monoFont = PlatformFont.monospacedSystemFont(ofSize: PlatformFont.systemFontSize, weight: .regular)
         let boldFont = PlatformFont.monospacedSystemFont(ofSize: PlatformFont.systemFontSize, weight: .bold)
-        let italicFont = PlatformFont(descriptor: monoFont.fontDescriptor.withSymbolicTraits(.italic), size: monoFont.pointSize) ?? monoFont
+#if canImport(AppKit)
+        let italicDescriptor = monoFont.fontDescriptor.withSymbolicTraits(italicSymbolicTraits)
+#elseif canImport(UIKit)
+        let italicDescriptor = monoFont.fontDescriptor.withSymbolicTraits(italicSymbolicTraits) ?? monoFont.fontDescriptor
+#endif
+        let italicFont = PlatformFont(descriptor: italicDescriptor, size: monoFont.pointSize) ?? monoFont
 
         for key: NSAttributedString.Key in [.foregroundColor, .backgroundColor] {
             layoutManager.removeRenderingAttribute(key, for: docRange)

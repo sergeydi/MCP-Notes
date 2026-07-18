@@ -232,7 +232,7 @@ actor NoteIndexer: NoteIndexing {
         uuidToKeys[note.id] = []
 
         let tags = note.tags.isEmpty ? "" : note.tags.joined(separator: " ")
-        let cleanBody = NoteIndexer.stripMarkdown(note.body)
+        let cleanBody = MarkdownPatterns.stripMarkdown(note.body)
 
         // Metadata as separate chunks: filename, tags (non-empty only).
         let metaChunks = [note.filename, tags].filter { !$0.isEmpty }
@@ -399,42 +399,6 @@ actor NoteIndexer: NoteIndexing {
         body.matches(of: /\[\[([^\]]+)\]\]/)
             .map { String($0.output.1).trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-    }
-
-    // MARK: - Private: markdown stripping
-
-    nonisolated static func stripMarkdown(_ text: String) -> String {
-        var s = text
-        // Code fence markers — keep code content, remove ``` lines
-        s = s.replacing(/(?m)^```[^\n]*$/, with: "")
-        // Inline code — keep content, remove backticks
-        s = s.replacing(/`([^`\n]+)`/) { $0.output.1 }
-        s = s.replacing(/`/, with: "")
-        // ATX headings
-        s = s.replacing(#/(?m)^#{1,6} /#, with: "")
-        // Task list markers - [ ] / - [x]
-        s = s.replacing(#/(?m)^- \[[ xX]\] /#, with: "")
-        // Bold **text** / __text__
-        s = s.replacing(/\*\*([^*\n]+)\*\*/) { $0.output.1 }
-        s = s.replacing(/__([^_\n]+)__/) { $0.output.1 }
-        // Italic *text* / _text_
-        s = s.replacing(/\*([^*\n]+)\*/) { $0.output.1 }
-        s = s.replacing(/_([^_\n]+)_/) { $0.output.1 }
-        // Strikethrough ~~text~~
-        s = s.replacing(/~~([^~\n]+)~~/) { $0.output.1 }
-        // Images — remove entirely
-        s = s.replacing(/!\[[^\]]*\]\([^)]*\)/, with: "")
-        // Markdown links [text](url) → text
-        s = s.replacing(/\[([^\]]+)\]\([^)]*\)/) { $0.output.1 }
-        // Wikilinks [[Name]] → Name
-        s = s.replacing(/\[\[([^\]]+)\]\]/) { $0.output.1 }
-        // Blockquotes
-        s = s.replacing(/(?m)^> ?/, with: "")
-        // Horizontal rules
-        s = s.replacing(/(?m)^[-*_]{3,}\s*$/, with: "")
-        // HTML tags
-        s = s.replacing(/<[^>]+>/, with: "")
-        return s
     }
 
     // MARK: - Private: deferred save

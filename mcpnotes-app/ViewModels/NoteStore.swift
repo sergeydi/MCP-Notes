@@ -114,7 +114,14 @@ final class NoteStore {
 
     func load() async {
         do {
-            notes = try fileService.loadAllNotes()
+            // Resolving the notes directory can block for a while on first access
+            // (e.g. FileManager.url(forUbiquityContainerIdentifier:) establishing the
+            // iCloud container) — run off the main actor so app launch never stalls
+            // long enough to trip the system's scene-creation watchdog.
+            let fs = fileService
+            notes = try await Task.detached(priority: .userInitiated) {
+                try fs.loadAllNotes()
+            }.value
         } catch {
             indexingState = .failed
             return
