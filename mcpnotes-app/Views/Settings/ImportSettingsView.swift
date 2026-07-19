@@ -106,6 +106,7 @@ struct ImportSettingsView: View {
         importState = .importing(done: 0, total: files.count)
         var imported = 0
         var skipped = 0
+        var copiedImages: [String: String] = [:]
 
         for (i, fileURL) in files.enumerated() {
             if i % 10 == 0 {
@@ -113,7 +114,7 @@ struct ImportSettingsView: View {
                 await Task.yield()
             }
             do {
-                try importFile(at: fileURL, to: destDir)
+                try importFile(at: fileURL, to: destDir, copiedImages: &copiedImages)
                 imported += 1
             } catch {
                 skipped += 1
@@ -148,12 +149,12 @@ struct ImportSettingsView: View {
         }
     }
 
-    private func importFile(at source: URL, to destDir: URL) throws {
+    private func importFile(at source: URL, to destDir: URL, copiedImages: inout [String: String]) throws {
         let raw = try String(contentsOf: source, encoding: .utf8)
         let baseName = sanitizeFilename(source.deletingPathExtension().lastPathComponent)
 
         let tags: [String]
-        let body: String
+        var body: String
         if source.pathExtension.lowercased() == "html" {
             tags = []
             body = convertHTMLToMarkdown(raw)
@@ -164,10 +165,90 @@ struct ImportSettingsView: View {
             (tags, body) = extractTagsAndBody(from: raw)
         }
 
+        body = importImages(
+            referencedIn: body,
+            sourceDir: source.deletingLastPathComponent(),
+            destDir: destDir,
+            copiedImages: &copiedImages
+        )
+
         let destURL = uniqueDestination(name: baseName, in: destDir)
         let content = FrontmatterParser.serialize(uid: UUID(), tags: tags, body: body)
         try content.write(to: destURL, atomically: true, encoding: .utf8)
     }
+
+    /// Copies local image files referenced by `![[name]]` embeds or `![alt](path)` links into
+    /// `destDir` and rewrites the references to the app's `![[name]]` embed format so they render.
+    /// `copiedImages` is shared across the whole import batch so an attachment referenced by
+    /// multiple notes is only copied once.
+    private func importImages(
+        referencedIn body: String,
+        sourceDir: URL,
+        destDir: URL,
+        copiedImages: inout [String: String]
+    ) -> String {
+        let nsBody = body as NSString
+        let wholeRange = NSRange(location: 0, length: nsBody.length)
+        var replacements: [(range: NSRange, replacement: String)] = []
+
+        func resolvedSourceURL(fromReference ref: String) -> URL? {
+            let decoded = ref.removingPercentEncoding ?? ref
+            let lower = decoded.lowercased()
+            guard !lower.hasPrefix("http://"), !lower.hasPrefix("https://"), !lower.hasPrefix("data:") else { return nil }
+            return URL(fileURLWithPath: decoded, relativeTo: sourceDir).standardizedFileURL
+        }
+
+        func destinationFilename(forSourceImage sourceImageURL: URL) -> String? {
+            if let cached = copiedImages[sourceImageURL.path] { return cached }
+            guard FileManager.default.fileExists(atPath: sourceImageURL.path) else { return nil }
+
+            let ext = sourceImageURL.pathExtension
+            let base = sanitizeFilename(sourceImageURL.deletingPathExtension().lastPathComponent)
+            var filename = ext.isEmpty ? base : "\(base).\(ext)"
+            var candidate = destDir.appendingPathComponent(filename)
+            var counter = 1
+            while FileManager.default.fileExists(atPath: candidate.path) {
+                filename = ext.isEmpty ? "\(base) \(counter)" : "\(base) \(counter).\(ext)"
+                candidate = destDir.appendingPathComponent(filename)
+                counter += 1
+            }
+            guard (try? FileManager.default.copyItem(at: sourceImageURL, to: candidate)) != nil else { return nil }
+            copiedImages[sourceImageURL.path] = filename
+            return filename
+        }
+
+        MarkdownPatterns.imageWikilinkRx.enumerateMatches(in: body, range: wholeRange) { m, _, _ in
+            guard let m else { return }
+            let raw = nsBody.substring(with: m.range)
+            let ref = String(raw.dropFirst(3).dropLast(2))
+            guard let sourceURL = resolvedSourceURL(fromReference: ref),
+                  let filename = destinationFilename(forSourceImage: sourceURL) else { return }
+            replacements.append((m.range, "![[\(filename)]]"))
+        }
+
+        Self.markdownImageRx.enumerateMatches(in: body, range: wholeRange) { m, _, _ in
+            guard let m, m.numberOfRanges > 1 else { return }
+            var ref = nsBody.substring(with: m.range(at: 1))
+            if let spaceIdx = ref.firstIndex(where: { $0 == " " || $0 == "\t" }) {
+                ref = String(ref[..<spaceIdx])
+            }
+            guard Self.importableImageExtensions.contains((ref as NSString).pathExtension.lowercased()),
+                  let sourceURL = resolvedSourceURL(fromReference: ref),
+                  let filename = destinationFilename(forSourceImage: sourceURL) else { return }
+            replacements.append((m.range, "![[\(filename)]]"))
+        }
+
+        guard !replacements.isEmpty else { return body }
+        let mutable = NSMutableString(string: body)
+        for (range, replacement) in replacements.sorted(by: { $0.range.location > $1.range.location }) {
+            mutable.replaceCharacters(in: range, with: replacement)
+        }
+        return mutable as String
+    }
+
+    private static let markdownImageRx = try! NSRegularExpression(
+        pattern: #"!\[[^\]\n]*\]\(([^)\n]+)\)"#)
+    private static let importableImageExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "webp", "tiff", "bmp"]
 
     private func extractTagsAndBody(from content: String) -> (tags: [String], body: String) {
         let lines = content.components(separatedBy: "\n")
