@@ -786,7 +786,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "mcpnotes-app/mcpnotes-app.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "mcpnotes-app/mcpnotes-app-macOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "mcpnotes-app/mcpnotes-app-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "mcpnotes-app/mcpnotes-app-iOS.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -835,7 +835,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "mcpnotes-app/mcpnotes-app.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "mcpnotes-app/mcpnotes-app-macOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "mcpnotes-app/mcpnotes-app-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "mcpnotes-app/mcpnotes-app-iOS.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
