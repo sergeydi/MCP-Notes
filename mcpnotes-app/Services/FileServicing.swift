@@ -1,7 +1,7 @@
 import Foundation
 
 public protocol FileServicing {
-    func loadAllNotes() throws -> [Note]
+    func loadAllNotes() async throws -> [Note]
     func saveNote(_ note: Note) throws
     func createNote(baseName: String) throws -> Note
     func deleteNote(_ note: Note) throws

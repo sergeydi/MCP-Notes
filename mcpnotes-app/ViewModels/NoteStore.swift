@@ -20,6 +20,9 @@ final class NoteStore {
     var notes: [Note] = [] {
         didSet { rebuildAllTags() }
     }
+    /// True until the initial cold-start load completes; drives a preloader in ContentView.
+    /// Stays visible for at least 1s even on fast (non-iCloud) loads to avoid a flash.
+    var isLoading: Bool = true
     var indexingState: IndexingState = .idle
     /// True when the search index had to be rebuilt due to corruption or inconsistency.
     /// Cleared when the user manually triggers a full re-index.
@@ -113,6 +116,12 @@ final class NoteStore {
     // MARK: - Loading
 
     func load() async {
+        let start = ContinuousClock.now
+        await loadNotes()
+        dismissLoadingIndicator(after: start)
+    }
+
+    private func loadNotes() async {
         do {
             // Resolving the notes directory can block for a while on first access
             // (e.g. FileManager.url(forUbiquityContainerIdentifier:) establishing the
@@ -120,7 +129,7 @@ final class NoteStore {
             // long enough to trip the system's scene-creation watchdog.
             let fs = fileService
             notes = try await Task.detached(priority: .userInitiated) {
-                try fs.loadAllNotes()
+                try await fs.loadAllNotes()
             }.value
         } catch {
             indexingState = .failed
@@ -142,6 +151,21 @@ final class NoteStore {
             indexingState = .ready(count: 0)
         }
         startWatchingNotesDirectory()
+    }
+
+    /// Clears `isLoading`, holding the preloader up to a 1s minimum so it never just flashes.
+    /// Runs detached from `load()` so callers (incl. tests) awaiting `load()` aren't delayed.
+    private func dismissLoadingIndicator(after start: ContinuousClock.Instant) {
+        let minimumDuration = Duration.seconds(1)
+        let elapsed = ContinuousClock.now - start
+        guard elapsed < minimumDuration else {
+            isLoading = false
+            return
+        }
+        Task { [weak self] in
+            try? await Task.sleep(for: minimumDuration - elapsed)
+            self?.isLoading = false
+        }
     }
 
     // MARK: - CRUD
@@ -368,7 +392,7 @@ final class NoteStore {
 
     func reloadExternalChanges() async {
         guard !isRenaming else { return }
-        guard let freshNotes = try? fileService.loadAllNotes() else { return }
+        guard let freshNotes = try? await fileService.loadAllNotes() else { return }
 
         let currentMap = Dictionary(notes.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
         let freshMap = Dictionary(freshNotes.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })

@@ -116,7 +116,9 @@ struct SidebarView: View {
 
             ScrollViewReader { proxy in
                 List(selection: $store.selectedNoteID) {
-                    if mode == .byTag {
+                    if store.isLoading {
+                        loadingContent
+                    } else if mode == .byTag {
                         tagGroupedContent
                     } else {
                         flatContent
@@ -158,6 +160,18 @@ struct SidebarView: View {
     }
 
     // MARK: - List content
+
+    @ViewBuilder
+    private var loadingContent: some View {
+        HStack {
+            Spacer()
+            ProgressView()
+            Spacer()
+        }
+        .padding(.top, 40)
+        .listRowSeparator(.hidden)
+        .selectionDisabled()
+    }
 
     private var textSearchTitleMatches: [Note] {
         let q = searchText.lowercased()

@@ -45,7 +45,12 @@ struct FileService: FileServicing {
         UserDefaults.standard.removeObject(forKey: customBookmarkKey)
     }
 
-    func loadAllNotes() throws -> [Note] {
+    /// Loads all notes, downloading any not-yet-local iCloud files first.
+    /// Files download concurrently (one task per file) instead of relying on
+    /// `String(contentsOf:)` to implicitly download each one in sequence — with many
+    /// small notes that serial per-file network latency, not file size, is what makes
+    /// a cold start slow on a freshly-signed-in device.
+    func loadAllNotes() async throws -> [Note] {
         let dir = Self.notesDirectoryURL
         let files = try FileManager.default.contentsOfDirectory(
             at: dir,
@@ -53,27 +58,57 @@ struct FileService: FileServicing {
             options: .skipsHiddenFiles
         ).filter { $0.pathExtension == "md" }
 
-        return files.compactMap { url -> Note? in
-            guard
-                let content = try? String(contentsOf: url, encoding: .utf8),
-                let parsed = FrontmatterParser.parse(content)
-            else { return nil }
+        let notes = try await withThrowingTaskGroup(of: Note?.self) { group in
+            for url in files {
+                group.addTask { try await Self.loadNote(at: url) }
+            }
+            var results: [Note] = []
+            for try await note in group {
+                if let note { results.append(note) }
+            }
+            return results
+        }
+        return notes.sorted { $0.filename.localizedCompare($1.filename) == .orderedAscending }
+    }
 
-            let filename = url.deletingPathExtension().lastPathComponent
-            let resourceValues = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey])
-            let modifiedAt = resourceValues?.contentModificationDate ?? .distantPast
-            let createdAt = resourceValues?.creationDate ?? .distantPast
-            return Note(
-                id: parsed.uid,
-                filename: filename,
-                tags: parsed.tags,
-                body: parsed.body,
-                fileURL: url,
-                isBookmarked: parsed.bookmarked,
-                modifiedAt: modifiedAt,
-                createdAt: createdAt
-            )
-        }.sorted { $0.filename.localizedCompare($1.filename) == .orderedAscending }
+    private static func loadNote(at url: URL) async throws -> Note? {
+        await waitForDownload(of: url)
+        guard
+            let content = try? String(contentsOf: url, encoding: .utf8),
+            let parsed = FrontmatterParser.parse(content)
+        else { return nil }
+
+        let filename = url.deletingPathExtension().lastPathComponent
+        let resourceValues = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey])
+        let modifiedAt = resourceValues?.contentModificationDate ?? .distantPast
+        let createdAt = resourceValues?.creationDate ?? .distantPast
+        return Note(
+            id: parsed.uid,
+            filename: filename,
+            tags: parsed.tags,
+            body: parsed.body,
+            fileURL: url,
+            isBookmarked: parsed.bookmarked,
+            modifiedAt: modifiedAt,
+            createdAt: createdAt
+        )
+    }
+
+    /// No-op for local files and already-downloaded iCloud items. For an undownloaded
+    /// ubiquitous item, triggers the download and polls its status instead of letting
+    /// `String(contentsOf:)` block on an implicit download — each call runs in its own
+    /// task, so many files download in parallel rather than one network round-trip at a time.
+    private static func waitForDownload(of url: URL) async {
+        guard
+            let status = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]).ubiquitousItemDownloadingStatus,
+            status == .notDownloaded
+        else { return }
+        try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+        for _ in 0..<300 { // ~30s cap per file; falls through to a best-effort read after that
+            try? await Task.sleep(for: .milliseconds(100))
+            let current = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]).ubiquitousItemDownloadingStatus
+            if current != .notDownloaded { return }
+        }
     }
 
     func saveNote(_ note: Note) throws {

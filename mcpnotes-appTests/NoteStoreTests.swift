@@ -13,7 +13,7 @@ final class MockFileService: FileServicing {
     private(set) var renamedTo: String?
     var shouldFailRename = false
 
-    func loadAllNotes() throws -> [Note] { stubbedNotes }
+    func loadAllNotes() async throws -> [Note] { stubbedNotes }
     func saveNote(_ note: Note) throws { savedNotes.append(note) }
     func createNote(baseName: String) throws -> Note {
         createdBaseName = baseName
