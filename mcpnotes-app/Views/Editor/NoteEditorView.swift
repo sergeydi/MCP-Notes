@@ -62,7 +62,6 @@ struct NoteEditorView: View {
                 formatProxy: formatProxy
             )
         }
-        .navigationTitle(note.filename)
         .toolbar { editorToolbar }
         .onAppear {
             viewModel.load(note: note)
@@ -97,21 +96,21 @@ struct NoteEditorView: View {
         .onDisappear {
             viewModel.flushAutosave()
         }
-        .confirmationDialog("Delete \"\(note.filename)\"?", isPresented: $showDeleteConfirmation) {
-            Button("Delete", role: .destructive) {
-                viewModel.cancelAutosave()
-                store.deleteNote(note)
-            }
-        } message: {
-            Text("This note will be permanently deleted.")
-        }
     }
 
     // MARK: - Toolbar
 
+    private var navigationPlacement: ToolbarItemPlacement {
+        #if os(iOS)
+        .topBarLeading
+        #else
+        .navigation
+        #endif
+    }
+
     @ToolbarContentBuilder
     private var editorToolbar: some ToolbarContent {
-        ToolbarItemGroup(placement: .navigation) {
+        ToolbarItemGroup(placement: navigationPlacement) {
             Button { store.navigateBack() } label: {
                 Image(systemName: "chevron.left")
             }
@@ -125,8 +124,8 @@ struct NoteEditorView: View {
             .help("Forward")
         }
 
-        ToolbarItem {
-            ControlGroup {
+        ToolbarItemGroup {
+            ControlGroup("Format", systemImage: "textformat") {
                 Button { formatProxy.applyWrap("**", "**") } label: {
                     Label("Bold", systemImage: "bold")
                 }
@@ -164,14 +163,20 @@ struct NoteEditorView: View {
             }
         }
 
-        ToolbarItem(placement: .primaryAction) {
+        ToolbarItemGroup(placement: .primaryAction) {
             Button("Delete Note", systemImage: "trash", role: .destructive) {
                 showDeleteConfirmation = true
             }
             .help("Delete note")
-        }
+            .confirmationDialog("Delete \"\(note.filename)\"?", isPresented: $showDeleteConfirmation) {
+                Button("Delete", role: .destructive) {
+                    viewModel.cancelAutosave()
+                    store.deleteNote(note)
+                }
+            } message: {
+                Text("This note will be permanently deleted.")
+            }
 
-        ToolbarItem(placement: .primaryAction) {
             Button {
                 store.toggleBookmark(for: note.id)
             } label: {
@@ -183,9 +188,7 @@ struct NoteEditorView: View {
             }
             .accessibilityLabel(note.isBookmarked ? "Remove bookmark" : "Add bookmark")
             .help(note.isBookmarked ? "Remove bookmark" : "Add bookmark")
-        }
 
-        ToolbarItem(placement: .primaryAction) {
             ShareLink(item: viewModel.body) {
                 Label("Share", systemImage: "square.and.arrow.up")
             }

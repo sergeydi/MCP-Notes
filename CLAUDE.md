@@ -29,9 +29,14 @@ xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-appTests \
 # Run UI tests
 xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-appUITests -destination 'platform=macOS'
 
-# Install + launch on a connected physical iPad (get the device id from `xcrun devicectl list devices`)
+# Install + launch on a connected physical iPad
+# 1. List paired devices — if more than one iPad shows up, ask the user which one (don't guess)
+xcrun devicectl list devices
+# 2. Build for that specific device (not generic/platform=iOS — a concrete id signs with the right provisioning profile)
 xcodebuild -project mcpnotes-mac.xcodeproj -scheme mcpnotes-app -destination 'id=<device-id>' build
-xcrun devicectl device install app --device <device-id> "<DerivedData path>/Build/Products/Debug-iphoneos/MCP Notes.app"
+# 3. Install the .app from DerivedData (path is stable per-project; find it once with -showBuildSettings if unsure)
+xcrun devicectl device install app --device <device-id> "$HOME/Library/Developer/Xcode/DerivedData/mcpnotes-mac-*/Build/Products/Debug-iphoneos/MCP Notes.app"
+# 4. Launch by bundle id (not app name)
 xcrun devicectl device process launch --device <device-id> mcp-notes
 ```
 
@@ -78,7 +83,7 @@ WikilinkGraphView (macOS only) ← separate Window scene ("wikilink-graph")
 
 **Platform filtering** is done per-file via `PBXFileSystemSynchronizedBuildFileExceptionSet.platformFiltersByRelativePath` in `project.pbxproj` (`(macos, )` or `(ios, )`), *not* `#if os()` — this keeps the excluded files out of the other platform's build entirely rather than compiling them to nothing. Currently macOS-only: `NoteIndexer/{EmbeddingXPCProtocol,IndexDatabase,NoteEmbedding,NoteIndexer,XPCNoteEmbedder}.swift`, all of `Views/Settings/`, all of `Views/WikilinkGraph/`, `Views/Editor/MarkdownTextViewRepresentable+macOS.swift`. iOS-only: `Views/Editor/MarkdownTextViewRepresentable+iOS.swift`. The same exception mechanism is applied to the `mcpnotes-appTests` target for the indexer/embedding test suites that need the real `NoteIndexer`/`MockNoteEmbedder`.
 
-- **`NoOpNoteIndexer`** (`NoteIndexer/NoOpNoteIndexer.swift`, unfiltered — compiles on both platforms) — no-op `NoteIndexing` actor used on iOS in place of the real `NoteIndexer` (constructed conditionally with `#if os(macOS)` in `mcpnotes_appApp.swift` / `ContentView.swift`'s `#Preview`).
+- **`NoOpNoteIndexer`** (`NoteIndexer/NoOpNoteIndexer.swift`, unfiltered — compiles on both platforms) — no-op `NoteIndexing` actor used on iOS in place of the real `NoteIndexer` (constructed conditionally with `#if os(macOS)` in `mcpnotes_App.swift` / `ContentView.swift`'s `#Preview`).
 - **`MarkdownTextViewRepresentable`** — two independent implementations sharing the same struct name/public interface (`text`, `onTextChanged`, `onWikilinkTapped`, `notesDirectoryURL`, `formatProxy`) so `MarkdownEditorView` doesn't need to know which platform it's on: `+macOS.swift` (`NSTextView`, full feature set) and `+iOS.swift` (`UITextView` MVP — syntax highlighting, wikilink/link tap, list auto-continuation/renumbering, toolbar formatting; **no** pasted-image insertion/inline preview or code-block copy button yet). `MarkdownHighlighter` is genuinely cross-platform (AppKit/UIKit typealiases + a `UIColor` extension shimming the AppKit semantic color names).
 - **Entitlements**: `mcpnotes-app-iOS.entitlements` (iCloud keys only) is used on iOS via `CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]`/`[sdk=iphonesimulator*]`; macOS keeps the existing `mcpnotes-app-macOS.entitlements` (App Sandbox, Apple Events automation, etc. — none of which apply to iOS).
 - **Frameworks**: `Embeddings`/`MCP`/`MLTensorUtils`/`USearch` are excluded from the iOS link via `platformFilters = (macos, );` on their `PBXBuildFile` entries in the Frameworks build phase — confirmed with `otool -L` that they're absent from the iOS binary.
