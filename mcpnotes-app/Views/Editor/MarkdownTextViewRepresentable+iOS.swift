@@ -5,8 +5,8 @@ import UIKit
 //
 // Feature parity with macOS: syntax highlighting, wikilink/link tap navigation,
 // list auto-continuation + renumbering, toolbar formatting via TextFormatProxy,
-// inline image preview for `![[filename]]` embeds, pasted-image insertion.
-// Deferred to a later pass: code-block copy button.
+// inline image preview for `![[filename]]` embeds, pasted-image insertion,
+// code-block background rendering and copy button.
 
 struct MarkdownTextViewRepresentable: UIViewRepresentable {
     @Binding var text: String
@@ -155,14 +155,19 @@ private extension UITextView {
 
 // MARK: - MarkdownTextView (iOS)
 
-/// UITextView subclass with markdown-aware behaviour: click navigation for wikilinks/URLs,
-/// list auto-continuation, inline image preview for `![[filename]]` embeds and pasted-image
-/// insertion. Mirrors the macOS `MarkdownTextView` (NSTextView) feature set, minus the
-/// code-block copy button (deferred).
+/// UITextView subclass with markdown-aware behaviour: code block background drawing and copy
+/// button, click navigation for wikilinks/URLs, list auto-continuation, inline image preview
+/// for `![[filename]]` embeds and pasted-image insertion. Mirrors the macOS `MarkdownTextView`
+/// (NSTextView) feature set.
 private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
     var onWikilinkTapped: ((String) -> Void)?
     var notesDirectoryURL: URL?
+    var codeBlockRanges: [NSRange] = [] {
+        didSet { setNeedsDisplay() }
+    }
+    var codeContentRanges: [NSRange] = []
     private var imageViews: [UIImageView] = []
+    private var copyButtons: [UIButton] = []
     private var lastLayoutWidth: CGFloat = 0
 
     override func layoutSubviews() {
@@ -172,6 +177,154 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
         lastLayoutWidth = w
         DispatchQueue.main.async { [weak self] in
             self?.updateImagePreviews()
+            self?.updateCopyButtons()
+            self?.setNeedsDisplay()
+        }
+    }
+
+    // MARK: Code block background
+
+    /// Draws a rounded background behind fenced code blocks. Unlike `NSTextView`, `UITextView`
+    /// has no separate "draw background before glyphs" hook — drawing here before calling
+    /// `super.draw(rect)` achieves the same layering, since the layer's own background (set to
+    /// `.clear`) is painted independently before this method runs.
+    override func draw(_ rect: CGRect) {
+        drawCodeBlockBackgrounds(in: rect)
+        super.draw(rect)
+    }
+
+    private func drawCodeBlockBackgrounds(in rect: CGRect) {
+        guard !codeBlockRanges.isEmpty,
+              let layoutManager = textLayoutManager,
+              let contentStorage = markdownContentStorage else { return }
+
+        let bg = UIColor.systemGray.withAlphaComponent(0.10)
+        let originX = textContainerInset.left
+        let originY = textContainerInset.top
+        let topPad: CGFloat = 2
+        let bottomPad: CGFloat = -6
+        let leftMargin: CGFloat = 8
+        let rightMargin: CGFloat = 10
+        let cornerRadius: CGFloat = 6
+
+        for nsRange in codeBlockRanges {
+            let base = contentStorage.documentRange.location
+            guard let startLoc = contentStorage.location(base, offsetBy: nsRange.location),
+                  let endLoc = contentStorage.location(startLoc, offsetBy: nsRange.length) else { continue }
+
+            var minY: CGFloat = .greatestFiniteMagnitude
+            var maxY: CGFloat = -.greatestFiniteMagnitude
+
+            layoutManager.enumerateTextLayoutFragments(from: startLoc, options: [.ensuresLayout]) { fragment in
+                if let elemRange = fragment.textElement?.elementRange,
+                   elemRange.location.compare(endLoc) != .orderedAscending { return false }
+                let frame = fragment.layoutFragmentFrame.offsetBy(dx: originX, dy: originY)
+                minY = min(minY, frame.minY)
+                maxY = max(maxY, frame.maxY)
+                return true
+            }
+
+            guard minY < maxY else { continue }
+
+            let blockRect = CGRect(
+                x: bounds.minX + leftMargin,
+                y: minY - topPad,
+                width: bounds.width - leftMargin - rightMargin,
+                height: (maxY - minY) + topPad + bottomPad
+            )
+            bg.setFill()
+            UIBezierPath(roundedRect: blockRect, cornerRadius: cornerRadius).fill()
+        }
+    }
+
+    // MARK: Copy button
+
+    func updateCopyButtons() {
+        copyButtons.forEach { $0.removeFromSuperview() }
+        copyButtons = []
+
+        guard !codeBlockRanges.isEmpty,
+              let layoutManager = textLayoutManager,
+              let contentStorage = markdownContentStorage else { return }
+
+        let originX = textContainerInset.left
+        let originY = textContainerInset.top
+        let topPad: CGFloat = 2
+        let rightMargin: CGFloat = 10
+        let buttonSize: CGFloat = 32
+        let buttonPad: CGFloat = 4
+
+        for (index, nsRange) in codeBlockRanges.enumerated() {
+            let base = contentStorage.documentRange.location
+            guard let startLoc = contentStorage.location(base, offsetBy: nsRange.location),
+                  let endLoc = contentStorage.location(startLoc, offsetBy: nsRange.length) else { continue }
+
+            var minY: CGFloat = .greatestFiniteMagnitude
+            layoutManager.enumerateTextLayoutFragments(from: startLoc, options: [.ensuresLayout]) { fragment in
+                if let elemRange = fragment.textElement?.elementRange,
+                   elemRange.location.compare(endLoc) != .orderedAscending { return false }
+                minY = min(minY, fragment.layoutFragmentFrame.offsetBy(dx: originX, dy: originY).minY)
+                return true
+            }
+            guard minY < .greatestFiniteMagnitude else { continue }
+
+            let button = UIButton(type: .system)
+            let symConfig = UIImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+            button.setImage(UIImage(systemName: "doc.on.doc", withConfiguration: symConfig), for: .normal)
+            button.tintColor = .secondaryLabel
+            button.tag = index
+            button.addTarget(self, action: #selector(copyCodeBlock(_:)), for: .touchUpInside)
+            button.layer.cornerRadius = 4
+            button.backgroundColor = UIColor.systemGray.withAlphaComponent(0.15)
+            button.frame = CGRect(
+                x: bounds.width - rightMargin - buttonSize - buttonPad,
+                y: minY - topPad + buttonPad,
+                width: buttonSize,
+                height: buttonSize
+            )
+            addSubview(button)
+            copyButtons.append(button)
+        }
+    }
+
+    @objc private func copyCodeBlock(_ sender: UIButton) {
+        let index = sender.tag
+        guard index < codeContentRanges.count else { return }
+        let nsRange = codeContentRanges[index]
+        let nsStr = (text ?? "") as NSString
+        guard nsRange.location + nsRange.length <= nsStr.length else { return }
+        let content = nsStr.substring(with: nsRange).trimmingCharacters(in: .newlines)
+        UIPasteboard.general.string = content
+        animateCopyFeedback(on: sender)
+    }
+
+    /// Brief press-down bounce plus a checkmark swap so the tap reads as "copied", not just a
+    /// silent pasteboard write — mirrors the transient confirmation macOS gets for free from
+    /// the button's native highlight state.
+    private func animateCopyFeedback(on button: UIButton) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+
+        UIView.animate(withDuration: 0.1, animations: {
+            button.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+        }, completion: { _ in
+            UIView.animate(withDuration: 0.15) {
+                button.transform = .identity
+            }
+        })
+
+        let symConfig = UIImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let originalImage = button.image(for: .normal)
+        UIView.transition(with: button, duration: 0.15, options: .transitionCrossDissolve, animations: {
+            button.setImage(UIImage(systemName: "checkmark", withConfiguration: symConfig), for: .normal)
+            button.tintColor = .systemGreen
+        })
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak button] in
+            guard let button else { return }
+            UIView.transition(with: button, duration: 0.15, options: .transitionCrossDissolve, animations: {
+                button.setImage(originalImage, for: .normal)
+                button.tintColor = .secondaryLabel
+            })
         }
     }
 
@@ -463,7 +616,12 @@ extension MarkdownTextViewRepresentable {
             guard let tv = textView else { return }
             highlighter.recomputeCodeFenceRanges(in: tv.text ?? "")
             highlighter.applyHighlights(to: tv)
-            (tv as? MarkdownTextView)?.updateImagePreviews()
+            if let mtv = tv as? MarkdownTextView {
+                mtv.codeBlockRanges = highlighter.codeFenceFullRanges
+                mtv.codeContentRanges = highlighter.codeFenceRanges
+                mtv.updateImagePreviews()
+                DispatchQueue.main.async { mtv.updateCopyButtons() }
+            }
         }
     }
 }
