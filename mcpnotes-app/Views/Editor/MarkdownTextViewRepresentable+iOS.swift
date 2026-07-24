@@ -4,8 +4,9 @@ import UIKit
 // MARK: - iOS (UITextView-based MVP)
 //
 // Feature parity with macOS: syntax highlighting, wikilink/link tap navigation,
-// list auto-continuation + renumbering, toolbar formatting via TextFormatProxy.
-// Deferred to a later pass: pasted-image insertion/inline preview, code-block copy button.
+// list auto-continuation + renumbering, toolbar formatting via TextFormatProxy,
+// inline image preview for `![[filename]]` embeds, pasted-image insertion.
+// Deferred to a later pass: code-block copy button.
 
 struct MarkdownTextViewRepresentable: UIViewRepresentable {
     @Binding var text: String
@@ -153,12 +154,190 @@ private extension UITextView {
 
 // MARK: - MarkdownTextView (iOS)
 
-/// UITextView subclass with markdown-aware behaviour: click navigation for wikilinks/URLs
-/// and list auto-continuation. Mirrors the macOS `MarkdownTextView` (NSTextView) feature set,
-/// minus pasted-image preview and the code-block copy button (deferred).
+/// UITextView subclass with markdown-aware behaviour: click navigation for wikilinks/URLs,
+/// list auto-continuation, inline image preview for `![[filename]]` embeds and pasted-image
+/// insertion. Mirrors the macOS `MarkdownTextView` (NSTextView) feature set, minus the
+/// code-block copy button (deferred).
 private final class MarkdownTextView: UITextView {
     var onWikilinkTapped: ((String) -> Void)?
     var notesDirectoryURL: URL?
+    private var imageViews: [UIImageView] = []
+    private var lastLayoutWidth: CGFloat = 0
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let w = bounds.width
+        guard abs(w - lastLayoutWidth) > 1 else { return }
+        lastLayoutWidth = w
+        DispatchQueue.main.async { [weak self] in
+            self?.updateImagePreviews()
+        }
+    }
+
+    // MARK: Image previews
+
+    /// Renders inline previews for `![[filename]]` embeds by reserving vertical space via
+    /// paragraph spacing (same technique as the macOS counterpart) and overlaying `UIImageView`s
+    /// positioned from TextKit 2 layout-fragment frames.
+    func updateImagePreviews() {
+        imageViews.forEach { $0.removeFromSuperview() }
+        imageViews = []
+
+        guard let textStorage = markdownContentStorage?.textStorage else { return }
+        let fullRange = NSRange(location: 0, length: (textStorage.string as NSString).length)
+        if fullRange.length > 0 {
+            textStorage.removeAttribute(.paragraphStyle, range: fullRange)
+        }
+
+        guard let notesDir = notesDirectoryURL,
+              let layoutManager = textLayoutManager,
+              let contentStorage = markdownContentStorage else { return }
+
+        let str = textStorage.string
+        let nsStr = str as NSString
+        let matchRange = NSRange(location: 0, length: nsStr.length)
+        guard matchRange.length > 0 else { return }
+
+        struct ImageEntry {
+            let lineRange: NSRange
+            let image: UIImage
+            let displaySize: CGSize
+            let spacing: CGFloat
+        }
+
+        let maxW = max(bounds.width - 20, 100)
+        let maxH = max(bounds.height - 40, 100)
+        let topGap: CGFloat = 6
+        let bottomGap: CGFloat = 6
+        var entries: [ImageEntry] = []
+
+        MarkdownPatterns.imageWikilinkRx.enumerateMatches(in: str, range: matchRange) { m, _, _ in
+            guard let m else { return }
+            let raw = nsStr.substring(with: m.range)
+            let filename = String(raw.dropFirst(3).dropLast(2))
+            let imageURL = notesDir.appendingPathComponent(filename)
+            guard let data = try? Data(contentsOf: imageURL),
+                  let image = UIImage(data: data),
+                  image.size.width > 0, image.size.height > 0 else { return }
+            let scale = min(min(maxW / image.size.width, maxH / image.size.height), 1.0)
+            let displaySize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            entries.append(ImageEntry(
+                lineRange: nsStr.lineRange(for: m.range),
+                image: image,
+                displaySize: displaySize,
+                spacing: topGap + displaySize.height + bottomGap
+            ))
+        }
+
+        guard !entries.isEmpty else { return }
+
+        let originX = textContainerInset.left
+        let originY = textContainerInset.top
+        let base = contentStorage.documentRange.location
+
+        // Compute line bottom Y values before adding paragraph spacing.
+        // Each image's spacing shifts all subsequent lines; cumulativeShift corrects for this.
+        var lineBottoms: [CGFloat] = []
+        var cumulativeShift: CGFloat = 0
+
+        for entry in entries {
+            guard entry.lineRange.length > 0,
+                  let startLoc = contentStorage.location(base, offsetBy: entry.lineRange.location),
+                  let endLoc = contentStorage.location(startLoc, offsetBy: entry.lineRange.length) else {
+                lineBottoms.append(0)
+                cumulativeShift += entry.spacing
+                continue
+            }
+
+            var rawMaxY: CGFloat = 0
+            layoutManager.enumerateTextLayoutFragments(from: startLoc, options: [.ensuresLayout]) { fragment in
+                if let elemRange = fragment.textElement?.elementRange,
+                   elemRange.location.compare(endLoc) != .orderedAscending { return false }
+                let frame = fragment.layoutFragmentFrame.offsetBy(dx: originX, dy: originY)
+                rawMaxY = max(rawMaxY, frame.maxY)
+                return true
+            }
+
+            lineBottoms.append(rawMaxY + cumulativeShift)
+            cumulativeShift += entry.spacing
+        }
+
+        // Reserve vertical space for each image via paragraph spacing
+        for entry in entries {
+            let style = NSMutableParagraphStyle()
+            style.paragraphSpacing = entry.spacing
+            textStorage.addAttribute(.paragraphStyle, value: style, range: entry.lineRange)
+        }
+
+        // Position image views after layout updates
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            for (entry, lineBottom) in zip(entries, lineBottoms) {
+                guard lineBottom > 0 else { continue }
+                let iv = UIImageView(image: entry.image)
+                iv.contentMode = .scaleAspectFit
+                iv.layer.cornerRadius = 4
+                iv.clipsToBounds = true
+                iv.frame = CGRect(
+                    x: originX + 2,
+                    y: lineBottom + topGap,
+                    width: entry.displaySize.width,
+                    height: entry.displaySize.height
+                )
+                self.addSubview(iv)
+                self.imageViews.append(iv)
+            }
+        }
+    }
+
+    // MARK: Paste image
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if action == #selector(paste(_:)), notesDirectoryURL != nil, UIPasteboard.general.hasImages {
+            return true
+        }
+        return super.canPerformAction(action, withSender: sender)
+    }
+
+    override func paste(_ sender: Any?) {
+        guard let notesDir = notesDirectoryURL,
+              let pngData = Self.imagePNGData(from: .general) else {
+            super.paste(sender)
+            return
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMddHHmmss"
+        let timestamp = formatter.string(from: Date())
+        var filename = "Pasted image \(timestamp).png"
+        var fileURL = notesDir.appendingPathComponent(filename)
+        var counter = 1
+        while FileManager.default.fileExists(atPath: fileURL.path) {
+            filename = "Pasted image \(timestamp)-\(counter).png"
+            fileURL = notesDir.appendingPathComponent(filename)
+            counter += 1
+        }
+
+        guard (try? pngData.write(to: fileURL)) != nil else {
+            super.paste(sender)
+            return
+        }
+
+        let wikilink = "![[\(filename)]]"
+        let sel = selectedRange
+        replaceText(in: sel, with: wikilink)
+        selectedRange = NSRange(location: sel.location + (wikilink as NSString).length, length: 0)
+    }
+
+    private static func imagePNGData(from pb: UIPasteboard) -> Data? {
+        if let data = pb.data(forPasteboardType: "public.png") {
+            return data
+        }
+        if let image = pb.image, let data = image.pngData() {
+            return data
+        }
+        return nil
+    }
 
     // MARK: List continuation
 
@@ -274,6 +453,7 @@ extension MarkdownTextViewRepresentable {
             guard let tv = textView else { return }
             highlighter.recomputeCodeFenceRanges(in: tv.text ?? "")
             highlighter.applyHighlights(to: tv)
+            (tv as? MarkdownTextView)?.updateImagePreviews()
         }
     }
 }
