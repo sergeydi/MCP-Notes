@@ -130,7 +130,7 @@ struct SidebarView: View {
                 }
             }
         }
-        .navigationSplitViewColumnWidth(min: 275, ideal: 275)
+        .navigationSplitViewColumnWidth(min: 350, ideal: 350)
         .navigationTitle("MCP Notes")
         .onChange(of: searchText) { triggerSemanticSearch() }
         .onChange(of: mode) {

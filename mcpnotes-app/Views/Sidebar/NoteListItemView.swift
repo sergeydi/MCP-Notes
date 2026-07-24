@@ -23,14 +23,15 @@ struct NoteListItemView: View {
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(formattedDate)
-                    .font(.subheadline)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .fixedSize()
                 if !note.tags.isEmpty {
-                    ForEach(note.tags, id: \.self) { tag in
-                        Text(tag)
-                            .font(.caption)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.secondary.opacity(0.2), in: Capsule())
+                    ViewThatFits(in: .horizontal) {
+                        tagsRow(count: note.tags.count, truncated: false)
+                        ForEach(Array(stride(from: note.tags.count - 1, through: 0, by: -1)), id: \.self) { count in
+                            tagsRow(count: count, truncated: true)
+                        }
                     }
                 }
             }
@@ -51,6 +52,27 @@ struct NoteListItemView: View {
         .listRowSeparator(.visible)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityDescription)
+    }
+
+    private func tagsRow(count: Int, truncated: Bool) -> some View {
+        HStack(spacing: 6) {
+            ForEach(note.tags.prefix(count), id: \.self) { tag in
+                tagCapsule(tag)
+            }
+            if truncated {
+                Text("…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func tagCapsule(_ tag: String) -> some View {
+        Text(tag)
+            .font(.caption)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(.secondary.opacity(0.2), in: Capsule())
     }
 
     private var bodySnippet: AttributedString? {
