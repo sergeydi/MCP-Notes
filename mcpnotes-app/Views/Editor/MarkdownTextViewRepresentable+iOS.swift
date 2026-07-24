@@ -37,6 +37,7 @@ struct MarkdownTextViewRepresentable: UIViewRepresentable {
 
         let tap = UITapGestureRecognizer(target: textView, action: #selector(MarkdownTextView.handleTap(_:)))
         tap.cancelsTouchesInView = false
+        tap.delegate = textView
         textView.addGestureRecognizer(tap)
 
         formatProxy?.register(
@@ -158,7 +159,7 @@ private extension UITextView {
 /// list auto-continuation, inline image preview for `![[filename]]` embeds and pasted-image
 /// insertion. Mirrors the macOS `MarkdownTextView` (NSTextView) feature set, minus the
 /// code-block copy button (deferred).
-private final class MarkdownTextView: UITextView {
+private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
     var onWikilinkTapped: ((String) -> Void)?
     var notesDirectoryURL: URL?
     private var imageViews: [UIImageView] = []
@@ -376,6 +377,15 @@ private final class MarkdownTextView: UITextView {
     }
 
     // MARK: Click navigation
+
+    /// Lets our wikilink/link tap recognizer coexist with UITextView's own tap-to-place-cursor
+    /// gesture — without this, only one of the two would ever recognize a plain single tap.
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool {
+        true
+    }
 
     @objc fileprivate func handleTap(_ gesture: UITapGestureRecognizer) {
         guard gesture.state == .ended,
