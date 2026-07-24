@@ -49,7 +49,6 @@ struct NoteListItemView: View {
             }
         }
         .padding(.vertical, 6)
-        .listRowSeparator(.visible)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityDescription)
     }

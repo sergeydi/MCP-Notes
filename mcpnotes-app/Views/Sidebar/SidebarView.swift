@@ -161,6 +161,20 @@ struct SidebarView: View {
 
     // MARK: - List content
 
+    /// The separator line between two rows is shared: hiding it only on the selected
+    /// row's own edge leaves the neighbor's edge still drawing it. Hide it from both sides.
+    private func rowSeparatorEdges(for id: UUID, in ids: [UUID]) -> (top: Visibility, bottom: Visibility) {
+        guard let idx = ids.firstIndex(of: id) else { return (.visible, .visible) }
+        let selected = store.selectedNoteID
+        let isSelected = id == selected
+        let prevSelected = idx > 0 && ids[idx - 1] == selected
+        let nextSelected = idx < ids.count - 1 && ids[idx + 1] == selected
+        return (
+            top: (isSelected || prevSelected) ? .hidden : .visible,
+            bottom: (isSelected || nextSelected) ? .hidden : .visible
+        )
+    }
+
     @ViewBuilder
     private var loadingContent: some View {
         HStack {
@@ -192,9 +206,13 @@ struct SidebarView: View {
         if mode == .search && !searchText.isEmpty {
             textSearchContent
         } else {
+            let ids = visibleNotes.map(\.id)
             ForEach(visibleNotes) { note in
+                let edges = rowSeparatorEdges(for: note.id, in: ids)
                 NoteListItemView(note: note)
                     .tag(note.id)
+                    .listRowSeparator(edges.top, edges: .top)
+                    .listRowSeparator(edges.bottom, edges: .bottom)
             }
             .onDelete { offsets in
                 offsets.forEach { store.deleteNote(visibleNotes[$0]) }
@@ -211,11 +229,18 @@ struct SidebarView: View {
             .filter { !shownIDs.contains($0.id) }
             .compactMap { r in store.notes.first { $0.id == r.id }.map { ($0, r.score) } }
 
+        let titleIDs = titleMatches.map(\.id)
+        let bodyIDs = bodyMatches.map(\.id)
+        let semanticIDs = semanticMatches.map(\.0.id)
+
         if !titleMatches.isEmpty {
             Section {
                 ForEach(titleMatches) { note in
+                    let edges = rowSeparatorEdges(for: note.id, in: titleIDs)
                     NoteListItemView(note: note, searchQuery: searchText)
                         .tag(note.id)
+                        .listRowSeparator(edges.top, edges: .top)
+                        .listRowSeparator(edges.bottom, edges: .bottom)
                 }
             } header: {
                 Text("Title").id("search-top")
@@ -223,16 +248,22 @@ struct SidebarView: View {
             if !bodyMatches.isEmpty {
                 Section("Content") {
                     ForEach(bodyMatches) { note in
+                        let edges = rowSeparatorEdges(for: note.id, in: bodyIDs)
                         NoteListItemView(note: note, searchQuery: searchText)
                             .tag(note.id)
+                            .listRowSeparator(edges.top, edges: .top)
+                            .listRowSeparator(edges.bottom, edges: .bottom)
                     }
                 }
             }
         } else if !bodyMatches.isEmpty {
             Section {
                 ForEach(bodyMatches) { note in
+                    let edges = rowSeparatorEdges(for: note.id, in: bodyIDs)
                     NoteListItemView(note: note, searchQuery: searchText)
                         .tag(note.id)
+                        .listRowSeparator(edges.top, edges: .top)
+                        .listRowSeparator(edges.bottom, edges: .bottom)
                 }
             } header: {
                 Text("Content").id("search-top")
@@ -242,8 +273,11 @@ struct SidebarView: View {
         if !semanticMatches.isEmpty {
             Section("Related") {
                 ForEach(semanticMatches, id: \.0.id) { note, score in
+                    let edges = rowSeparatorEdges(for: note.id, in: semanticIDs)
                     NoteListItemView(note: note, score: score)
                         .tag(note.id)
+                        .listRowSeparator(edges.top, edges: .top)
+                        .listRowSeparator(edges.bottom, edges: .bottom)
                 }
             }
         }
@@ -258,9 +292,13 @@ struct SidebarView: View {
             let isExpanded = expandedTags.contains(tag)
             Section {
                 if isExpanded {
+                    let ids = tagNotes.map(\.id)
                     ForEach(tagNotes) { note in
+                        let edges = rowSeparatorEdges(for: note.id, in: ids)
                         NoteListItemView(note: note)
                             .tag(note.id)
+                            .listRowSeparator(edges.top, edges: .top)
+                            .listRowSeparator(edges.bottom, edges: .bottom)
                     }
                 }
             } header: {
@@ -292,9 +330,13 @@ struct SidebarView: View {
         if !untagged.isEmpty {
             Section {
                 if noTagsExpanded {
+                    let ids = untagged.map(\.id)
                     ForEach(untagged) { note in
+                        let edges = rowSeparatorEdges(for: note.id, in: ids)
                         NoteListItemView(note: note)
                             .tag(note.id)
+                            .listRowSeparator(edges.top, edges: .top)
+                            .listRowSeparator(edges.bottom, edges: .bottom)
                     }
                 }
             } header: {
