@@ -4,6 +4,7 @@ struct NoteListItemView: View {
     let note: Note
     var score: Float? = nil
     var searchQuery: String? = nil
+    var isSelected: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -49,6 +50,7 @@ struct NoteListItemView: View {
             }
         }
         .padding(.vertical, 6)
+        .foregroundStyle(isSelected ? .white : .primary)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityDescription)
     }
@@ -103,7 +105,7 @@ struct NoteListItemView: View {
         var result = AttributedString(before)
         var highlighted = AttributedString(match)
         highlighted.font = Font.subheadline.bold()
-        highlighted.foregroundColor = Color.primary
+        highlighted.foregroundColor = isSelected ? Color.white : Color.primary
         result += highlighted
         result += AttributedString(after)
         return result

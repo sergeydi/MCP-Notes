@@ -125,6 +125,9 @@ struct SidebarView: View {
                     }
                 }
                 .padding(.top, 8)
+#if os(macOS)
+                .environment(\.controlActiveState, .active)
+#endif
                 .onChange(of: searchText) {
                     proxy.scrollTo("search-top", anchor: .top)
                 }
@@ -175,6 +178,26 @@ struct SidebarView: View {
         )
     }
 
+    /// macOS renders the accent-colored selection natively (see `.controlActiveState` above);
+    /// iOS's plain/inset List selection is a dull gray, so paint it ourselves there.
+    private func isRowSelected(_ id: UUID) -> Bool {
+#if os(iOS)
+        id == store.selectedNoteID
+#else
+        false
+#endif
+    }
+
+    @ViewBuilder
+    private func rowBackground(for id: UUID) -> some View {
+        if isRowSelected(id) {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.accentColor)
+        } else {
+            Color.clear
+        }
+    }
+
     @ViewBuilder
     private var loadingContent: some View {
         HStack {
@@ -209,10 +232,11 @@ struct SidebarView: View {
             let ids = visibleNotes.map(\.id)
             ForEach(visibleNotes) { note in
                 let edges = rowSeparatorEdges(for: note.id, in: ids)
-                NoteListItemView(note: note)
+                NoteListItemView(note: note, isSelected: isRowSelected(note.id))
                     .tag(note.id)
                     .listRowSeparator(edges.top, edges: .top)
                     .listRowSeparator(edges.bottom, edges: .bottom)
+                    .listRowBackground(rowBackground(for: note.id))
             }
             .onDelete { offsets in
                 offsets.forEach { store.deleteNote(visibleNotes[$0]) }
@@ -237,10 +261,11 @@ struct SidebarView: View {
             Section {
                 ForEach(titleMatches) { note in
                     let edges = rowSeparatorEdges(for: note.id, in: titleIDs)
-                    NoteListItemView(note: note, searchQuery: searchText)
+                    NoteListItemView(note: note, searchQuery: searchText, isSelected: isRowSelected(note.id))
                         .tag(note.id)
                         .listRowSeparator(edges.top, edges: .top)
                         .listRowSeparator(edges.bottom, edges: .bottom)
+                        .listRowBackground(rowBackground(for: note.id))
                 }
             } header: {
                 Text("Title").id("search-top")
@@ -249,10 +274,11 @@ struct SidebarView: View {
                 Section("Content") {
                     ForEach(bodyMatches) { note in
                         let edges = rowSeparatorEdges(for: note.id, in: bodyIDs)
-                        NoteListItemView(note: note, searchQuery: searchText)
+                        NoteListItemView(note: note, searchQuery: searchText, isSelected: isRowSelected(note.id))
                             .tag(note.id)
                             .listRowSeparator(edges.top, edges: .top)
                             .listRowSeparator(edges.bottom, edges: .bottom)
+                            .listRowBackground(rowBackground(for: note.id))
                     }
                 }
             }
@@ -260,10 +286,11 @@ struct SidebarView: View {
             Section {
                 ForEach(bodyMatches) { note in
                     let edges = rowSeparatorEdges(for: note.id, in: bodyIDs)
-                    NoteListItemView(note: note, searchQuery: searchText)
+                    NoteListItemView(note: note, searchQuery: searchText, isSelected: isRowSelected(note.id))
                         .tag(note.id)
                         .listRowSeparator(edges.top, edges: .top)
                         .listRowSeparator(edges.bottom, edges: .bottom)
+                        .listRowBackground(rowBackground(for: note.id))
                 }
             } header: {
                 Text("Content").id("search-top")
@@ -274,10 +301,11 @@ struct SidebarView: View {
             Section("Related") {
                 ForEach(semanticMatches, id: \.0.id) { note, score in
                     let edges = rowSeparatorEdges(for: note.id, in: semanticIDs)
-                    NoteListItemView(note: note, score: score)
+                    NoteListItemView(note: note, score: score, isSelected: isRowSelected(note.id))
                         .tag(note.id)
                         .listRowSeparator(edges.top, edges: .top)
                         .listRowSeparator(edges.bottom, edges: .bottom)
+                        .listRowBackground(rowBackground(for: note.id))
                 }
             }
         }
@@ -295,10 +323,11 @@ struct SidebarView: View {
                     let ids = tagNotes.map(\.id)
                     ForEach(tagNotes) { note in
                         let edges = rowSeparatorEdges(for: note.id, in: ids)
-                        NoteListItemView(note: note)
+                        NoteListItemView(note: note, isSelected: isRowSelected(note.id))
                             .tag(note.id)
                             .listRowSeparator(edges.top, edges: .top)
                             .listRowSeparator(edges.bottom, edges: .bottom)
+                            .listRowBackground(rowBackground(for: note.id))
                     }
                 }
             } header: {
@@ -333,10 +362,11 @@ struct SidebarView: View {
                     let ids = untagged.map(\.id)
                     ForEach(untagged) { note in
                         let edges = rowSeparatorEdges(for: note.id, in: ids)
-                        NoteListItemView(note: note)
+                        NoteListItemView(note: note, isSelected: isRowSelected(note.id))
                             .tag(note.id)
                             .listRowSeparator(edges.top, edges: .top)
                             .listRowSeparator(edges.bottom, edges: .bottom)
+                            .listRowBackground(rowBackground(for: note.id))
                     }
                 }
             } header: {
