@@ -23,9 +23,15 @@ struct FrontmatterParser {
         guard let end = closingIndex else { return nil }
 
         let frontmatterLines = Array(lines[1..<end])
-        let bodyLines = lines[(end + 1)...]
+        // `serialize` always inserts exactly one blank line between the closing
+        // `---` and the body. Strip only that single separator line here so parse
+        // is a true inverse of serialize — trimming *all* leading/trailing
+        // newlines would silently drop blank lines intentionally present in the body.
+        var bodyLines = Array(lines[(end + 1)...])
+        if bodyLines.first == "" {
+            bodyLines.removeFirst()
+        }
         let body = bodyLines.joined(separator: "\n")
-            .trimmingCharacters(in: .init(charactersIn: "\n"))
 
         var uid: UUID?
         var tags: [String] = []

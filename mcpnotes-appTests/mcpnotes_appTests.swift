@@ -184,6 +184,20 @@ struct FrontmatterParserTests {
         #expect(parsed.tags == [])
         #expect(parsed.body == "")
     }
+
+    @Test func roundTripPreservesTrailingBlankLines() throws {
+        let body = "Some text\n\n\n\n"
+        let serialized = FrontmatterParser.serialize(uid: sampleUID, tags: [], body: body)
+        let parsed = try #require(FrontmatterParser.parse(serialized))
+        #expect(parsed.body == body)
+    }
+
+    @Test func roundTripPreservesLeadingBlankLines() throws {
+        let body = "\n\nSome text"
+        let serialized = FrontmatterParser.serialize(uid: sampleUID, tags: [], body: body)
+        let parsed = try #require(FrontmatterParser.parse(serialized))
+        #expect(parsed.body == body)
+    }
 }
 
 // MARK: - NoteFilenameValidator

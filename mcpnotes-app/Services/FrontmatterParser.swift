@@ -38,9 +38,16 @@ public struct FrontmatterParser {
         let body: String
         if let end = closingIndex {
             frontmatterLines = Array(lines[1..<end])
-            let bodyLines = lines[(end + 1)...]
+            // `serialize` always inserts exactly one blank line between the closing
+            // `---` and the body. Strip only that single separator line here so parse
+            // is a true inverse of serialize — trimming *all* leading/trailing
+            // newlines would silently drop blank lines the user intentionally typed
+            // at the start/end of the body on the next external-change reload.
+            var bodyLines = Array(lines[(end + 1)...])
+            if bodyLines.first == "" {
+                bodyLines.removeFirst()
+            }
             body = bodyLines.joined(separator: "\n")
-                .trimmingCharacters(in: .init(charactersIn: "\n"))
         } else {
             // No closing ---: treat entire remainder as frontmatter, body is empty.
             frontmatterLines = Array(lines[1...])
