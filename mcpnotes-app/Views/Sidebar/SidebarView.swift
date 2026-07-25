@@ -131,6 +131,15 @@ struct SidebarView: View {
                 .onChange(of: searchText) {
                     proxy.scrollTo("search-top", anchor: .top)
                 }
+                .onChange(of: store.bookmarkedNotes.map(\.id)) { oldIDs, newIDs in
+                    // Bookmarked notes stay in the same alphabetical order as the main list,
+                    // so a newly-bookmarked note can land anywhere in it — scroll to reveal it
+                    // rather than leaving the list wherever it happened to be scrolled.
+                    guard mode == .favorites, newIDs.count > oldIDs.count, let first = newIDs.first else { return }
+                    withAnimation {
+                        proxy.scrollTo(first, anchor: .top)
+                    }
+                }
             }
         }
         .navigationSplitViewColumnWidth(min: 350, ideal: 350)

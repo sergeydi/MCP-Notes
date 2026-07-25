@@ -330,7 +330,10 @@ final class NoteStore {
         guard let index = notes.firstIndex(where: { $0.id == noteID }) else { return }
         notes[index].isBookmarked.toggle()
         let note = notes[index]
-        Task { try? fileService.saveNote(note) }
+        Task {
+            try? fileService.saveNote(note)
+            watchFiles([note])
+        }
     }
 
     // MARK: - Private
@@ -454,7 +457,10 @@ final class NoteStore {
         let addedIDs = freshIDs.subtracting(currentIDs)
         let changedNotes = freshNotes.filter { fresh in
             guard let current = currentMap[fresh.id] else { return false }
-            return current.body != fresh.body || current.tags != fresh.tags || current.filename != fresh.filename
+            return current.body != fresh.body
+                || current.tags != fresh.tags
+                || current.filename != fresh.filename
+                || current.isBookmarked != fresh.isBookmarked
         }
 
         guard !removedIDs.isEmpty || !addedIDs.isEmpty || !changedNotes.isEmpty else { return }
