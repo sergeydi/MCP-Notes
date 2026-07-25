@@ -87,6 +87,14 @@ final class NoteStore {
 
     private var directoryWatcher: DispatchSourceFileSystemObject?
     private var watcherFD: Int32 = -1
+    // Per-note file watchers. The directory-level watcher only fires on dirent changes
+    // (add/remove/rename) — a plain in-place write to an existing file's contents (which is
+    // how iCloud sync sometimes updates an already-materialized note) never touches the
+    // directory's own vnode and is invisible to it. Watching each note's file directly closes
+    // that gap. Any write — ours or iCloud's — that replaces the file atomically also swaps
+    // out the underlying inode, which stales the open fd, so watchers are always torn down
+    // and reopened rather than reused.
+    private var fileWatchers: [UUID: DispatchSourceFileSystemObject] = [:]
     private var reloadTask: Task<Void, Never>?
     private var noteIndexQueue: [Note] = []
     private var indexWorkerTask: Task<Void, Never>?
@@ -100,6 +108,7 @@ final class NoteStore {
     deinit {
         directoryWatcher?.cancel()
         // watcherFD is closed by setCancelHandler — do not close it here
+        for source in fileWatchers.values { source.cancel() }
         reloadTask?.cancel()
     }
 
@@ -151,6 +160,7 @@ final class NoteStore {
             indexingState = .ready(count: 0)
         }
         startWatchingNotesDirectory()
+        watchFiles(notes)
     }
 
     /// Clears `isLoading`, holding the preloader up to a 1s minimum so it never just flashes.
@@ -175,6 +185,7 @@ final class NoteStore {
             let note = try fileService.createNote(baseName: "New Note")
             notes.append(note)
             sortNotes()
+            watchFiles([note])
             selectedNoteID = note.id
             try? await indexer.indexNote(note)
             indexingState = .ready(count: await indexer.indexedCount())
@@ -192,12 +203,14 @@ final class NoteStore {
         Task {
             // TODO: surface errors to user
             try? fileService.saveNote(merged)
+            watchFiles([merged])
             try? await indexer.indexNote(merged)
             indexingState = .ready(count: await indexer.indexedCount())
         }
     }
 
     func deleteNote(_ note: Note) {
+        stopWatchingFile(id: note.id)
         notes.removeAll { $0.id == note.id }
 
         navHistory.removeAll { $0 == note.id }
@@ -234,6 +247,7 @@ final class NoteStore {
                 notes[index] = renamed
                 sortNotes()
             }
+            watchFiles([renamed])
             try? await indexer.indexNote(renamed)
 
             let pattern = /\[\[([^\]]+)\]\]/
@@ -256,6 +270,7 @@ final class NoteStore {
                 }
                 updatedFilenames.append(n.filename)
                 try? fileService.saveNote(n)
+                watchFiles([n])
                 try? await indexer.indexNote(n)
             }
             indexingState = .ready(count: await indexer.indexedCount())
@@ -268,6 +283,7 @@ final class NoteStore {
     func switchDirectory() async {
         directoryWatcher?.cancel()
         directoryWatcher = nil
+        stopWatchingAllFiles()
         notes = []
         selectedNoteID = nil
         navHistory = []
@@ -381,6 +397,41 @@ final class NoteStore {
         directoryWatcher = source
     }
 
+    /// (Re)opens a file-level watcher for each given note, replacing any existing one.
+    /// Must be called after any write to a note's file (ours or external) since an atomic
+    /// replace swaps the inode out from under the previously open fd.
+    private func watchFiles(_ notesToWatch: [Note]) {
+        for note in notesToWatch {
+            stopWatchingFile(id: note.id)
+            let fd = open(note.fileURL.path, O_EVTONLY)
+            guard fd >= 0 else { continue }
+            let source = DispatchSource.makeFileSystemObjectSource(
+                fileDescriptor: fd,
+                eventMask: [.write, .extend, .rename, .delete],
+                queue: .global(qos: .utility)
+            )
+            source.setEventHandler { [weak self] in
+                Task { @MainActor [weak self] in
+                    self?.scheduleExternalReload()
+                }
+            }
+            source.setCancelHandler {
+                close(fd)
+            }
+            source.resume()
+            fileWatchers[note.id] = source
+        }
+    }
+
+    private func stopWatchingFile(id: UUID) {
+        fileWatchers.removeValue(forKey: id)?.cancel()
+    }
+
+    private func stopWatchingAllFiles() {
+        for source in fileWatchers.values { source.cancel() }
+        fileWatchers.removeAll()
+    }
+
     func scheduleExternalReload() {
         reloadTask?.cancel()
         reloadTask = Task { [weak self] in
@@ -419,6 +470,12 @@ final class NoteStore {
             if let note = freshMap[id] { notes.append(note) }
         }
         sortNotes()
+
+        // Re-sync file watchers: drop removed notes, (re)open changed/added ones since an
+        // external atomic replace invalidates the previously open fd for that note.
+        for id in removedIDs { stopWatchingFile(id: id) }
+        let notesToWatch = changedNotes + addedIDs.compactMap { freshMap[$0] }
+        if !notesToWatch.isEmpty { watchFiles(notesToWatch) }
 
         // Clean up navigation state for removed notes.
         for id in removedIDs {

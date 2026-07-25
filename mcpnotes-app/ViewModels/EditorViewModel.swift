@@ -15,7 +15,8 @@ public final class EditorViewModel {
     private var autosaveTask: Task<Void, Never>?
     private var _loadedHash: Insecure.MD5Digest?
 
-    private var isDirty: Bool {
+    /// True when `body`/`tags` have local changes not yet handed off to `onSave`.
+    public var isDirty: Bool {
         contentHash(body: body, tags: tags) != _loadedHash
     }
 
@@ -45,6 +46,7 @@ public final class EditorViewModel {
             try? await Task.sleep(for: .seconds(1))
             guard let self, !Task.isCancelled else { return }
             onSave?(body, tags)
+            _loadedHash = contentHash(body: body, tags: tags)
         }
     }
 
@@ -54,6 +56,7 @@ public final class EditorViewModel {
         autosaveTask = nil
         guard isDirty else { return }
         onSave?(body, tags)
+        _loadedHash = contentHash(body: body, tags: tags)
     }
 
     /// Cancels any pending autosave without saving (e.g., before deletion).

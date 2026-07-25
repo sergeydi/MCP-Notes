@@ -579,7 +579,9 @@
 /* Begin PBXTargetDependency section */
 		E205F3552FF4EB1700A61BEB /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			platformFilters = (macos, );
+			platformFilters = (
+				macos,
+			);
 			target = E205F33B2FF4E70400A61BEB /* mcpnotes-embeddings */;
 			targetProxy = E205F3542FF4EB1700A61BEB /* PBXContainerItemProxy */;
 		};
@@ -600,7 +602,9 @@
 		};
 		E290F0042FA72B6C00C4C0FD /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			platformFilters = (macos, );
+			platformFilters = (
+				macos,
+			);
 			target = E290A0032FA72B6C00C4C0FD /* mcpnotes-server */;
 			targetProxy = E290F0032FA72B6C00C4C0FD /* PBXContainerItemProxy */;
 		};

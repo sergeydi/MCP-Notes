@@ -76,14 +76,25 @@ struct NoteEditorView: View {
                 store.updateNote(updated)
             }
         }
-        .onChange(of: note.id) { _, _ in
+        .onChange(of: note) { oldValue, newValue in
+            guard newValue.id != oldValue.id else {
+                // Same note, changed externally (e.g. iCloud sync from another device).
+                // Only pull in the fresh content if the user has no unsaved local edits —
+                // otherwise we'd clobber what they're currently typing.
+                guard !viewModel.isDirty else { return }
+                viewModel.load(note: newValue)
+                if !isEditingFilename {
+                    draftFilename = newValue.filename
+                }
+                return
+            }
             viewModel.flushAutosave()
-            viewModel.load(note: note)
-            draftFilename = note.filename
+            viewModel.load(note: newValue)
+            draftFilename = newValue.filename
             isEditingFilename = false
             renameMessageTask?.cancel()
             wikilinkRenameCount = nil
-            let noteID = note.id
+            let noteID = newValue.id
             viewModel.onSave = { [weak store] body, tags in
                 guard let store else { return }
                 guard let current = store.notes.first(where: { $0.id == noteID }) else { return }
