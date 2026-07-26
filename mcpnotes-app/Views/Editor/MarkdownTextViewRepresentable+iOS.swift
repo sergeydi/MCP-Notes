@@ -623,5 +623,13 @@ extension MarkdownTextViewRepresentable {
                 DispatchQueue.main.async { mtv.updateCopyButtons() }
             }
         }
+
+        /// UIKit only repaints the newly-exposed strip of a `UIScrollView`'s drawRect content
+        /// on scroll, not the whole visible area — so the code-block background (painted in
+        /// `draw(_:)`) is left partially stale whenever the view scrolls, e.g. when the system
+        /// auto-scrolls to keep the caret visible above the keyboard. Force a full repaint here.
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            (textView as? MarkdownTextView)?.setNeedsDisplay()
+        }
     }
 }
