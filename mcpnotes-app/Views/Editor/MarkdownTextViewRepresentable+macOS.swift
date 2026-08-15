@@ -6,6 +6,7 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
     var onWikilinkTapped: ((String) -> Void)?
     var notesDirectoryURL: URL?
     var formatProxy: TextFormatProxy?
+    var header: FrontmatterView
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text, onTextChanged: onTextChanged)
@@ -120,11 +121,34 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
         context.coordinator.refreshHighlighting()
 
         scrollView.documentView = textView
+
+        // Host the SwiftUI frontmatter header as a subview of the text view's document,
+        // so it scrolls with the body instead of staying pinned above it. Positioning it
+        // this way (rather than as a sibling of the scroll view) reuses the same "subview
+        // positioned in document space scrolls for free" mechanism as the image previews.
+        let headerHostingView = NSHostingView(rootView: header)
+        headerHostingView.translatesAutoresizingMaskIntoConstraints = false
+        headerHostingView.postsFrameChangedNotifications = true
+        textView.addSubview(headerHostingView)
+        NSLayoutConstraint.activate([
+            headerHostingView.topAnchor.constraint(equalTo: textView.topAnchor),
+            headerHostingView.leadingAnchor.constraint(equalTo: textView.leadingAnchor),
+            headerHostingView.widthAnchor.constraint(equalTo: textView.widthAnchor)
+        ])
+        context.coordinator.headerHostingView = headerHostingView
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.headerFrameDidChange),
+            name: NSView.frameDidChangeNotification,
+            object: headerHostingView
+        )
+
         return scrollView
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.onTextChanged = onTextChanged
+        context.coordinator.headerHostingView?.rootView = header
         if let mtv = context.coordinator.textView as? MarkdownTextView {
             mtv.onWikilinkTapped = onWikilinkTapped
             mtv.notesDirectoryURL = notesDirectoryURL
@@ -157,6 +181,26 @@ private final class MarkdownTextView: NSTextView {
     private var lastLayoutWidth: CGFloat = 0
     private var minFrameHeight: CGFloat = 0
 
+    /// Height of the hosted frontmatter header, reserved at the top of the text container via
+    /// an exclusion path so the first line of text lays out below it and the caret in an empty
+    /// note still starts in the right place.
+    var headerHeight: CGFloat = 0 {
+        didSet {
+            guard abs(headerHeight - oldValue) > 0.5 else { return }
+            applyHeaderExclusion()
+        }
+    }
+
+    private func applyHeaderExclusion() {
+        guard let container = textContainer else { return }
+        guard headerHeight > 0 else {
+            if !container.exclusionPaths.isEmpty { container.exclusionPaths = [] }
+            return
+        }
+        let width = max(bounds.width, 1)
+        container.exclusionPaths = [NSBezierPath(rect: NSRect(x: 0, y: 0, width: width, height: headerHeight))]
+    }
+
     override func setFrameSize(_ newSize: NSSize) {
         var s = newSize
         if minFrameHeight > 0 { s.height = max(s.height, minFrameHeight) }
@@ -168,6 +212,7 @@ private final class MarkdownTextView: NSTextView {
         let w = bounds.width
         guard abs(w - lastLayoutWidth) > 1 else { return }
         lastLayoutWidth = w
+        applyHeaderExclusion()
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.updateImagePreviews()
@@ -630,12 +675,22 @@ extension MarkdownTextViewRepresentable {
         var text: Binding<String>
         var onTextChanged: () -> Void
         weak var textView: NSTextView?
+        weak var headerHostingView: NSHostingView<FrontmatterView>?
         var isUpdatingFromSwiftUI = false
         private var highlighter = MarkdownHighlighter()
 
         init(text: Binding<String>, onTextChanged: @escaping () -> Void) {
             self.text = text
             self.onTextChanged = onTextChanged
+        }
+
+        deinit {
+            NotificationCenter.default.removeObserver(self)
+        }
+
+        @objc func headerFrameDidChange(_ notification: Notification) {
+            guard let headerHostingView, let mtv = textView as? MarkdownTextView else { return }
+            mtv.headerHeight = headerHostingView.frame.height
         }
 
         func textDidChange(_ notification: Notification) {

@@ -10,6 +10,7 @@ struct MarkdownEditorView: View {
     var onWikilinkTapped: ((String) -> Void)? = nil
     var notesDirectoryURL: URL? = nil
     var formatProxy: TextFormatProxy? = nil
+    var header: FrontmatterView
 
     var body: some View {
         MarkdownTextViewRepresentable(
@@ -17,7 +18,8 @@ struct MarkdownEditorView: View {
             onTextChanged: onTextChanged,
             onWikilinkTapped: onWikilinkTapped,
             notesDirectoryURL: notesDirectoryURL,
-            formatProxy: formatProxy
+            formatProxy: formatProxy,
+            header: header
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityLabel("Note content")

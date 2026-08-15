@@ -818,7 +818,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26;
-				MARKETING_VERSION = 3.0.1;
+				MARKETING_VERSION = 3.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes";
 				PRODUCT_MODULE_NAME = mcpnotes_app;
 				PRODUCT_NAME = "MCP Notes";
@@ -867,7 +867,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26;
-				MARKETING_VERSION = 3.0.1;
+				MARKETING_VERSION = 3.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "mcp-notes";
 				PRODUCT_MODULE_NAME = mcpnotes_app;
 				PRODUCT_NAME = "MCP Notes";

@@ -14,6 +14,7 @@ struct MarkdownTextViewRepresentable: UIViewRepresentable {
     var onWikilinkTapped: ((String) -> Void)?
     var notesDirectoryURL: URL?
     var formatProxy: TextFormatProxy?
+    var header: FrontmatterView
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text, onTextChanged: onTextChanged)
@@ -115,11 +116,29 @@ struct MarkdownTextViewRepresentable: UIViewRepresentable {
         )
         context.coordinator.refreshHighlighting()
 
+        // Host the SwiftUI frontmatter header as a subview of the text view's scrollable
+        // content, so it scrolls with the body instead of staying pinned above it — mirrors
+        // the macOS representable. UITextView is itself the UIScrollView, so pinning to its
+        // contentLayoutGuide (not its own anchors) is what makes the subview scroll with content
+        // while frameLayoutGuide keeps the header's width matched to the visible viewport.
+        let headerHostingController = UIHostingController(rootView: header)
+        headerHostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        headerHostingController.view.backgroundColor = .clear
+        textView.addSubview(headerHostingController.view)
+        NSLayoutConstraint.activate([
+            headerHostingController.view.topAnchor.constraint(equalTo: textView.contentLayoutGuide.topAnchor),
+            headerHostingController.view.leadingAnchor.constraint(equalTo: textView.contentLayoutGuide.leadingAnchor),
+            headerHostingController.view.widthAnchor.constraint(equalTo: textView.frameLayoutGuide.widthAnchor)
+        ])
+        context.coordinator.headerHostingController = headerHostingController
+        textView.headerHostingView = headerHostingController.view
+
         return textView
     }
 
     func updateUIView(_ uiView: UITextView, context: Context) {
         context.coordinator.onTextChanged = onTextChanged
+        context.coordinator.headerHostingController?.rootView = header
         if let mtv = context.coordinator.textView as? MarkdownTextView {
             mtv.onWikilinkTapped = onWikilinkTapped
             mtv.notesDirectoryURL = notesDirectoryURL
@@ -170,16 +189,39 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
     private var copyButtons: [UIButton] = []
     private var lastLayoutWidth: CGFloat = 0
 
+    /// Weak ref to the hosted frontmatter header's view; its Auto Layout–driven height is read
+    /// on every layout pass (not gated on width change, since header height changes independent
+    /// of width — e.g. entering filename-edit mode) to keep `headerHeight` in sync.
+    weak var headerHostingView: UIView?
+    private var headerHeight: CGFloat = 0
+
     override func layoutSubviews() {
         super.layoutSubviews()
+        if let headerHostingView, abs(headerHostingView.frame.height - headerHeight) > 0.5 {
+            headerHeight = headerHostingView.frame.height
+            applyHeaderExclusion()
+        }
         let w = bounds.width
         guard abs(w - lastLayoutWidth) > 1 else { return }
         lastLayoutWidth = w
+        applyHeaderExclusion()
         DispatchQueue.main.async { [weak self] in
             self?.updateImagePreviews()
             self?.updateCopyButtons()
             self?.setNeedsDisplay()
         }
+    }
+
+    /// Reserves space for the header at the top of the text container via an exclusion path, so
+    /// the first line of text lays out below it and the caret in an empty note still starts in
+    /// the right place. Mirrors the macOS representable's approach.
+    private func applyHeaderExclusion() {
+        guard headerHeight > 0 else {
+            if !textContainer.exclusionPaths.isEmpty { textContainer.exclusionPaths = [] }
+            return
+        }
+        let width = max(bounds.width, 1)
+        textContainer.exclusionPaths = [UIBezierPath(rect: CGRect(x: 0, y: 0, width: width, height: headerHeight))]
     }
 
     // MARK: Code block background
@@ -593,6 +635,7 @@ extension MarkdownTextViewRepresentable {
         var text: Binding<String>
         var onTextChanged: () -> Void
         weak var textView: UITextView?
+        var headerHostingController: UIHostingController<FrontmatterView>?
         var isUpdatingFromSwiftUI = false
         private var isRenumbering = false
         private var highlighter = MarkdownHighlighter()

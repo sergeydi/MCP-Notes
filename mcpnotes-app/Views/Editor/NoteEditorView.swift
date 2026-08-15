@@ -15,8 +15,17 @@ struct NoteEditorView: View {
     @State private var renameMessageTask: Task<Void, Never>? = nil
 
     var body: some View {
-        VStack(spacing: 0) {
-            FrontmatterView(
+        MarkdownEditorView(
+            text: $viewModel.body,
+            onTextChanged: viewModel.scheduleAutosave,
+            onWikilinkTapped: { name in
+                if let target = store.notes.first(where: { $0.filename == name }) {
+                    store.selectedNoteID = target.id
+                }
+            },
+            notesDirectoryURL: FileService.notesDirectoryURL,
+            formatProxy: formatProxy,
+            header: FrontmatterView(
                 filename: note.filename,
                 draftFilename: $draftFilename,
                 isEditingFilename: $isEditingFilename,
@@ -46,22 +55,7 @@ struct NoteEditorView: View {
                     }
                 }
             )
-            .zIndex(1)
-
-            Divider()
-
-            MarkdownEditorView(
-                text: $viewModel.body,
-                onTextChanged: viewModel.scheduleAutosave,
-                onWikilinkTapped: { name in
-                    if let target = store.notes.first(where: { $0.filename == name }) {
-                        store.selectedNoteID = target.id
-                    }
-                },
-                notesDirectoryURL: FileService.notesDirectoryURL,
-                formatProxy: formatProxy
-            )
-        }
+        )
         .toolbar { editorToolbar }
         .onAppear {
             viewModel.load(note: note)
