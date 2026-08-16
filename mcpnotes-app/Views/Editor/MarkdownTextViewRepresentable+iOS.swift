@@ -194,17 +194,17 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
     /// of width — e.g. entering filename-edit mode) to keep `headerHeight` in sync.
     weak var headerHostingView: UIView?
     private var headerHeight: CGFloat = 0
+    private let baseTopInset: CGFloat = 8
 
     override func layoutSubviews() {
         super.layoutSubviews()
         if let headerHostingView, abs(headerHostingView.frame.height - headerHeight) > 0.5 {
             headerHeight = headerHostingView.frame.height
-            applyHeaderExclusion()
+            applyHeaderInset()
         }
         let w = bounds.width
         guard abs(w - lastLayoutWidth) > 1 else { return }
         lastLayoutWidth = w
-        applyHeaderExclusion()
         DispatchQueue.main.async { [weak self] in
             self?.updateImagePreviews()
             self?.updateCopyButtons()
@@ -212,16 +212,18 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
         }
     }
 
-    /// Reserves space for the header at the top of the text container via an exclusion path, so
-    /// the first line of text lays out below it and the caret in an empty note still starts in
-    /// the right place. Mirrors the macOS representable's approach.
-    private func applyHeaderExclusion() {
-        guard headerHeight > 0 else {
-            if !textContainer.exclusionPaths.isEmpty { textContainer.exclusionPaths = [] }
-            return
-        }
-        let width = max(bounds.width, 1)
-        textContainer.exclusionPaths = [UIBezierPath(rect: CGRect(x: 0, y: 0, width: width, height: headerHeight))]
+    /// Reserves space for the header via `textContainerInset.top` (rather than an exclusion
+    /// path) so the first line of text lays out below it and the caret in an empty note still
+    /// starts in the right place. A static inset — unlike an exclusion path — isn't sensitive to
+    /// TextKit 2's viewport-based lazy layout for long documents: retroactively changing
+    /// `exclusionPaths` after the initial viewport has been laid out let the viewport's anchor
+    /// desync from the reserved region, so long notes opened straight into the body with the
+    /// header pushed out of view instead of scrolling to show it. `textContainerInset` shifts the
+    /// whole container uniformly and is unaffected by viewport chunking.
+    private func applyHeaderInset() {
+        var inset = textContainerInset
+        inset.top = baseTopInset + headerHeight
+        textContainerInset = inset
     }
 
     // MARK: Code block background

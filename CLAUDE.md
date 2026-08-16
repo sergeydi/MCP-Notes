@@ -34,8 +34,11 @@ xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-appUITests -des
 xcrun devicectl list devices
 # 2. Build for that specific device (not generic/platform=iOS — a concrete id signs with the right provisioning profile)
 xcodebuild -project mcpnotes-mac.xcodeproj -scheme mcpnotes-app -destination 'id=<device-id>' build
-# 3. Install the .app from DerivedData (path is stable per-project; find it once with -showBuildSettings if unsure)
-xcrun devicectl device install app --device <device-id> "$HOME/Library/Developer/Xcode/DerivedData/mcpnotes-mac-*/Build/Products/Debug-iphoneos/MCP Notes.app"
+# 3. Install the .app from DerivedData. The glob must NOT be double-quoted (quoting disables
+#    shell expansion, so the literal "mcpnotes-mac-*" path segment fails) — resolve it into a
+#    variable first, since the DerivedData hash suffix is stable per checkout but unknown upfront.
+APP_PATH="$(find "$HOME/Library/Developer/Xcode/DerivedData" -maxdepth 1 -iname 'mcpnotes-mac-*' | head -1)/Build/Products/Debug-iphoneos/MCP Notes.app"
+xcrun devicectl device install app --device <device-id> "$APP_PATH"
 # 4. Launch by bundle id (not app name)
 xcrun devicectl device process launch --device <device-id> mcp-notes
 ```
