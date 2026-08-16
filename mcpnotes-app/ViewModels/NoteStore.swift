@@ -20,8 +20,10 @@ final class NoteStore {
     var notes: [Note] = [] {
         didSet { rebuildAllTags() }
     }
-    /// True until the initial cold-start load completes; drives a preloader in ContentView.
-    /// Stays visible for at least 1s even on fast (non-iCloud) loads to avoid a flash.
+    /// True until the initial cold-start load completes; drives a small spinner in
+    /// SidebarView's toolbar. The note list itself is shown immediately, so this never
+    /// blocks already-loaded notes from appearing.
+    /// Stays true for at least 1s even on fast (non-iCloud) loads to avoid a flash.
     var isLoading: Bool = true
     var indexingState: IndexingState = .idle
     /// True when the search index had to be rebuilt due to corruption or inconsistency.

@@ -116,9 +116,7 @@ struct SidebarView: View {
 
             ScrollViewReader { proxy in
                 List(selection: $store.selectedNoteID) {
-                    if store.isLoading {
-                        loadingContent
-                    } else if mode == .byTag {
+                    if mode == .byTag {
                         tagGroupedContent
                     } else {
                         flatContent
@@ -205,18 +203,6 @@ struct SidebarView: View {
         } else {
             Color.clear
         }
-    }
-
-    @ViewBuilder
-    private var loadingContent: some View {
-        HStack {
-            Spacer()
-            ProgressView()
-            Spacer()
-        }
-        .padding(.top, 40)
-        .listRowSeparator(.hidden)
-        .selectionDisabled()
     }
 
     private var textSearchTitleMatches: [Note] {
@@ -406,8 +392,26 @@ struct SidebarView: View {
 
     // MARK: - Toolbar
 
+    private var navigationPlacement: ToolbarItemPlacement {
+#if os(iOS)
+        .topBarLeading
+#else
+        .navigation
+#endif
+    }
+
     @ToolbarContentBuilder
     private var sidebarToolbar: some ToolbarContent {
+        if store.isLoading {
+            ToolbarItem(placement: navigationPlacement) {
+                ProgressView()
+#if os(macOS)
+                    .controlSize(.small)
+#endif
+                    .accessibilityLabel("Loading notes")
+            }
+        }
+
         ToolbarItem {
             Button("New Note", systemImage: "square.and.pencil") {
                 Task { await store.createNote() }
