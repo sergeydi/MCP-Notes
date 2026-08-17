@@ -97,6 +97,6 @@ struct FrontmatterView: View {
         }
         .font(.callout)
         .padding()
-        .background(.background.secondary)
+        .background(.background)
     }
 }
