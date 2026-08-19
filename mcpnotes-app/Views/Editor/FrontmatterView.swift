@@ -36,6 +36,7 @@ struct FrontmatterView: View {
                 if isEditingFilename {
                     TextField("", text: $draftFilename, selection: $filenameSelection)
                         .textFieldStyle(.plain)
+                        .font(.title3.bold())
                         .disabled(!isIdle)
                         .focused($isFilenameFocused)
                         .onSubmit { if canApply { onApplyRename() } else { cancelEdit() } }
@@ -78,6 +79,7 @@ struct FrontmatterView: View {
                     }
                 } else {
                     Text(filename)
+                        .font(.title3.bold())
                         .textSelection(.enabled)
 
                     Button {
