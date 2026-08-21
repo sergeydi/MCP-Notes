@@ -109,6 +109,8 @@
 				NoteIndexer/NoteEmbedding.swift = (macos, );
 				NoteIndexer/NoteIndexer.swift = (macos, );
 				NoteIndexer/XPCNoteEmbedder.swift = (macos, );
+				"Views/Editor/FilenameEditorView+iOS.swift" = (ios, );
+				"Views/Editor/FilenameEditorView+macOS.swift" = (macos, );
 				"Views/Editor/MarkdownTextViewRepresentable+iOS.swift" = (ios, );
 				"Views/Editor/MarkdownTextViewRepresentable+macOS.swift" = (macos, );
 				Views/Settings/ImportSettingsView.swift = (macos, );

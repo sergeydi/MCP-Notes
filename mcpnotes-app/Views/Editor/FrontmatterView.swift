@@ -14,84 +14,17 @@ struct FrontmatterView: View {
     var onTagsChanged: () -> Void
     var onApplyRename: () -> Void
 
-    private var trimmed: String { draftFilename.trimmingCharacters(in: .whitespaces) }
-    private var validation: NoteFilenameValidator.ValidationResult { NoteFilenameValidator.validate(draftFilename) }
-    private var hasConflict: Bool {
-        validation == .valid && otherFilenames.contains { $0.lowercased() == trimmed.lowercased() }
-    }
-    private var canApply: Bool { validation == .valid && !hasConflict && trimmed != filename }
-    private var isIdle: Bool { !isRenamingInProgress && wikilinkRenameCount == nil }
-    @FocusState private var isFilenameFocused: Bool
-    @State private var filenameSelection: TextSelection?
-
-    private func cancelEdit() {
-        guard isIdle else { return }
-        draftFilename = filename
-        isEditingFilename = false
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                if isEditingFilename {
-                    TextField("", text: $draftFilename, selection: $filenameSelection)
-                        .textFieldStyle(.plain)
-                        .font(.title3.bold())
-                        .disabled(!isIdle)
-                        .focused($isFilenameFocused)
-                        .onSubmit { if canApply { onApplyRename() } else { cancelEdit() } }
-                        .onKeyPress(.escape) {
-                            cancelEdit()
-                            return .handled
-                        }
-                        .onAppear {
-                            guard isIdle else { return }
-                            filenameSelection = TextSelection(insertionPoint: draftFilename.endIndex)
-                            isFilenameFocused = true
-                        }
-                        .onChange(of: isFilenameFocused) { _, focused in
-                            guard focused, isIdle else { return }
-                            filenameSelection = TextSelection(insertionPoint: draftFilename.endIndex)
-                        }
-
-                    if isRenamingInProgress {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else if let count = wikilinkRenameCount {
-                        Text(count == 0
-                             ? String(localized: "No wikilinks updated")
-                             : count == 1
-                                ? String(localized: "1 wikilink updated")
-                                : String(localized: "\(count) wikilinks updated"))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        if hasConflict {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.yellow)
-                                .help(String(localized: "A note with this filename already exists"))
-                        }
-
-                        Button("Apply", action: onApplyRename)
-                            .disabled(!canApply)
-                            .buttonStyle(.borderless)
-                            .controlSize(.small)
-                            .foregroundStyle(canApply ? Color.primary : Color.secondary)
-                    }
-                } else {
-                    Text(filename)
-                        .font(.title3.bold())
-                        .textSelection(.enabled)
-
-                    Button {
-                        draftFilename = filename
-                        isEditingFilename = true
-                    } label: {
-                        Image(systemName: "pencil").imageScale(.large)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Edit filename")
-                }
-            }
+            FilenameEditorView(
+                filename: filename,
+                draftFilename: $draftFilename,
+                isEditingFilename: $isEditingFilename,
+                isRenamingInProgress: isRenamingInProgress,
+                wikilinkRenameCount: wikilinkRenameCount,
+                otherFilenames: otherFilenames,
+                onApplyRename: onApplyRename
+            )
 
             Divider()
 
