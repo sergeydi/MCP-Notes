@@ -34,6 +34,9 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
             height: .greatestFiniteMagnitude
         )
         textView.textContainer?.widthTracksTextView = true
+        // Matches FrontmatterView's leading padding so body text (and its placeholder) line up
+        // with the filename/tags header above it.
+        textView.textContainer?.lineFragmentPadding = 16
         textView.font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         textView.textColor = .labelColor
         textView.onWikilinkTapped = onWikilinkTapped
@@ -173,6 +176,7 @@ struct MarkdownTextViewRepresentable: NSViewRepresentable {
 private final class MarkdownTextView: NSTextView {
     var onWikilinkTapped: ((String) -> Void)?
     var notesDirectoryURL: URL?
+    private let placeholderText = String(localized: "Start writing…")
     private var linkRects: [CGRect] = []
     var codeBlockRanges: [NSRange] = []
     var codeContentRanges: [NSRange] = []
@@ -224,6 +228,9 @@ private final class MarkdownTextView: NSTextView {
 
     override func drawBackground(in rect: NSRect) {
         super.drawBackground(in: rect)
+        if textStorage?.length == 0 {
+            drawPlaceholder()
+        }
         guard !codeBlockRanges.isEmpty,
               let layoutManager = textLayoutManager,
               let contentStorage = textContentStorage else { return }
@@ -264,6 +271,26 @@ private final class MarkdownTextView: NSTextView {
             bg.setFill()
             NSBezierPath(roundedRect: blockRect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
         }
+    }
+
+    // MARK: Placeholder
+
+    /// Drawn directly rather than via an overlay subview so it scrolls and reflows with the
+    /// header exclusion path for free, like the rest of the text container's content.
+    private func drawPlaceholder() {
+        let origin = textContainerOrigin
+        let padding = textContainer?.lineFragmentPadding ?? 5
+        let placeholderFont = font ?? .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        let rect = NSRect(
+            x: bounds.minX + origin.x + padding,
+            y: bounds.minY + origin.y + headerHeight,
+            width: bounds.width - origin.x - padding - 10,
+            height: placeholderFont.pointSize * 1.4
+        )
+        (placeholderText as NSString).draw(in: rect, withAttributes: [
+            .font: placeholderFont,
+            .foregroundColor: NSColor.placeholderTextColor
+        ])
     }
 
     // MARK: Copy buttons

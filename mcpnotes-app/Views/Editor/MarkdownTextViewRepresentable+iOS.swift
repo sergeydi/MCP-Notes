@@ -30,7 +30,9 @@ struct MarkdownTextViewRepresentable: UIViewRepresentable {
         textView.smartDashesType = .no
         textView.smartInsertDeleteType = .no
         textView.backgroundColor = .clear
-        textView.textContainerInset = UIEdgeInsets(top: 8, left: 4, bottom: 8, right: 4)
+        // Left inset matches FrontmatterView's leading padding so body text (and its placeholder)
+        // line up with the filename/tags header above it.
+        textView.textContainerInset = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 4)
         textView.onWikilinkTapped = onWikilinkTapped
         textView.notesDirectoryURL = notesDirectoryURL
         textView.delegate = context.coordinator
@@ -181,6 +183,7 @@ private extension UITextView {
 private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
     var onWikilinkTapped: ((String) -> Void)?
     var notesDirectoryURL: URL?
+    private let placeholderText = String(localized: "Start writing…")
     var codeBlockRanges: [NSRange] = [] {
         didSet { setNeedsDisplay() }
     }
@@ -234,7 +237,26 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
     /// `.clear`) is painted independently before this method runs.
     override func draw(_ rect: CGRect) {
         drawCodeBlockBackgrounds(in: rect)
+        if (text ?? "").isEmpty {
+            drawPlaceholder()
+        }
         super.draw(rect)
+    }
+
+    /// Drawn directly rather than via an overlay subview so it reflows with `textContainerInset`
+    /// (which already reserves space for the header) for free, like the rest of the content.
+    private func drawPlaceholder() {
+        let placeholderFont = font ?? .monospacedSystemFont(ofSize: UIFont.systemFontSize, weight: .regular)
+        let rect = CGRect(
+            x: textContainerInset.left + 4,
+            y: textContainerInset.top,
+            width: bounds.width - textContainerInset.left - textContainerInset.right - 8,
+            height: placeholderFont.pointSize * 1.4
+        )
+        (placeholderText as NSString).draw(in: rect, withAttributes: [
+            .font: placeholderFont,
+            .foregroundColor: UIColor.placeholderText
+        ])
     }
 
     private func drawCodeBlockBackgrounds(in rect: CGRect) {

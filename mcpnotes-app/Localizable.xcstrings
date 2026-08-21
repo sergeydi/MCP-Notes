@@ -2168,6 +2168,29 @@
         }
       }
     },
+    "Start writing…": {
+      "comment": "Placeholder shown in the note editor body when it is empty",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start writing…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Начните писать…"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Почніть писати…"
+          }
+        }
+      }
+    },
     "Storage": {
       "comment": "Settings tab label for storage / file system options",
       "localizations": {
