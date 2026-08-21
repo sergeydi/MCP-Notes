@@ -31,8 +31,11 @@ struct MarkdownTextViewRepresentable: UIViewRepresentable {
         textView.smartInsertDeleteType = .no
         textView.backgroundColor = .clear
         // Left inset matches FrontmatterView's leading padding so body text (and its placeholder)
-        // line up with the filename/tags header above it.
+        // line up with the filename/tags header above it. Zero out the container's own
+        // lineFragmentPadding (5pt by default) — otherwise it stacks on top of the inset and
+        // shifts glyphs further right than the header.
         textView.textContainerInset = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 4)
+        textView.textContainer.lineFragmentPadding = 0
         textView.onWikilinkTapped = onWikilinkTapped
         textView.notesDirectoryURL = notesDirectoryURL
         textView.delegate = context.coordinator
@@ -134,6 +137,7 @@ struct MarkdownTextViewRepresentable: UIViewRepresentable {
         ])
         context.coordinator.headerHostingController = headerHostingController
         textView.headerHostingView = headerHostingController.view
+        textView.updatePlaceholderVisibility()
 
         return textView
     }
@@ -155,6 +159,7 @@ struct MarkdownTextViewRepresentable: UIViewRepresentable {
         )
         context.coordinator.isUpdatingFromSwiftUI = false
         context.coordinator.refreshHighlighting()
+        (textView as? MarkdownTextView)?.updatePlaceholderVisibility()
     }
 }
 
@@ -192,12 +197,79 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
     private var copyButtons: [UIButton] = []
     private var lastLayoutWidth: CGFloat = 0
 
-    /// Weak ref to the hosted frontmatter header's view; its Auto Layout–driven height is read
-    /// on every layout pass (not gated on width change, since header height changes independent
-    /// of width — e.g. entering filename-edit mode) to keep `headerHeight` in sync.
-    weak var headerHostingView: UIView?
+    /// Weak ref to the hosted frontmatter header's view; assigning it pins `placeholderLabel`
+    /// directly below it via Auto Layout, and its height is also read on every layout pass (not
+    /// gated on width change, since header height changes independent of width — e.g. entering
+    /// filename-edit mode) to keep `headerHeight`/`textContainerInset` in sync for text layout.
+    weak var headerHostingView: UIView? {
+        didSet {
+            placeholderTopConstraint?.isActive = false
+            guard let headerHostingView else { return }
+            let constraint = placeholderLabel.topAnchor.constraint(
+                equalTo: headerHostingView.bottomAnchor, constant: baseTopInset
+            )
+            constraint.isActive = true
+            placeholderTopConstraint = constraint
+        }
+    }
     private var headerHeight: CGFloat = 0
     private let baseTopInset: CGFloat = 8
+
+    /// A real subview (unlike the old manual `draw(_:)` text) whose position is pinned via Auto
+    /// Layout to the hosted header's bottom, so it reflows for free whenever the header resizes
+    /// (filename-edit mode, tag wrapping, …) instead of needing hand-rolled `setNeedsDisplay()`
+    /// calls kept in sync with every place `textContainerInset`/the header height can change.
+    private lazy var placeholderLabel: UILabel = {
+        let label = UILabel()
+        label.text = placeholderText
+        label.font = .monospacedSystemFont(ofSize: UIFont.systemFontSize, weight: .regular)
+        label.textColor = .placeholderText
+        label.numberOfLines = 0
+        label.isUserInteractionEnabled = false
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: frameLayoutGuide.leadingAnchor, constant: textContainerInset.left),
+            label.trailingAnchor.constraint(equalTo: frameLayoutGuide.trailingAnchor, constant: -textContainerInset.right - 4)
+        ])
+        return label
+    }()
+    private var placeholderTopConstraint: NSLayoutConstraint?
+
+    /// Shown only once fully at rest (not editing, keyboard fully dismissed) — driven by explicit
+    /// calls to `updatePlaceholderVisibility()` from the coordinator's delegate methods and the
+    /// keyboard notifications below, rather than checked mid-transition, so it never has to
+    /// reposition itself while the keyboard is still animating.
+    private var isKeyboardVisible = false
+    private var keyboardObservers: [NSObjectProtocol] = []
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        keyboardObservers.forEach(NotificationCenter.default.removeObserver)
+        keyboardObservers.removeAll()
+        guard window != nil else { return }
+        let center = NotificationCenter.default
+        keyboardObservers.append(center.addObserver(
+            forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.isKeyboardVisible = true
+            self?.updatePlaceholderVisibility()
+        })
+        keyboardObservers.append(center.addObserver(
+            forName: UIResponder.keyboardDidHideNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.isKeyboardVisible = false
+            self?.updatePlaceholderVisibility()
+        })
+    }
+
+    deinit {
+        keyboardObservers.forEach(NotificationCenter.default.removeObserver)
+    }
+
+    func updatePlaceholderVisibility() {
+        placeholderLabel.isHidden = !(text ?? "").isEmpty || isFirstResponder || isKeyboardVisible
+    }
 
     override func layoutSubviews() {
         super.layoutSubviews()
@@ -227,6 +299,7 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
         var inset = textContainerInset
         inset.top = baseTopInset + headerHeight
         textContainerInset = inset
+        setNeedsDisplay()
     }
 
     // MARK: Code block background
@@ -237,26 +310,7 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
     /// `.clear`) is painted independently before this method runs.
     override func draw(_ rect: CGRect) {
         drawCodeBlockBackgrounds(in: rect)
-        if (text ?? "").isEmpty {
-            drawPlaceholder()
-        }
         super.draw(rect)
-    }
-
-    /// Drawn directly rather than via an overlay subview so it reflows with `textContainerInset`
-    /// (which already reserves space for the header) for free, like the rest of the content.
-    private func drawPlaceholder() {
-        let placeholderFont = font ?? .monospacedSystemFont(ofSize: UIFont.systemFontSize, weight: .regular)
-        let rect = CGRect(
-            x: textContainerInset.left + 4,
-            y: textContainerInset.top,
-            width: bounds.width - textContainerInset.left - textContainerInset.right - 8,
-            height: placeholderFont.pointSize * 1.4
-        )
-        (placeholderText as NSString).draw(in: rect, withAttributes: [
-            .font: placeholderFont,
-            .foregroundColor: UIColor.placeholderText
-        ])
     }
 
     private func drawCodeBlockBackgrounds(in rect: CGRect) {
@@ -670,6 +724,7 @@ extension MarkdownTextViewRepresentable {
         }
 
         func textViewDidChange(_ textView: UITextView) {
+            (textView as? MarkdownTextView)?.updatePlaceholderVisibility()
             guard !isUpdatingFromSwiftUI, !isRenumbering else { return }
             isRenumbering = true
             (textView as? MarkdownTextView)?.renumberAllLists()
@@ -697,6 +752,16 @@ extension MarkdownTextViewRepresentable {
         /// auto-scrolls to keep the caret visible above the keyboard. Force a full repaint here.
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             (textView as? MarkdownTextView)?.setNeedsDisplay()
+        }
+
+        /// The placeholder is only shown while not first responder (see `updatePlaceholderVisibility()`),
+        /// so becoming / resigning first responder must update it right away.
+        func textViewDidBeginEditing(_ textView: UITextView) {
+            (textView as? MarkdownTextView)?.updatePlaceholderVisibility()
+        }
+
+        func textViewDidEndEditing(_ textView: UITextView) {
+            (textView as? MarkdownTextView)?.updatePlaceholderVisibility()
         }
     }
 }
