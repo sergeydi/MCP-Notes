@@ -18,6 +18,7 @@ struct FilenameEditorView: View {
     private var hasConflict: Bool {
         validation == .valid && otherFilenames.contains { $0.lowercased() == trimmed.lowercased() }
     }
+    private var isEmpty: Bool { validation == .empty }
     private var canApply: Bool { validation == .valid && !hasConflict && trimmed != filename }
     private var isIdle: Bool { !isRenamingInProgress && wikilinkRenameCount == nil }
     @FocusState private var isFilenameFocused: Bool
@@ -48,7 +49,7 @@ struct FilenameEditorView: View {
                     selectAll()
                 }
                 .overlay(alignment: .bottom) {
-                    if hasConflict {
+                    if hasConflict || isEmpty {
                         Rectangle()
                             .fill(Color.red)
                             .frame(height: 1.5)

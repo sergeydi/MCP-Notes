@@ -222,7 +222,8 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
     private lazy var placeholderLabel: UILabel = {
         let label = UILabel()
         label.text = placeholderText
-        label.font = .monospacedSystemFont(ofSize: UIFont.systemFontSize, weight: .regular)
+        // Matches the size of the tags field placeholder (FrontmatterView applies .callout to it).
+        label.font = .monospacedSystemFont(ofSize: UIFont.preferredFont(forTextStyle: .callout).pointSize, weight: .regular)
         label.textColor = .placeholderText
         label.numberOfLines = 0
         label.isUserInteractionEnabled = false
