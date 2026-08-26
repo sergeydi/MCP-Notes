@@ -70,23 +70,6 @@ struct SidebarView: View {
                     .accessibilityLabel(m.label)
                     Spacer(minLength: 0)
                 }
-#if os(macOS)
-                Divider()
-                    .frame(height: 18)
-                Spacer(minLength: 0)
-                Button {
-                    openWindow(id: "wikilink-graph")
-                } label: {
-                    Image(systemName: "point.3.connected.trianglepath.dotted")
-                        .font(.system(size: 13, weight: .regular))
-                        .frame(width: 28, height: 28)
-                        .foregroundStyle(Color.secondary)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("Show Wikilink Graph")
-                Spacer(minLength: 0)
-#endif
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -431,6 +414,15 @@ struct SidebarView: View {
                     }
             }
             .accessibilityLabel("Open settings")
+        }
+
+        ToolbarItem {
+            Button {
+                openWindow(id: "wikilink-graph")
+            } label: {
+                Image(systemName: "point.3.connected.trianglepath.dotted")
+            }
+            .help("Show Wikilink Graph")
         }
 #endif
     }
