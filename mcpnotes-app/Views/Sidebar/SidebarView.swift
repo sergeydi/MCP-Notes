@@ -31,81 +31,22 @@ struct SidebarView: View {
             return store.notes
         case .favorites:
             return store.bookmarkedNotes
-        case .search:
-            guard !searchText.isEmpty else { return [] }
-            if ragEnabled && isRAGReady && !semanticResults.isEmpty {
-                return semanticResults.compactMap { r in store.notes.first { $0.id == r.id } }
-            }
-            let q = searchText.lowercased()
-            return store.notes.filter {
-                $0.filename.lowercased().contains(q) ||
-                $0.body.lowercased().contains(q) ||
-                $0.tags.contains { $0.lowercased().contains(q) }
-            }
         }
     }
 
     var body: some View {
         @Bindable var store = store
 
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
-                ForEach(SidebarMode.allCases, id: \.self) { m in
-                    Button {
-                        mode = m
-                    } label: {
-                        Image(systemName: m.symbolName)
-                            .font(.system(size: 13, weight: .regular))
-                            .frame(width: 36, height: 36)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(mode == m ? Color.accentColor : Color.clear)
-                            )
-                            .foregroundStyle(mode == m ? Color.white : Color.secondary)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help(m.label)
-                    .accessibilityLabel(m.label)
-                    Spacer(minLength: 0)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-
-            Divider()
-
-            if mode == .search {
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField("Search", text: $searchText)
-                        .textFieldStyle(.plain)
-                    if !searchText.isEmpty {
-                        Button {
-                            searchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                Divider()
-            }
-
             ScrollViewReader { proxy in
                 List(selection: $store.selectedNoteID) {
-                    if mode == .byTag {
+                    if !searchText.isEmpty {
+                        textSearchContent
+                    } else if mode == .byTag {
                         tagGroupedContent
                     } else {
                         flatContent
                     }
                 }
-                .padding(.top, 8)
 #if os(macOS)
                 .environment(\.controlActiveState, .active)
 #endif
@@ -122,17 +63,8 @@ struct SidebarView: View {
                     }
                 }
             }
-        }
-        .navigationSplitViewColumnWidth(min: 350, ideal: 350)
         .navigationTitle("MCP Notes")
-        .onChange(of: searchText) { triggerSemanticSearch() }
-        .onChange(of: mode) {
-            if mode != .search {
-                searchText = ""
-                semanticResults = []
-                searchTask?.cancel()
-            }
-        }
+        .searchable(text: $searchText, placement: .sidebar, prompt: "Search")
         .toolbar { sidebarToolbar }
     }
 
@@ -204,21 +136,17 @@ struct SidebarView: View {
 
     @ViewBuilder
     private var flatContent: some View {
-        if mode == .search && !searchText.isEmpty {
-            textSearchContent
-        } else {
-            let ids = visibleNotes.map(\.id)
-            ForEach(visibleNotes) { note in
-                let edges = rowSeparatorEdges(for: note.id, in: ids)
-                NoteListItemView(note: note, isSelected: isRowSelected(note.id))
-                    .tag(note.id)
-                    .listRowSeparator(edges.top, edges: .top)
-                    .listRowSeparator(edges.bottom, edges: .bottom)
-                    .listRowBackground(rowBackground(for: note.id))
-            }
-            .onDelete { offsets in
-                offsets.forEach { store.deleteNote(visibleNotes[$0]) }
-            }
+        let ids = visibleNotes.map(\.id)
+        ForEach(visibleNotes) { note in
+            let edges = rowSeparatorEdges(for: note.id, in: ids)
+            NoteListItemView(note: note, isSelected: isRowSelected(note.id))
+                .tag(note.id)
+                .listRowSeparator(edges.top, edges: .top)
+                .listRowSeparator(edges.bottom, edges: .bottom)
+                .listRowBackground(rowBackground(for: note.id))
+        }
+        .onDelete { offsets in
+            offsets.forEach { store.deleteNote(visibleNotes[$0]) }
         }
     }
 
@@ -289,86 +217,63 @@ struct SidebarView: View {
         }
     }
 
+    private func tagDisclosureBinding(for tag: String) -> Binding<Bool> {
+        Binding(
+            get: { expandedTags.contains(tag) },
+            set: { isExpanded in
+                if isExpanded { expandedTags.insert(tag) }
+                else { expandedTags.remove(tag) }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func tagDisclosureLabel(_ title: String, count: Int) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
+            Spacer()
+            Text("\(count)")
+                .foregroundStyle(.tertiary)
+                .font(.caption)
+        }
+    }
+
     @ViewBuilder
     private var tagGroupedContent: some View {
         let untagged = store.notes.filter { $0.tags.isEmpty }
 
         ForEach(store.allTags, id: \.self) { tag in
             let tagNotes = store.notes.filter { $0.tags.contains(tag) }
-            let isExpanded = expandedTags.contains(tag)
-            Section {
-                if isExpanded {
-                    let ids = tagNotes.map(\.id)
-                    ForEach(tagNotes) { note in
-                        let edges = rowSeparatorEdges(for: note.id, in: ids)
-                        NoteListItemView(note: note, isSelected: isRowSelected(note.id))
-                            .tag(note.id)
-                            .listRowSeparator(edges.top, edges: .top)
-                            .listRowSeparator(edges.bottom, edges: .bottom)
-                            .listRowBackground(rowBackground(for: note.id))
-                    }
+            let ids = tagNotes.map(\.id)
+            DisclosureGroup(isExpanded: tagDisclosureBinding(for: tag)) {
+                ForEach(tagNotes) { note in
+                    let edges = rowSeparatorEdges(for: note.id, in: ids)
+                    NoteListItemView(note: note, isSelected: isRowSelected(note.id))
+                        .tag(note.id)
+                        .listRowSeparator(edges.top, edges: .top)
+                        .listRowSeparator(edges.bottom, edges: .bottom)
+                        .listRowBackground(rowBackground(for: note.id))
                 }
-            } header: {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        if isExpanded { expandedTags.remove(tag) }
-                        else { expandedTags.insert(tag) }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                        Text(tag)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Text("\(tagNotes.count)")
-                            .foregroundStyle(.tertiary)
-                            .font(.caption)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+            } label: {
+                tagDisclosureLabel(tag, count: tagNotes.count)
             }
         }
 
         if !untagged.isEmpty {
-            Section {
-                if noTagsExpanded {
-                    let ids = untagged.map(\.id)
-                    ForEach(untagged) { note in
-                        let edges = rowSeparatorEdges(for: note.id, in: ids)
-                        NoteListItemView(note: note, isSelected: isRowSelected(note.id))
-                            .tag(note.id)
-                            .listRowSeparator(edges.top, edges: .top)
-                            .listRowSeparator(edges.bottom, edges: .bottom)
-                            .listRowBackground(rowBackground(for: note.id))
-                    }
+            let ids = untagged.map(\.id)
+            DisclosureGroup(isExpanded: $noTagsExpanded) {
+                ForEach(untagged) { note in
+                    let edges = rowSeparatorEdges(for: note.id, in: ids)
+                    NoteListItemView(note: note, isSelected: isRowSelected(note.id))
+                        .tag(note.id)
+                        .listRowSeparator(edges.top, edges: .top)
+                        .listRowSeparator(edges.bottom, edges: .bottom)
+                        .listRowBackground(rowBackground(for: note.id))
                 }
-            } header: {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        noTagsExpanded.toggle()
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .rotationEffect(.degrees(noTagsExpanded ? 90 : 0))
-                        Text("No Tags")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Text("\(untagged.count)")
-                            .foregroundStyle(.tertiary)
-                            .font(.caption)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+            } label: {
+                tagDisclosureLabel("No Tags", count: untagged.count)
             }
         }
     }
@@ -396,6 +301,22 @@ struct SidebarView: View {
         }
 
         ToolbarItem {
+            Menu {
+                ForEach(SidebarMode.allCases, id: \.self) { m in
+                    Button {
+                        mode = m
+                    } label: {
+                        Label(m.label, systemImage: m.symbolName)
+                    }
+                }
+            } label: {
+                Image(systemName: mode.symbolName)
+            }
+            .help(mode.label)
+            .accessibilityLabel(mode.label)
+        }
+
+        ToolbarItem {
             Button("New Note", systemImage: "square.and.pencil") {
                 Task { await store.createNote() }
             }
@@ -403,6 +324,8 @@ struct SidebarView: View {
         }
 
 #if os(macOS)
+        ToolbarSpacer(.fixed)
+
         ToolbarItem {
             SettingsLink {
                 Image(systemName: "gear")
