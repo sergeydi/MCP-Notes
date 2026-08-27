@@ -7,6 +7,9 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             SidebarView()
+#if os(macOS)
+                .navigationSplitViewColumnWidth(min: 350, ideal: 370)
+#endif
         } detail: {
             if let note = store.selectedNote {
                 NoteEditorView(note: note)
