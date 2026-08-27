@@ -63,7 +63,7 @@ struct SidebarView: View {
                     }
                 }
             }
-        .navigationTitle("MCP Notes")
+        .navigationTitle(mode.navigationTitle)
         .searchable(text: $searchText, placement: .sidebar, prompt: "Search")
         .toolbar { sidebarToolbar }
     }

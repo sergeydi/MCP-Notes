@@ -21,4 +21,12 @@ public enum SidebarMode: Int, CaseIterable, Hashable {
         case .favorites: "Favorites"
         }
     }
+
+    public var navigationTitle: LocalizedStringKey {
+        switch self {
+        case .all:       "Notes"
+        case .byTag:     "Tags"
+        case .favorites: "Favorite"
+        }
+    }
 }
