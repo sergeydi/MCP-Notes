@@ -2,7 +2,7 @@
 
 ## Build & Test
 
-Open `mcpnotes-mac.xcodeproj` in Xcode 26+. All commands below use `xcodebuild`. `mcpnotes-app` targets both macOS and iOS (iPad only — see [iOS (iPad) support](#ios-ipad-support)); `mcpnotes-server`/`mcpnotes-embeddings` remain macOS-only.
+Open `mcpnotes-mac.xcodeproj` in Xcode 26+. All commands below use `xcodebuild`. `mcpnotes-app` targets both macOS and iOS (iPhone and iPad — see [iOS support](#ios-support)); `mcpnotes-server`/`mcpnotes-embeddings` remain macOS-only.
 
 > **File system sync**: the project uses `PBXFileSystemSynchronizedRootGroup` (Xcode 16+). Any new Swift file placed inside a target's source folder is automatically included in the build for **both** macOS and iOS — no changes to `project.pbxproj` needed, *unless* the file must be excluded from one platform (see the platform-filter pattern below).
 
@@ -10,13 +10,13 @@ Open `mcpnotes-mac.xcodeproj` in Xcode 26+. All commands below use `xcodebuild`.
 # Build main app (macOS)
 xcodebuild -project mcpnotes-mac.xcodeproj -scheme mcpnotes-app -destination 'platform=macOS' build
 
-# Build main app (iOS Simulator — iPad only)
+# Build main app (iOS Simulator — universal, runs on iPhone and iPad)
 xcodebuild -project mcpnotes-mac.xcodeproj -scheme mcpnotes-app -destination 'generic/platform=iOS Simulator' build
 
 # Run unit tests (Swift Testing) — macOS
 xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-appTests -destination 'platform=macOS'
 
-# Run unit tests — iPad Simulator
+# Run unit tests — iOS Simulator (any iPhone/iPad destination works; iPad shown here)
 xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-appTests -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M4)'
 
 # Run MCP server tests
@@ -29,8 +29,8 @@ xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-appTests \
 # Run UI tests
 xcodebuild test -project mcpnotes-mac.xcodeproj -scheme mcpnotes-appUITests -destination 'platform=macOS'
 
-# Install + launch on a connected physical iPad
-# 1. List paired devices — if more than one iPad shows up, ask the user which one (don't guess)
+# Install + launch on a connected physical iPhone or iPad
+# 1. List paired devices — if more than one iOS device shows up, ask the user which one (don't guess)
 xcrun devicectl list devices
 # 2. Build for that specific device (not generic/platform=iOS — a concrete id signs with the right provisioning profile)
 xcodebuild -project mcpnotes-mac.xcodeproj -scheme mcpnotes-app -destination 'id=<device-id>' build
@@ -51,7 +51,7 @@ MVVM with strict layer separation: **Views → ViewModels → Models/Services**.
 
 The project has three main code targets:
 
-- **`mcpnotes-app`** — main SwiftUI app (target/module name `mcpnotes_app`), builds for **macOS and iOS (iPad only)**. Contains everything: `Note`, `SidebarMode`, `FileServicing` protocol, `FrontmatterParser`, markdown utilities (`MarkdownToken`, `MarkdownPatterns`, `MarkdownListContinuation`), `NoteFilenameValidator`, `EditorViewModel`, `NoteStore`, `FileService`, `NoteIndexer`/`NoteIndexing`/`IndexDatabase`, `MarkdownHighlighter`, `MarkdownTextView`, all Views. There is no separate shared framework — everything lives in this one target. See [iOS (iPad) support](#ios-ipad-support) for what's macOS-only.
+- **`mcpnotes-app`** — main SwiftUI app (target/module name `mcpnotes_app`), builds for **macOS and iOS (iPhone and iPad)**. Contains everything: `Note`, `SidebarMode`, `FileServicing` protocol, `FrontmatterParser`, markdown utilities (`MarkdownToken`, `MarkdownPatterns`, `MarkdownListContinuation`), `NoteFilenameValidator`, `EditorViewModel`, `NoteStore`, `FileService`, `NoteIndexer`/`NoteIndexing`/`IndexDatabase`, `MarkdownHighlighter`, `MarkdownTextView`, all Views. There is no separate shared framework — everything lives in this one target. See [iOS support](#ios-support) for what's macOS-only.
 - **`mcpnotes-embeddings`** — XPC Service. Runs in a separate process inside `Contents/XPCServices/`. Loads multilingual-e5-small via the `Embeddings` package and exposes `EmbeddingXPCProtocol`. The main app connects on first embed call and disconnects after 60 s of idle (`exit(0)` on invalidation), so CoreML/Metal memory is fully released by the OS between indexing sessions.
 - **`mcpnotes-server`** — MCP server executable. Does **not** depend on `mcpnotes-app`; it bundles its own private copies of `Note` and `FrontmatterParser`.
 
@@ -64,9 +64,11 @@ ContentView (NavigationSplitView)
 ├── SidebarView           ← reads NoteStore, drives selectedNoteID
 │   └── NoteListItemView  ← single row in note list
 └── NoteEditorView        ← owns EditorViewModel, writes to NoteStore on autosave
-    ├── FrontmatterView   ← editable filename (rename + wikilink cascade), editable tags, read-only uid
-    │   └── TagsEditorView
     └── MarkdownEditorView
+        └── MarkdownTextViewRepresentable  ← hosts FrontmatterView as a header (see below)
+            └── FrontmatterView   ← editable filename (rename + wikilink cascade), editable tags, read-only uid
+                ├── FilenameEditorView ← platform-split (+macOS/+iOS)
+                └── TagsEditorView
 
 SettingsView (macOS only) ← opened as a separate window (openWindow)
 ├── RAGSettingsView      ← RAG toggle + indexer status (Views/Settings/RAGSettingsView.swift)
@@ -80,14 +82,17 @@ WikilinkGraphView (macOS only) ← separate Window scene ("wikilink-graph")
     └── GraphSKScene     ← force-directed graph simulation (repulsion + spring + damping)
 ```
 
-### iOS (iPad) support
+`FrontmatterView` is not a sibling pane next to the markdown body — it's passed into `MarkdownEditorView`/`MarkdownTextViewRepresentable` as a `header: FrontmatterView` parameter and hosted as an `NSHostingView`/`UIHostingView` subview *inside* the text view's document (pinned to its top/leading/width edges). The text container reserves space for it via an exclusion path (`headerHeight`, updated live off the hosting view's frame-change notifications), so the filename/tags header scrolls together with the note body in a single `NSTextView`/`UITextView` scroll view rather than as a separate SwiftUI view above it.
 
-`mcpnotes-app` builds for iOS too (`SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx"`, `TARGETED_DEVICE_FAMILY = 2` — iPad only, no iPhone). RAG, Embeddings, MCP config, the Settings window, and the Wikilink Graph window are all **macOS-only**; iOS search is title/content match only (no semantic "Related" section — there's no UI to ever enable `ragEnabled` on iOS, so it never activates).
+### iOS support
 
-**Platform filtering** is done per-file via `PBXFileSystemSynchronizedBuildFileExceptionSet.platformFiltersByRelativePath` in `project.pbxproj` (`(macos, )` or `(ios, )`), *not* `#if os()` — this keeps the excluded files out of the other platform's build entirely rather than compiling them to nothing. Currently macOS-only: `NoteIndexer/{EmbeddingXPCProtocol,IndexDatabase,NoteEmbedding,NoteIndexer,XPCNoteEmbedder}.swift`, all of `Views/Settings/`, all of `Views/WikilinkGraph/`, `Views/Editor/MarkdownTextViewRepresentable+macOS.swift`. iOS-only: `Views/Editor/MarkdownTextViewRepresentable+iOS.swift`. The same exception mechanism is applied to the `mcpnotes-appTests` target for the indexer/embedding test suites that need the real `NoteIndexer`/`MockNoteEmbedder`.
+`mcpnotes-app` builds for iOS too (`SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx"`, `TARGETED_DEVICE_FAMILY = "1,2"` — iPhone and iPad). There is no iPhone/iPad idiom branching anywhere yet (no `userInterfaceIdiom`/`horizontalSizeClass` usage) — the same iOS layout runs on both, so a phone-specific compact layout is a known gap to watch for as usage grows. RAG, Embeddings, MCP config, the Settings window, and the Wikilink Graph window are all **macOS-only**; iOS search is title/content match only (no semantic "Related" section — there's no UI to ever enable `ragEnabled` on iOS, so it never activates).
+
+**Platform filtering** is done per-file via `PBXFileSystemSynchronizedBuildFileExceptionSet.platformFiltersByRelativePath` in `project.pbxproj` (`(macos, )` or `(ios, )`), *not* `#if os()` — this keeps the excluded files out of the other platform's build entirely rather than compiling them to nothing. Currently macOS-only: `NoteIndexer/{EmbeddingXPCProtocol,IndexDatabase,NoteEmbedding,NoteIndexer,XPCNoteEmbedder}.swift`, all of `Views/Settings/`, all of `Views/WikilinkGraph/`, `Views/Editor/MarkdownTextViewRepresentable+macOS.swift`, `Views/Editor/FilenameEditorView+macOS.swift`. iOS-only: `Views/Editor/MarkdownTextViewRepresentable+iOS.swift`, `Views/Editor/FilenameEditorView+iOS.swift`. The same exception mechanism is applied to the `mcpnotes-appTests` target for the indexer/embedding test suites that need the real `NoteIndexer`/`MockNoteEmbedder`.
 
 - **`NoOpNoteIndexer`** (`NoteIndexer/NoOpNoteIndexer.swift`, unfiltered — compiles on both platforms) — no-op `NoteIndexing` actor used on iOS in place of the real `NoteIndexer` (constructed conditionally with `#if os(macOS)` in `mcpnotes_App.swift` / `ContentView.swift`'s `#Preview`).
-- **`MarkdownTextViewRepresentable`** — two independent implementations sharing the same struct name/public interface (`text`, `onTextChanged`, `onWikilinkTapped`, `notesDirectoryURL`, `formatProxy`) so `MarkdownEditorView` doesn't need to know which platform it's on: `+macOS.swift` (`NSTextView`, full feature set) and `+iOS.swift` (`UITextView` MVP — syntax highlighting, wikilink/link tap, list auto-continuation/renumbering, toolbar formatting; **no** pasted-image insertion/inline preview or code-block copy button yet). `MarkdownHighlighter` is genuinely cross-platform (AppKit/UIKit typealiases + a `UIColor` extension shimming the AppKit semantic color names).
+- **`MarkdownTextViewRepresentable`** — two independent implementations sharing the same struct name/public interface (`text`, `onTextChanged`, `onWikilinkTapped`, `notesDirectoryURL`, `formatProxy`, `header: FrontmatterView`) so `MarkdownEditorView` doesn't need to know which platform it's on: `+macOS.swift` (`NSTextView`) and `+iOS.swift` (`UITextView`) — both now at full feature parity: syntax highlighting, wikilink/link tap navigation, list auto-continuation/renumbering, toolbar formatting, pasted-image insertion, inline `![[filename]]` embed preview, and a code-block copy button. `MarkdownHighlighter` is genuinely cross-platform (AppKit/UIKit typealiases + a `UIColor` extension shimming the AppKit semantic color names).
+- **`FilenameEditorView`** — same pattern: two independent implementations sharing the struct name/public interface (`filename`, `draftFilename`, `isEditingFilename`, `isRenamingInProgress`, `wikilinkRenameCount`, `otherFilenames`, `onApplyRename`), used by `FrontmatterView` on both platforms. Both start editing as soon as the cursor is placed in the field (no separate edit button). `+macOS.swift`: Enter applies the rename, Escape or losing focus without Enter reverts the draft. `+iOS.swift`: touch-first — 44pt-minimum Cancel/Apply tap targets (no hardware Escape to rely on) instead of a keyboard shortcut, and the whole filename is selected on focus so retyping doesn't require manual deletion.
 - **Entitlements**: `mcpnotes-app-iOS.entitlements` (iCloud keys only) is used on iOS via `CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]`/`[sdk=iphonesimulator*]`; macOS keeps the existing `mcpnotes-app-macOS.entitlements` (App Sandbox, Apple Events automation, etc. — none of which apply to iOS).
 - **Frameworks**: `Embeddings`/`MCP`/`MLTensorUtils`/`USearch` are excluded from the iOS link via `platformFilters = (macos, );` on their `PBXBuildFile` entries in the Frameworks build phase — confirmed with `otool -L` that they're absent from the iOS binary.
 - **Fixed gap**: the embedded `mcpnotes-embeddings.xpc` (Copy Files build phase) and the `mcpnotes-server` executable (Copy Server Executable build phase) used to get copied into iOS app bundles regardless of platform, which App Store Connect rejected on upload ("Unexpected CFBundleExecutable Key... does not contain a bundle executable"). Fixed by adding `platformFilters = (macos, );` to **both** the `PBXBuildFile` entry in each Copy Files phase *and* the corresponding `PBXTargetDependency` (`mcpnotes-embeddings`/`mcpnotes-server` target dependencies on `mcpnotes-app`) — filtering only one of the two isn't enough, since the build file filter alone still leaves the dependency forcing the macOS-only target to build. Verified via `xcodebuild ... -destination 'generic/platform=iOS Simulator'` that the built `.app` has no `XPCServices` folder and no `mcpnotes-server` binary, and via `-destination 'platform=macOS'` that both are still embedded correctly there.
@@ -127,7 +132,7 @@ Markdown body…
 | Type | Role |
 |---|---|
 | `NoteStore` | `@Observable` class in `mcpnotes-app`. Indexing uses `noteIndexQueue` processed by `indexWorkerTask` via `enqueueNotes(_:)` — no concurrent `indexAll`, progressive indexing; `createNote`/`updateNote`/`renameNote` call `indexNote` directly. Browser-style navigation: `canNavigateBack`/`canNavigateForward`. External changes via `scheduleExternalReload`/`reloadExternalChanges`. |
-| `SidebarMode` | `enum` in `mcpnotes-app`. In `.search` mode results split into: **Title** (filename match), **Content** (body/tag match), **Related** (RAG semantic matches with score %). |
+| `SidebarMode` | `enum` in `mcpnotes-app`: `.all`, `.byTag`, `.favorites` (`symbolName`, `label`, `navigationTitle` per case), switched via a toolbar `Menu` in `SidebarView`. Search is **not** a mode — it's native `.searchable(text:)` state (`searchText`) layered on top, independent of `mode`; whenever `searchText` is non-empty, `SidebarView` shows results split into **Title** (filename match), **Content** (body/tag match), **Related** (RAG semantic matches with score %) instead of the selected mode's content. |
 | `EditorViewModel` | `@Observable` class in `mcpnotes-app`. One instance per `NoteEditorView`. Owns autosave `Task`. |
 | `FileService` | `struct` in `mcpnotes-app` conforming to `FileServicing`. Uses iCloud Drive, security-scoped bookmarks for custom directories, falls back to Application Support. |
 | `NoteFilenameValidator` | `struct` in `mcpnotes-app`. Allowlist: Unicode letters, digits, space, hyphen, underscore, period. `maxLength = 200`. Returns `ValidationResult`: `.valid`, `.empty`, `.tooLong`, `.forbiddenCharacter`. |
@@ -138,9 +143,10 @@ Markdown body…
 | `IndexDatabase` | **macOS-only.** Private SQLite wrapper. Tables: chunk→key mappings, MD5 hashes, FTS5 full-text, tag index, note metadata, `pending_removes`. Used only by `NoteIndexer`. |
 | `GraphSKView` | **macOS-only.** `SKView` subclass. Observes `NSWindow.didChangeOcclusionStateNotification` to restart SpriteKit's display link on reopen (SpriteKit stops it without going through `isPaused`). |
 | `GraphSKScene` | **macOS-only.** `SKScene` subclass. Force-directed: O(n²) repulsion, spring edges, center gravity, `simAlpha` damping. |
-| `NoteListItemView` | Sidebar row (shared, macOS + iOS). `searchQuery: String?` — replaces body preview with ±40-char snippet, match bolded, via `MarkdownPatterns.stripMarkdown`. `score: Float?` — semantic similarity % (RAG results, macOS only — never populated on iOS). |
+| `NoteListItemView` | Sidebar row (shared, macOS + iOS). `searchQuery: String?` — replaces body preview with ±40-char snippet, match bolded, via `MarkdownPatterns.stripMarkdown`. `score: Float?` — semantic similarity % (RAG results, macOS only — never populated on iOS). `isSelected: Bool` — `SidebarView` paints this itself on iOS only (native inset-List selection tint is a dull gray there); macOS relies on the native accent-colored row selection instead. |
+| `FilenameEditorView` | Platform-split (`+macOS.swift`/`+iOS.swift`), used by `FrontmatterView`. See [iOS support](#ios-support). |
 | `MarkdownHighlighter` | Cross-platform `struct` (AppKit/UIKit typealiases + a `UIColor` extension shimming AppKit's semantic color names and `.traitItalic`/`.italic` symbolic-trait naming). Applies TextKit 2 attributes for CommonMark + GFM; used by both `MarkdownTextViewRepresentable+macOS.swift` and `+iOS.swift`. |
-| `MarkdownTextView` | Two platform-specific subclasses sharing the name (mutually exclusive via platform-filtered files): `NSTextView` in `MarkdownTextViewRepresentable+macOS.swift` (pointing-hand cursor; single-click `[[wikilink]]`/`[text](url)` navigation; list auto-continuation on Enter; numbered list renumbering; image paste → saves file, inserts `![](filename)`; code-block copy button) and `UITextView` in `+iOS.swift` (tap navigation via `UITapGestureRecognizer`; list auto-continuation/renumbering; **no** image paste or copy button yet). |
+| `MarkdownTextView` | Two platform-specific subclasses sharing the name (mutually exclusive via platform-filtered files), both hosting `FrontmatterView` as a scrolling header (see Data flow above): `NSTextView` in `MarkdownTextViewRepresentable+macOS.swift` (pointing-hand cursor; single-click `[[wikilink]]`/`[text](url)` navigation; list auto-continuation on Enter; numbered list renumbering; image paste → saves file, inserts `![](filename)`; code-block copy button) and `UITextView` in `+iOS.swift` (tap navigation via `UITapGestureRecognizer`; list auto-continuation/renumbering; image paste; code-block copy button). |
 | `TextFormatProxy` | Routes toolbar formatting to the active text view without coupling `NoteEditorView` to `MarkdownTextViewRepresentable`. Plain closure-holder, no AppKit/UIKit types itself — both platform representables register their own handlers. Cursor-aware, handles multi-line selections. |
 | `ImportSettingsView` | **macOS-only.** Two flows: (1) Markdown folder via `NSOpenPanel`; (2) Apple Notes via `NSAppleScript` (HTML→Markdown via regex). Both write to `FileService.notesDirectoryURL`. |
 
@@ -157,7 +163,7 @@ On macOS 26, `automation.apple-events` alone fails without a provisioning profil
 ## Swift conventions
 
 - No force-unwrap (`!`) outside of tests.
-- `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and `SWIFT_APPROACHABLE_CONCURRENCY = YES` on the app target — all types implicitly `@MainActor`. Most file I/O in `NoteStore` uses `Task { }` (suspends on main actor, fine for quick local disk access). Exception: the initial `fileService.loadAllNotes()` in `NoteStore.load()` runs inside `Task.detached` — see [iOS (iPad) support](#ios-ipad-support) for why (iCloud container resolution can block long enough to trip iOS's launch watchdog).
+- `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and `SWIFT_APPROACHABLE_CONCURRENCY = YES` on the app target — all types implicitly `@MainActor`. Most file I/O in `NoteStore` uses `Task { }` (suspends on main actor, fine for quick local disk access). Exception: the initial `fileService.loadAllNotes()` in `NoteStore.load()` runs inside `Task.detached` — see [iOS support](#ios-support) for why (iCloud container resolution can block long enough to trip iOS's launch watchdog).
 - Tests use **Swift Testing** (`import Testing`, `@Test`, `#expect`), not XCTest — except UI tests.
 - Use `@Suite` to group tests. One suite per component.
 - `NoteIndexerIntegrationTests.swift` uses real ML via XPC; model (~115 MB) is cached after first download. Requires `.timeLimit(.minutes(5))`.
