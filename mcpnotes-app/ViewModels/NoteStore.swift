@@ -276,7 +276,11 @@ final class NoteStore {
                 notesToIndex.append(n)
             }
             // Indexing runs off the rename path in the background worker (see enqueueNotes)
-            // so the rename itself isn't blocked on ML embedding.
+            // so the rename itself isn't blocked on ML embedding. Set .indexing up front so
+            // the settings-icon indicator lights up even for a single-note rename, where the
+            // worker itself would otherwise never report an intermediate state.
+            let indexed = await indexer.indexedCount()
+            indexingState = .indexing(indexed: indexed, total: indexed + notesToIndex.count)
             enqueueNotes(notesToIndex)
             onComplete?(updatedFilenames)
         }
