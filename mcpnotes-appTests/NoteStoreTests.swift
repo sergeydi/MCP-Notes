@@ -61,6 +61,17 @@ final class MockNoteIndexer: NoteIndexing {
 
 // MARK: - Shared fixture
 
+/// Yields repeatedly until `condition` is true, up to `maxAttempts` times. Used instead of a
+/// fixed `Task.yield()` count when a Task chain is more than one hop deep (e.g. renameNote's
+/// outer Task enqueues a separate indexWorkerTask) — under parallel test execution, unrelated
+/// tests' work can interleave on the shared MainActor queue, so a fixed hop count is not reliable.
+@MainActor
+private func yieldUntil(maxAttempts: Int = 200, _ condition: () -> Bool) async {
+    for _ in 0..<maxAttempts where !condition() {
+        await Task.yield()
+    }
+}
+
 private func makeNote(
     filename: String = "Test",
     tags: [String] = [],
@@ -414,8 +425,10 @@ struct NoteStoreIndexerTests {
         let note = makeNote(filename: "Old")
         store.notes = [note]
         store.renameNote(note, to: "New")
-        await Task.yield()
-        let indexed = try #require(idx.indexNoteCalledWith.first)
+        // renameNote's outer Task enqueues the renamed note onto a separate indexWorkerTask —
+        // poll instead of a fixed yield count (see yieldUntil).
+        await yieldUntil { !idx.indexNoteIfChangedCalledWith.isEmpty }
+        let indexed = try #require(idx.indexNoteIfChangedCalledWith.first)
         #expect(indexed.filename == "New")
     }
 
@@ -818,11 +831,10 @@ struct NoteStoreRenameWikilinkTests {
         b.body = "[[Old]] and more"
         store.notes = [renamed, a, b]
         store.renameNote(renamed, to: "New")
-        // Two yields: first runs the outer renameNote Task (which spawns inner Tasks),
-        // second runs the inner indexNote Tasks.
-        await Task.yield()
-        await Task.yield()
-        let indexedIDs = Set(idx.indexNoteCalledWith.map(\.id))
+        // renameNote's outer Task enqueues onto a separate indexWorkerTask —
+        // poll instead of a fixed yield count (see yieldUntil).
+        await yieldUntil { idx.indexNoteIfChangedCalledWith.count >= 3 }
+        let indexedIDs = Set(idx.indexNoteIfChangedCalledWith.map(\.id))
         #expect(indexedIDs.contains(renamed.id))
         #expect(indexedIDs.contains(a.id))
         #expect(indexedIDs.contains(b.id))

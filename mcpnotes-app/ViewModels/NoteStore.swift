@@ -250,7 +250,7 @@ final class NoteStore {
                 sortNotes()
             }
             watchFiles([renamed])
-            try? await indexer.indexNote(renamed)
+            var notesToIndex = [renamed]
 
             let pattern = /\[\[([^\]]+)\]\]/
             var updatedFilenames: [String] = []
@@ -273,9 +273,11 @@ final class NoteStore {
                 updatedFilenames.append(n.filename)
                 try? fileService.saveNote(n)
                 watchFiles([n])
-                try? await indexer.indexNote(n)
+                notesToIndex.append(n)
             }
-            indexingState = .ready(count: await indexer.indexedCount())
+            // Indexing runs off the rename path in the background worker (see enqueueNotes)
+            // so the rename itself isn't blocked on ML embedding.
+            enqueueNotes(notesToIndex)
             onComplete?(updatedFilenames)
         }
     }
