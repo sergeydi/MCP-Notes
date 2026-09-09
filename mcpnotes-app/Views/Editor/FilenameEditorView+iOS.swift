@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Displays and edits the note's filename, including rename validation and wikilink-cascade feedback.
 /// iPad: touch-first layout — 44pt-minimum tap targets, an explicit Cancel button (no hardware Escape
@@ -47,6 +48,21 @@ struct FilenameEditorView: View {
         draftFilename = filename
         isEditingFilename = false
         isFilenameFocused = false
+        // `isFilenameFocused = false` alone doesn't reliably resign the real UITextField here —
+        // same nested-hosting FocusState breakage as `beginEditingIfNeeded()` above, just in the
+        // write direction. Resigning via the responder chain directly is what actually dismisses
+        // the caret/keyboard.
+        //
+        // Deferred to the next run loop turn: the same tap that hits this Cancel button can also
+        // be seen by the underlying note-body UITextView's own tap-to-place-cursor recognizer
+        // (another symptom of the header's UIHostingController not being a proper child view
+        // controller — see the nested-hosting FocusState memory note), which grabs first responder
+        // for the body right after we resign the filename field, landing the cursor there instead
+        // of dismissing the keyboard entirely. Resigning after that recognition has settled hits
+        // whatever actually ended up first responder, so the keyboard closes for good.
+        DispatchQueue.main.async {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
     }
 
     var body: some View {

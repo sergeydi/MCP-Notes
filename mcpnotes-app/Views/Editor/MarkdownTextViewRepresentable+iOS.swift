@@ -137,6 +137,7 @@ struct MarkdownTextViewRepresentable: UIViewRepresentable {
         ])
         context.coordinator.headerHostingController = headerHostingController
         textView.headerHostingView = headerHostingController.view
+        textView.headerHostingController = headerHostingController
         textView.updatePlaceholderVisibility()
 
         return textView
@@ -215,6 +216,38 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
     private var headerHeight: CGFloat = 0
     private let baseTopInset: CGFloat = 8
 
+    /// The frontmatter header's hosting controller. Its view is added as a plain subview (see
+    /// `makeUIView` below), but never wired into a parent view controller until `didMoveToWindow`
+    /// runs `attachHeaderControllerIfNeeded()` — without that, SwiftUI's environment (focus system,
+    /// trait collection) inside the header isn't properly connected to the rest of the UIKit
+    /// hierarchy, which is the root cause behind the FocusState/hit-testing quirks documented on
+    /// `FilenameEditorView+iOS.swift` and `TagsEditorView.swift` (nested-hosting FocusState memory
+    /// note): taps on controls inside the header could fall through and also be recognized by this
+    /// text view's own tap-to-place-cursor behavior underneath, stealing first responder.
+    weak var headerHostingController: UIViewController?
+
+    private func nearestViewController() -> UIViewController? {
+        var responder: UIResponder? = self
+        while let current = responder {
+            if let viewController = current as? UIViewController { return viewController }
+            responder = current.next
+        }
+        return nil
+    }
+
+    private func attachHeaderControllerIfNeeded() {
+        guard let headerHostingController, headerHostingController.parent == nil,
+              let parentViewController = nearestViewController() else { return }
+        parentViewController.addChild(headerHostingController)
+        headerHostingController.didMove(toParent: parentViewController)
+    }
+
+    private func detachHeaderController() {
+        guard let headerHostingController, headerHostingController.parent != nil else { return }
+        headerHostingController.willMove(toParent: nil)
+        headerHostingController.removeFromParent()
+    }
+
     /// A real subview (unlike the old manual `draw(_:)` text) whose position is pinned via Auto
     /// Layout to the hosted header's bottom, so it reflows for free whenever the header resizes
     /// (filename-edit mode, tag wrapping, …) instead of needing hand-rolled `setNeedsDisplay()`
@@ -248,7 +281,11 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
         super.didMoveToWindow()
         keyboardObservers.forEach(NotificationCenter.default.removeObserver)
         keyboardObservers.removeAll()
-        guard window != nil else { return }
+        guard window != nil else {
+            detachHeaderController()
+            return
+        }
+        attachHeaderControllerIfNeeded()
         let center = NotificationCenter.default
         keyboardObservers.append(center.addObserver(
             forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main
