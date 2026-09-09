@@ -30,6 +30,10 @@ struct MarkdownTextViewRepresentable: UIViewRepresentable {
         textView.smartDashesType = .no
         textView.smartInsertDeleteType = .no
         textView.backgroundColor = .clear
+        // Lets a downward drag anywhere in the body follow the finger and dismiss the keyboard,
+        // matching Notes.app/Messages — UITextView is itself the scroll view, so this is native
+        // UIScrollView behavior, no custom gesture recognizer needed.
+        textView.keyboardDismissMode = .interactive
         // Left inset matches FrontmatterView's leading padding so body text (and its placeholder)
         // line up with the filename/tags header above it. Zero out the container's own
         // lineFragmentPadding (5pt by default) — otherwise it stacks on top of the inset and
