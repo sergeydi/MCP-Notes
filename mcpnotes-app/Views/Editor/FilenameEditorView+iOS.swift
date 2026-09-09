@@ -28,6 +28,20 @@ struct FilenameEditorView: View {
         filenameSelection = TextSelection(range: draftFilename.startIndex..<draftFilename.endIndex)
     }
 
+    // Not triggered from `onChange(of: isFilenameFocused)` alone: this TextField is hosted via
+    // UIHostingController inside a UITextView (the note body's own text container), and that
+    // nested-first-responder setup on iOS leaves `isFilenameFocused` unreliable — on iPhone it can
+    // stay stuck at false even while the field visibly has the caret and keyboard, so the
+    // Cancel/Apply buttons (gated on `isEditingFilename`) never appeared. A tap gesture is plain
+    // UIKit gesture routing, unaffected by that broken SwiftUI focus plumbing, so it's used as the
+    // primary "editing started" signal instead. Guarded to fire only once per edit session so a
+    // later tap to reposition the cursor doesn't re-select all the text.
+    private func beginEditingIfNeeded() {
+        guard isIdle, !isEditingFilename else { return }
+        isEditingFilename = true
+        selectAll()
+    }
+
     private func cancelEdit() {
         guard isIdle else { return }
         draftFilename = filename
@@ -43,10 +57,10 @@ struct FilenameEditorView: View {
                 .disabled(!isIdle)
                 .focused($isFilenameFocused)
                 .onSubmit { if canApply { onApplyRename() } else { cancelEdit() } }
+                .simultaneousGesture(TapGesture().onEnded { beginEditingIfNeeded() })
                 .onChange(of: isFilenameFocused) { _, focused in
-                    guard focused, isIdle else { return }
-                    isEditingFilename = true
-                    selectAll()
+                    guard focused else { return }
+                    beginEditingIfNeeded()
                 }
                 .overlay(alignment: .bottom) {
                     if hasConflict || isEmpty {
