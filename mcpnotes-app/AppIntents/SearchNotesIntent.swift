@@ -11,8 +11,13 @@ struct SearchNotesIntent: AppIntent {
     @Parameter(title: "Search Text")
     var query: String
 
+    @Parameter(title: "Only Bookmarked", default: false)
+    var onlyBookmarked: Bool
+
     static var parameterSummary: some ParameterSummary {
-        Summary("Search notes for \(\.$query)")
+        Summary("Search notes for \(\.$query)") {
+            \.$onlyBookmarked
+        }
     }
 
     func perform() async throws -> some IntentResult & ReturnsValue<[NoteEntity]> & ProvidesDialog {
@@ -23,6 +28,7 @@ struct SearchNotesIntent: AppIntent {
 
         let notes = try await FileService().loadAllNotes()
         let matches: [NoteEntity] = notes
+            .filter { !onlyBookmarked || $0.isBookmarked }
             .filter { note in
                 note.filename.lowercased().contains(lowercased)
                     || note.body.lowercased().contains(lowercased)
