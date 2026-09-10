@@ -30,5 +30,14 @@ struct MCPNotesShortcuts: AppShortcutsProvider {
             shortTitle: "Open Note",
             systemImageName: "note.text"
         )
+        AppShortcut(
+            intent: AppendToNoteIntent(),
+            phrases: [
+                "Add to a note in \(.applicationName)",
+                "Append to a note in \(.applicationName)"
+            ],
+            shortTitle: "Add to Note",
+            systemImageName: "text.append"
+        )
     }
 }
