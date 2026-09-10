@@ -39,5 +39,14 @@ struct MCPNotesShortcuts: AppShortcutsProvider {
             shortTitle: "Add to Note",
             systemImageName: "text.append"
         )
+        AppShortcut(
+            intent: ToggleBookmarkIntent(),
+            phrases: [
+                "Bookmark a note in \(.applicationName)",
+                "Toggle bookmark in \(.applicationName)"
+            ],
+            shortTitle: "Toggle Bookmark",
+            systemImageName: "bookmark.fill"
+        )
     }
 }
