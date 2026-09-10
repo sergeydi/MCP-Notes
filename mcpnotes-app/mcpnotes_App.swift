@@ -7,6 +7,7 @@ struct MCPNotesApp: App {
 #else
     @State private var noteStore = NoteStore(indexer: NoOpNoteIndexer())
 #endif
+    @Environment(\.scenePhase) private var scenePhase
 
     // Skip SwiftUI UI initialization during test runs to avoid crashes in macOS 26 beta
     // system frameworks (NSSplitView, DynamicPropertyBuffer) before the test runner connects.
@@ -30,6 +31,16 @@ struct MCPNotesApp: App {
                 }
                 .keyboardShortcut("n", modifiers: .command)
             }
+        }
+        // App Intents (Siri/Shortcuts) can run in a separate, background instance of this app's
+        // process even while this one is already open — its writes land on disk via FileService,
+        // but this instance's live directory watcher can't reliably deliver that change while
+        // suspended (no run loop to dispatch the kqueue event). Re-running the same external-change
+        // pipeline used for MCP server writes and iCloud sync on every foreground guarantees this
+        // instance picks up whatever changed while it was away, regardless of who wrote it.
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            noteStore.scheduleExternalReload()
         }
 
         // Opens a specific note in a standalone window via context menu.

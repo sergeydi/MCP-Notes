@@ -1,0 +1,26 @@
+import AppIntents
+
+/// Registers phrases that surface `CreateNoteIntent`/`SearchNotesIntent` directly in Siri and
+/// the Shortcuts app without any per-user setup.
+struct MCPNotesShortcuts: AppShortcutsProvider {
+    static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: CreateNoteIntent(),
+            phrases: [
+                "Create a note in \(.applicationName)",
+                "Add a new note to \(.applicationName)"
+            ],
+            shortTitle: "Create Note",
+            systemImageName: "square.and.pencil"
+        )
+        AppShortcut(
+            intent: SearchNotesIntent(),
+            phrases: [
+                "Search notes in \(.applicationName)",
+                "Find a note in \(.applicationName)"
+            ],
+            shortTitle: "Search Notes",
+            systemImageName: "magnifyingglass"
+        )
+    }
+}
