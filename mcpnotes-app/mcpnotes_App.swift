@@ -41,6 +41,9 @@ struct MCPNotesApp: App {
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
             noteStore.scheduleExternalReload()
+            if let pendingNoteID = PendingNoteNavigation.consume() {
+                noteStore.selectedNoteID = pendingNoteID
+            }
         }
 
         // Opens a specific note in a standalone window via context menu.

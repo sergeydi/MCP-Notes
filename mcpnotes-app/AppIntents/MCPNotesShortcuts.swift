@@ -22,5 +22,13 @@ struct MCPNotesShortcuts: AppShortcutsProvider {
             shortTitle: "Search Notes",
             systemImageName: "magnifyingglass"
         )
+        AppShortcut(
+            intent: OpenNoteIntent(),
+            phrases: [
+                "Open a note in \(.applicationName)"
+            ],
+            shortTitle: "Open Note",
+            systemImageName: "note.text"
+        )
     }
 }
