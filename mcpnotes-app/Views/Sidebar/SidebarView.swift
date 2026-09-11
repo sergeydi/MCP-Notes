@@ -64,7 +64,11 @@ struct SidebarView: View {
                 }
             }
         .navigationTitle(mode.navigationTitle)
+#if os(iOS)
+        .searchable(text: $searchText, prompt: "Search")
+#else
         .searchable(text: $searchText, placement: .sidebar, prompt: "Search")
+#endif
         .toolbar { sidebarToolbar }
     }
 
@@ -316,16 +320,27 @@ struct SidebarView: View {
             .accessibilityLabel(mode.label)
         }
 
+#if os(iOS)
+        DefaultToolbarItem(kind: .search, placement: .bottomBar)
+
+        ToolbarSpacer(placement: .bottomBar)
+
+        ToolbarItem(placement: .bottomBar) {
+            Button("New Note", systemImage: "square.and.pencil") {
+                Task { await store.createNote() }
+            }
+            .accessibilityLabel("Create new note")
+        }
+#else
         ToolbarItem {
             Button("New Note", systemImage: "square.and.pencil") {
                 Task { await store.createNote() }
             }
             .accessibilityLabel("Create new note")
         }
+#endif
 
 #if os(macOS)
-        ToolbarSpacer(.fixed)
-
         ToolbarItem {
             SettingsLink {
                 Image(systemName: "gear")
