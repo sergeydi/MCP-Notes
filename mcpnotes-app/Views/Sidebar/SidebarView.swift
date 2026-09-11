@@ -283,23 +283,47 @@ struct SidebarView: View {
     }
 
     // MARK: - Toolbar
-
-    private var navigationPlacement: ToolbarItemPlacement {
 #if os(iOS)
-        .topBarLeading
-#else
-        .navigation
-#endif
-    }
-
     @ToolbarContentBuilder
     private var sidebarToolbar: some ToolbarContent {
         if store.isLoading {
-            ToolbarItem(placement: navigationPlacement) {
+            ToolbarItem(placement: .topBarLeading) {
                 ProgressView()
-#if os(macOS)
+                    .accessibilityLabel("Loading notes")
+            }
+        }
+
+        ToolbarItem {
+            ControlGroup {
+                ForEach(SidebarMode.allCases, id: \.self) { m in
+                    Button {
+                        mode = m
+                    } label: {
+                        Label(m.label, systemImage: m.symbolName)
+                    }
+                    .tint(mode == m ? Color.accentColor : nil)
+                }
+            }
+        }
+
+        DefaultToolbarItem(kind: .search, placement: .bottomBar)
+
+        ToolbarSpacer(placement: .bottomBar)
+
+        ToolbarItem(placement: .bottomBar) {
+            Button("New Note", systemImage: "square.and.pencil") {
+                Task { await store.createNote() }
+            }
+            .accessibilityLabel("Create new note")
+        }
+    }
+#else
+    @ToolbarContentBuilder
+    private var sidebarToolbar: some ToolbarContent {
+        if store.isLoading {
+            ToolbarItem(placement: .navigation) {
+                ProgressView()
                     .controlSize(.small)
-#endif
                     .accessibilityLabel("Loading notes")
             }
         }
@@ -320,27 +344,13 @@ struct SidebarView: View {
             .accessibilityLabel(mode.label)
         }
 
-#if os(iOS)
-        DefaultToolbarItem(kind: .search, placement: .bottomBar)
-
-        ToolbarSpacer(placement: .bottomBar)
-
-        ToolbarItem(placement: .bottomBar) {
-            Button("New Note", systemImage: "square.and.pencil") {
-                Task { await store.createNote() }
-            }
-            .accessibilityLabel("Create new note")
-        }
-#else
         ToolbarItem {
             Button("New Note", systemImage: "square.and.pencil") {
                 Task { await store.createNote() }
             }
             .accessibilityLabel("Create new note")
         }
-#endif
 
-#if os(macOS)
         ToolbarItem {
             SettingsLink {
                 Image(systemName: "gear")
@@ -362,24 +372,6 @@ struct SidebarView: View {
             }
             .help("Show Wikilink Graph")
         }
-#endif
     }
-}
-
-#if os(macOS)
-private struct IndexingDot: View {
-    @State private var pulse = false
-
-    var body: some View {
-        Circle()
-            .fill(Color.accentColor)
-            .frame(width: 6, height: 6)
-            .opacity(pulse ? 1.0 : 0.3)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
-                    pulse = true
-                }
-            }
-    }
-}
 #endif
+}

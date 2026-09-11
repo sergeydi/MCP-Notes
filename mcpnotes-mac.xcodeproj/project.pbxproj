@@ -118,6 +118,7 @@
 				Views/Settings/RAGSettingsView.swift = (macos, );
 				Views/Settings/SettingsView.swift = (macos, );
 				Views/Settings/StorageSettingsView.swift = (macos, );
+				Views/Sidebar/IndexingDot.swift = (macos, );
 				Views/WikilinkGraph/GraphSKScene.swift = (macos, );
 				Views/WikilinkGraph/GraphSKView.swift = (macos, );
 				Views/WikilinkGraph/WikilinkGraphView.swift = (macos, );
