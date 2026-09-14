@@ -131,6 +131,13 @@ struct MarkdownTextViewRepresentable: UIViewRepresentable {
         // contentLayoutGuide (not its own anchors) is what makes the subview scroll with content
         // while frameLayoutGuide keeps the header's width matched to the visible viewport.
         let headerHostingController = UIHostingController(rootView: header)
+        // The header (filename/tags) never contains the focused responder — the body text view
+        // does — but once it's a properly attached child view controller, SwiftUI applies its own
+        // keyboard-avoidance to it regardless, which transiently changes its height as the keyboard
+        // animates in/out. That transient headerHeight change fed into applyHeaderInset() below,
+        // shifting textContainerInset.top and making the code-block background jump. Excluding
+        // .keyboard from its safe area regions stops SwiftUI from reserving/avoiding that space.
+        headerHostingController.safeAreaRegions = .container
         headerHostingController.view.translatesAutoresizingMaskIntoConstraints = false
         headerHostingController.view.backgroundColor = .clear
         textView.addSubview(headerHostingController.view)
@@ -195,9 +202,11 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
     var notesDirectoryURL: URL?
     private let placeholderText = String(localized: "Start writing…")
     var codeBlockRanges: [NSRange] = [] {
-        didSet { setNeedsDisplay() }
+        didSet { updateCodeBlockBackgrounds() }
     }
     var codeContentRanges: [NSRange] = []
+    /// Background subviews for `codeBlockRanges`, refreshed by `updateCodeBlockBackgrounds()`.
+    private var codeBlockBackgroundViews: [UIView] = []
     private var imageViews: [UIImageView] = []
     private var copyButtons: [UIButton] = []
     private var lastLayoutWidth: CGFloat = 0
@@ -323,9 +332,9 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
         guard abs(w - lastLayoutWidth) > 1 else { return }
         lastLayoutWidth = w
         DispatchQueue.main.async { [weak self] in
+            self?.updateCodeBlockBackgrounds()
             self?.updateImagePreviews()
             self?.updateCopyButtons()
-            self?.setNeedsDisplay()
         }
     }
 
@@ -341,33 +350,37 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
         var inset = textContainerInset
         inset.top = baseTopInset + headerHeight
         textContainerInset = inset
-        setNeedsDisplay()
+        updateCodeBlockBackgrounds()
     }
 
     // MARK: Code block background
 
-    /// Draws a rounded background behind fenced code blocks. Unlike `NSTextView`, `UITextView`
-    /// has no separate "draw background before glyphs" hook — drawing here before calling
-    /// `super.draw(rect)` achieves the same layering, since the layer's own background (set to
-    /// `.clear`) is painted independently before this method runs.
-    override func draw(_ rect: CGRect) {
-        drawCodeBlockBackgrounds(in: rect)
-        super.draw(rect)
-    }
+    /// Positions a real background `UIView` per fenced code block, instead of hand-drawing them
+    /// in `draw(_:)`. SwiftUI's automatic keyboard avoidance repeatedly resizes this text view's
+    /// bounds while the keyboard animates in; a manual `draw(_:)` fill has to be re-triggered on
+    /// every one of those bounds changes (else the old bitmap gets visibly stretched to fit each
+    /// new size), and forcing that redraw synchronously *during* the live CoreAnimation-driven
+    /// resize could composite a torn frame: one block's background flashing missing, another
+    /// ballooning to cover unrelated text, for a single frame before snapping back — reproduced
+    /// even with geometry cached ahead of time, so it wasn't a stale-data bug, it was the forced
+    /// live redraw itself racing the animation. Real subviews (like the copy buttons, which never
+    /// showed this) aren't part of the view's own drawn backing store, so
+    /// they're simply uninvolved in that compositing race — moving the background into the same
+    /// category sidesteps the problem instead of chasing it further.
+    func updateCodeBlockBackgrounds() {
+        codeBlockBackgroundViews.forEach { $0.removeFromSuperview() }
+        codeBlockBackgroundViews = []
 
-    private func drawCodeBlockBackgrounds(in rect: CGRect) {
         guard !codeBlockRanges.isEmpty,
               let layoutManager = textLayoutManager,
               let contentStorage = markdownContentStorage else { return }
 
-        let bg = UIColor.systemGray.withAlphaComponent(0.10)
         let originX = textContainerInset.left
         let originY = textContainerInset.top
         let topPad: CGFloat = 2
         let bottomPad: CGFloat = -6
         let leftMargin: CGFloat = 8
         let rightMargin: CGFloat = 10
-        let cornerRadius: CGFloat = 6
 
         for nsRange in codeBlockRanges {
             let base = contentStorage.documentRange.location
@@ -388,14 +401,17 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
 
             guard minY < maxY else { continue }
 
-            let blockRect = CGRect(
+            let blockView = UIView(frame: CGRect(
                 x: bounds.minX + leftMargin,
                 y: minY - topPad,
                 width: bounds.width - leftMargin - rightMargin,
                 height: (maxY - minY) + topPad + bottomPad
-            )
-            bg.setFill()
-            UIBezierPath(roundedRect: blockRect, cornerRadius: cornerRadius).fill()
+            ))
+            blockView.backgroundColor = UIColor.systemGray.withAlphaComponent(0.10)
+            blockView.layer.cornerRadius = 6
+            blockView.isUserInteractionEnabled = false
+            insertSubview(blockView, at: 0)
+            codeBlockBackgroundViews.append(blockView)
         }
     }
 
