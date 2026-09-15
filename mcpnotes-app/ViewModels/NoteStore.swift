@@ -15,9 +15,15 @@ enum IndexingState {
 
 /// Central data store for all notes. Injected as an environment object
 /// so every view in the hierarchy shares the same instance.
+///
+/// `notes` holds only metadata — no body — for every note, always. Full note content (`body`)
+/// is loaded from disk on demand (`loadFullNote(_:)`) and expected to be resident for at most
+/// one note at a time: the note open in the editor, or transiently inside a loop that reads,
+/// checks, and discards one note's body before moving to the next (rename cascade, indexing
+/// worker). See CLAUDE.md's NoteStore section for the full design rationale.
 @Observable
 final class NoteStore {
-    var notes: [Note] = [] {
+    var notes: [NoteMetadata] = [] {
         didSet { rebuildAllTags() }
     }
     /// True until the initial cold-start load completes; drives a small spinner in
@@ -98,7 +104,7 @@ final class NoteStore {
     // and reopened rather than reused.
     private var fileWatchers: [UUID: DispatchSourceFileSystemObject] = [:]
     private var reloadTask: Task<Void, Never>?
-    private var noteIndexQueue: [Note] = []
+    private var noteIndexQueue: [NoteMetadata] = []
     private var indexWorkerTask: Task<Void, Never>?
 
     init(fileService: any FileServicing = FileService(),
@@ -114,13 +120,13 @@ final class NoteStore {
         reloadTask?.cancel()
     }
 
-    var selectedNote: Note? {
+    var selectedNote: NoteMetadata? {
         notes.first { $0.id == selectedNoteID }
     }
 
     private(set) var allTags: [String] = []
 
-    var bookmarkedNotes: [Note] {
+    var bookmarkedNotes: [NoteMetadata] {
         notes.filter(\.isBookmarked)
     }
 
@@ -140,7 +146,7 @@ final class NoteStore {
             // long enough to trip the system's scene-creation watchdog.
             let fs = fileService
             notes = try await Task.detached(priority: .userInitiated) {
-                try await fs.loadAllNotes()
+                try await fs.loadAllNotesMetadata()
             }.value
         } catch {
             indexingState = .failed
@@ -180,14 +186,22 @@ final class NoteStore {
         }
     }
 
+    /// Loads a note's full content on demand — the only place in the app that should hold a
+    /// note's `body` for longer than a single local scope (the editor, for as long as that
+    /// note stays open).
+    func loadFullNote(_ metadata: NoteMetadata) async throws -> Note {
+        try await fileService.loadNote(at: metadata.fileURL)
+    }
+
     // MARK: - CRUD
 
     func createNote() async {
         do {
             let note = try fileService.createNote(baseName: "New Note")
-            notes.append(note)
+            let metadata = NoteMetadata(note)
+            notes.append(metadata)
             sortNotes()
-            watchFiles([note])
+            watchFiles([metadata])
             selectedNoteID = note.id
             try? await indexer.indexNote(note)
             indexingState = .ready(count: await indexer.indexedCount())
@@ -200,18 +214,25 @@ final class NoteStore {
         guard let index = notes.firstIndex(where: { $0.id == updated.id }) else { return }
         var merged = updated
         merged.isBookmarked = notes[index].isBookmarked
-        notes[index] = merged
+        notes[index] = NoteMetadata(merged)
         sortNotes()
         Task {
             // TODO: surface errors to user
             try? fileService.saveNote(merged)
-            watchFiles([merged])
+            if let idx = notes.firstIndex(where: { $0.id == merged.id }) {
+                // Refresh modifiedAt from the file we just wrote so the next external-reload
+                // tick (mtime diff) doesn't mistake our own save for an external change.
+                if let mtime = try? merged.fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate {
+                    notes[idx].modifiedAt = mtime
+                }
+                watchFiles([notes[idx]])
+            }
             try? await indexer.indexNote(merged)
             indexingState = .ready(count: await indexer.indexedCount())
         }
     }
 
-    func deleteNote(_ note: Note) {
+    func deleteNote(_ note: NoteMetadata) {
         stopWatchingFile(id: note.id)
         notes.removeAll { $0.id == note.id }
 
@@ -233,7 +254,7 @@ final class NoteStore {
         }
     }
 
-    func renameNote(_ note: Note, to newName: String, onComplete: (@MainActor (_ updatedNoteFilenames: [String]) -> Void)? = nil) {
+    func renameNote(_ note: NoteMetadata, to newName: String, onComplete: (@MainActor (_ updatedNoteFilenames: [String]) -> Void)? = nil) {
         guard !newName.isEmpty else { return }
         let oldName = note.filename
         Task { @MainActor in
@@ -241,21 +262,24 @@ final class NoteStore {
             defer { isRenaming = false }
 
             // TODO: surface errors to user
-            guard let renamed = try? fileService.renameNote(note, to: newName) else {
+            guard let renamedMetadata = try? fileService.renameNote(note, to: newName) else {
                 onComplete?([])
                 return
             }
             if let index = notes.firstIndex(where: { $0.id == note.id }) {
-                notes[index] = renamed
+                notes[index] = renamedMetadata
                 sortNotes()
             }
-            watchFiles([renamed])
-            var notesToIndex = [renamed]
+            watchFiles([renamedMetadata])
+            var notesToEnqueue = [renamedMetadata]
 
             let pattern = /\[\[([^\]]+)\]\]/
             var updatedFilenames: [String] = []
-            let snapshot = notes.filter { $0.id != note.id }
-            for var n in snapshot {
+            // Read/check/save one candidate at a time so at most one other note's body is
+            // ever resident in memory during the cascade, regardless of vault size.
+            let candidates = notes.filter { $0.id != note.id }
+            for metadata in candidates {
+                guard var n = try? await fileService.loadNote(at: metadata.fileURL) else { continue }
                 var mutated = false
                 let newBody = n.body.replacing(pattern) { match in
                     let inner = match.output.1.trimmingCharacters(in: .whitespaces)
@@ -267,21 +291,22 @@ final class NoteStore {
                 }
                 guard mutated else { continue }
                 n.body = newBody
-                if let idx = notes.firstIndex(where: { $0.id == n.id }) {
-                    notes[idx] = n
-                }
-                updatedFilenames.append(n.filename)
                 try? fileService.saveNote(n)
-                watchFiles([n])
-                notesToIndex.append(n)
+                let updatedMetadata = NoteMetadata(n)
+                if let idx = notes.firstIndex(where: { $0.id == n.id }) {
+                    notes[idx] = updatedMetadata
+                }
+                watchFiles([updatedMetadata])
+                updatedFilenames.append(n.filename)
+                notesToEnqueue.append(updatedMetadata)
             }
             // Indexing runs off the rename path in the background worker (see enqueueNotes)
             // so the rename itself isn't blocked on ML embedding. Set .indexing up front so
             // the settings-icon indicator lights up even for a single-note rename, where the
             // worker itself would otherwise never report an intermediate state.
             let indexed = await indexer.indexedCount()
-            indexingState = .indexing(indexed: indexed, total: indexed + notesToIndex.count)
-            enqueueNotes(notesToIndex)
+            indexingState = .indexing(indexed: indexed, total: indexed + notesToEnqueue.count)
+            enqueueNotes(notesToEnqueue)
             onComplete?(updatedFilenames)
         }
     }
@@ -320,6 +345,26 @@ final class NoteStore {
         try await indexer.searchRanked(query: query, limit: limit)
     }
 
+    /// Plain-substring "Content" search: reads candidate notes' bodies from disk one at a time,
+    /// checking for a match and discarding the body immediately after — never holds more than
+    /// one candidate's body in memory, and preserves exact substring semantics (unlike a
+    /// token-based FTS index) on both platforms.
+    func searchNoteBodies(query: String, in candidates: [NoteMetadata]) async -> [BodySearchMatch] {
+        guard !query.isEmpty else { return [] }
+        let lowerQuery = query.lowercased()
+        var results: [BodySearchMatch] = []
+        for metadata in candidates {
+            guard let note = try? await fileService.loadNote(at: metadata.fileURL) else { continue }
+            if let match = SnippetBuilder.match(in: note.body, query: query) {
+                results.append(BodySearchMatch(metadata: metadata, match: match))
+            } else if metadata.tags.contains(where: { $0.lowercased().contains(lowerQuery) }) {
+                results.append(BodySearchMatch(metadata: metadata, match: nil))
+            }
+            // `note` goes out of scope here — at most one body in memory during this loop.
+        }
+        return results
+    }
+
     func outgoingLinks(from noteID: UUID) async -> [UUID] {
         await indexer.outgoingLinks(from: noteID)
     }
@@ -337,19 +382,21 @@ final class NoteStore {
     func toggleBookmark(for noteID: UUID) {
         guard let index = notes.firstIndex(where: { $0.id == noteID }) else { return }
         notes[index].isBookmarked.toggle()
-        let note = notes[index]
+        let metadata = notes[index]
         Task {
-            try? fileService.saveNote(note)
-            watchFiles([note])
+            try? fileService.setBookmarked(metadata.isBookmarked, at: metadata.fileURL)
+            watchFiles([metadata])
         }
     }
 
     // MARK: - Private
 
     /// Appends notes to the per-note index queue, deduplicating by ID, and starts the
-    /// worker task if it is not already running. The worker calls indexNoteIfChanged()
-    /// so notes whose body and tags haven't changed are skipped without ML inference.
-    private func enqueueNotes(_ notes: [Note]) {
+    /// worker task if it is not already running. The worker reads each note's body from disk
+    /// immediately before indexing it (never holding more than one body at a time, even during
+    /// a full cold-start index of a large vault) and calls indexNoteIfChanged() so notes whose
+    /// body and tags haven't changed are skipped without ML inference.
+    private func enqueueNotes(_ notes: [NoteMetadata]) {
         for note in notes {
             noteIndexQueue.removeAll { $0.id == note.id }
             noteIndexQueue.append(note)
@@ -359,9 +406,11 @@ final class NoteStore {
             guard let self else { return }
             var processed = 0
             while !self.noteIndexQueue.isEmpty {
-                let note = self.noteIndexQueue.removeFirst()
+                let metadata = self.noteIndexQueue.removeFirst()
                 processed += 1
-                try? await self.indexer.indexNoteIfChanged(note)
+                if let note = try? await self.fileService.loadNote(at: metadata.fileURL) {
+                    try? await self.indexer.indexNoteIfChanged(note)
+                }
                 let remaining = self.noteIndexQueue.count
                 if remaining > 0 {
                     self.indexingState = .indexing(indexed: processed, total: processed + remaining)
@@ -411,7 +460,7 @@ final class NoteStore {
     /// (Re)opens a file-level watcher for each given note, replacing any existing one.
     /// Must be called after any write to a note's file (ours or external) since an atomic
     /// replace swaps the inode out from under the previously open fd.
-    private func watchFiles(_ notesToWatch: [Note]) {
+    private func watchFiles(_ notesToWatch: [NoteMetadata]) {
         for note in notesToWatch {
             stopWatchingFile(id: note.id)
             let fd = open(note.fileURL.path, O_EVTONLY)
@@ -454,7 +503,7 @@ final class NoteStore {
 
     func reloadExternalChanges() async {
         guard !isRenaming else { return }
-        guard let freshNotes = try? await fileService.loadAllNotes() else { return }
+        guard let freshNotes = try? await fileService.loadAllNotesMetadata() else { return }
 
         let currentMap = Dictionary(notes.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
         let freshMap = Dictionary(freshNotes.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
@@ -463,11 +512,13 @@ final class NoteStore {
 
         let removedIDs = currentIDs.subtracting(freshIDs)
         let addedIDs = freshIDs.subtracting(currentIDs)
+        // mtime changes on every write (body, tags, or bookmark — see FrontmatterParser/
+        // FileService), so it's a correct proxy for "content changed" without reading the file.
         let changedNotes = freshNotes.filter { fresh in
             guard let current = currentMap[fresh.id] else { return false }
-            return current.body != fresh.body
-                || current.tags != fresh.tags
+            return current.modifiedAt != fresh.modifiedAt
                 || current.filename != fresh.filename
+                || current.tags != fresh.tags
                 || current.isBookmarked != fresh.isBookmarked
         }
 
@@ -518,4 +569,12 @@ final class NoteStore {
             indexingState = .ready(count: await indexer.indexedCount())
         }
     }
+}
+
+/// A "Content" search hit: the note plus (if the match came from body text) the highlighted
+/// context around it. `match` is `nil` when the note matched via a tag instead of its body.
+struct BodySearchMatch: Identifiable {
+    let metadata: NoteMetadata
+    let match: SnippetBuilder.Match?
+    var id: UUID { metadata.id }
 }

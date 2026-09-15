@@ -12,7 +12,7 @@ struct ContentView: View {
 #endif
         } detail: {
             if let note = store.selectedNote {
-                NoteEditorView(note: note)
+                NoteEditorView(noteMetadata: note)
                     .id(note.id)
             } else {
                 ContentUnavailableView(

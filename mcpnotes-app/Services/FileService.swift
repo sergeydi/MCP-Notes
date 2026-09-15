@@ -51,16 +51,10 @@ struct FileService: FileServicing {
     /// small notes that serial per-file network latency, not file size, is what makes
     /// a cold start slow on a freshly-signed-in device.
     func loadAllNotes() async throws -> [Note] {
-        let dir = Self.notesDirectoryURL
-        let files = try FileManager.default.contentsOfDirectory(
-            at: dir,
-            includingPropertiesForKeys: [.nameKey, .contentModificationDateKey, .creationDateKey],
-            options: .skipsHiddenFiles
-        ).filter { $0.pathExtension == "md" }
-
+        let files = try mdFiles()
         let notes = try await withThrowingTaskGroup(of: Note?.self) { group in
             for url in files {
-                group.addTask { try await Self.loadNote(at: url) }
+                group.addTask { try await Self.readNote(at: url) }
             }
             var results: [Note] = []
             for try await note in group {
@@ -71,7 +65,42 @@ struct FileService: FileServicing {
         return notes.sorted { $0.filename.localizedCompare($1.filename) == .orderedAscending }
     }
 
-    private static func loadNote(at url: URL) async throws -> Note? {
+    /// Same directory scan as `loadAllNotes()`, but reads only what's needed to build
+    /// `NoteMetadata` (including a bounded `preview` snippet) — never keeps a full body around.
+    func loadAllNotesMetadata() async throws -> [NoteMetadata] {
+        let files = try mdFiles()
+        let metadata = try await withThrowingTaskGroup(of: NoteMetadata?.self) { group in
+            for url in files {
+                group.addTask { try await Self.readNoteMetadata(at: url) }
+            }
+            var results: [NoteMetadata] = []
+            for try await item in group {
+                if let item { results.append(item) }
+            }
+            return results
+        }
+        return metadata.sorted { $0.filename.localizedCompare($1.filename) == .orderedAscending }
+    }
+
+    /// Loads a single note's full content on demand — used by the editor and by anything that
+    /// needs one note's body (indexing worker, rename cascade) without holding the whole vault.
+    func loadNote(at fileURL: URL) async throws -> Note {
+        guard let note = try await Self.readNote(at: fileURL) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return note
+    }
+
+    private func mdFiles() throws -> [URL] {
+        let dir = Self.notesDirectoryURL
+        return try FileManager.default.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: [.nameKey, .contentModificationDateKey, .creationDateKey],
+            options: .skipsHiddenFiles
+        ).filter { $0.pathExtension == "md" }
+    }
+
+    private static func readNote(at url: URL) async throws -> Note? {
         await waitForDownload(of: url)
         guard
             let content = try? String(contentsOf: url, encoding: .utf8),
@@ -91,6 +120,29 @@ struct FileService: FileServicing {
             isBookmarked: parsed.bookmarked,
             modifiedAt: modifiedAt,
             createdAt: createdAt
+        )
+    }
+
+    private static func readNoteMetadata(at url: URL) async throws -> NoteMetadata? {
+        await waitForDownload(of: url)
+        guard
+            let content = try? String(contentsOf: url, encoding: .utf8),
+            let parsed = FrontmatterParser.parse(content)
+        else { return nil }
+
+        let filename = url.deletingPathExtension().lastPathComponent
+        let resourceValues = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey])
+        let modifiedAt = resourceValues?.contentModificationDate ?? .distantPast
+        let createdAt = resourceValues?.creationDate ?? .distantPast
+        return NoteMetadata(
+            id: parsed.uid,
+            filename: filename,
+            tags: parsed.tags,
+            fileURL: url,
+            isBookmarked: parsed.bookmarked,
+            modifiedAt: modifiedAt,
+            createdAt: createdAt,
+            preview: NoteMetadata.makePreview(from: parsed.body)
         )
     }
 
@@ -132,17 +184,30 @@ struct FileService: FileServicing {
         return note
     }
 
-    func deleteNote(_ note: Note) throws {
-        try FileManager.default.trashItem(at: note.fileURL, resultingItemURL: nil)
+    /// Rewrites just the `bookmarked` frontmatter flag, re-reading the file to preserve its
+    /// current body/tags without requiring the caller to hold a full `Note`.
+    func setBookmarked(_ isBookmarked: Bool, at fileURL: URL) throws {
+        let content = try String(contentsOf: fileURL, encoding: .utf8)
+        guard let parsed = FrontmatterParser.parse(content) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let newContent = FrontmatterParser.serialize(
+            uid: parsed.uid, tags: parsed.tags, isBookmarked: isBookmarked, body: parsed.body
+        )
+        try newContent.write(to: fileURL, atomically: true, encoding: .utf8)
     }
 
-    /// Renames the note file on disk and returns an updated `Note` value.
-    func renameNote(_ note: Note, to newName: String) throws -> Note {
-        let newURL = note.fileURL
+    func deleteNote(_ metadata: NoteMetadata) throws {
+        try FileManager.default.trashItem(at: metadata.fileURL, resultingItemURL: nil)
+    }
+
+    /// Renames the note file on disk and returns updated metadata.
+    func renameNote(_ metadata: NoteMetadata, to newName: String) throws -> NoteMetadata {
+        let newURL = metadata.fileURL
             .deletingLastPathComponent()
             .appendingPathComponent("\(newName).md")
-        try FileManager.default.moveItem(at: note.fileURL, to: newURL)
-        var updated = note
+        try FileManager.default.moveItem(at: metadata.fileURL, to: newURL)
+        var updated = metadata
         updated.filename = newName
         updated.fileURL = newURL
         return updated

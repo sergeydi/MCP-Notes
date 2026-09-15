@@ -6,26 +6,67 @@ import Testing
 
 @MainActor
 final class MockFileService: FileServicing {
-    var stubbedNotes: [Note] = []
+    /// Notes "on disk" — setting this rebuilds `disk`, mirroring what a fresh directory scan
+    /// would see. Reads/writes below (`loadNote`, `saveNote`, `renameNote`, ...) go through
+    /// `disk` too, so it always reflects the current simulated filesystem state, the same way
+    /// a later `loadNote(at:)` on a real `FileService` would see whatever was last written.
+    var stubbedNotes: [Note] = [] {
+        didSet { disk = Dictionary(uniqueKeysWithValues: stubbedNotes.map { ($0.fileURL, $0) }) }
+    }
+    private var disk: [URL: Note] = [:]
+
     private(set) var savedNotes: [Note] = []
-    private(set) var deletedNotes: [Note] = []
+    private(set) var deletedMetadata: [NoteMetadata] = []
     private(set) var createdBaseName: String?
     private(set) var renamedTo: String?
+    private(set) var bookmarkCalls: [(fileURL: URL, isBookmarked: Bool)] = []
     var shouldFailRename = false
 
-    func loadAllNotes() async throws -> [Note] { stubbedNotes }
-    func saveNote(_ note: Note) throws { savedNotes.append(note) }
+    private var sortedDisk: [Note] {
+        disk.values.sorted { $0.filename.localizedCompare($1.filename) == .orderedAscending }
+    }
+
+    func loadAllNotes() async throws -> [Note] { sortedDisk }
+    func loadAllNotesMetadata() async throws -> [NoteMetadata] { sortedDisk.map { NoteMetadata($0) } }
+    func loadNote(at fileURL: URL) async throws -> Note {
+        guard let note = disk[fileURL] else { throw NSError(domain: "test", code: 404) }
+        return note
+    }
+    func saveNote(_ note: Note) throws {
+        savedNotes.append(note)
+        disk[note.fileURL] = note
+    }
     func createNote(baseName: String) throws -> Note {
         createdBaseName = baseName
-        return Note(id: UUID(), filename: baseName, tags: [], body: "",
+        let note = Note(id: UUID(), filename: baseName, tags: [], body: "",
                     fileURL: URL(fileURLWithPath: "/tmp/\(baseName).md"))
+        disk[note.fileURL] = note
+        return note
     }
-    func deleteNote(_ note: Note) throws { deletedNotes.append(note) }
-    func renameNote(_ note: Note, to newName: String) throws -> Note {
+    func setBookmarked(_ isBookmarked: Bool, at fileURL: URL) throws {
+        bookmarkCalls.append((fileURL, isBookmarked))
+        if var note = disk[fileURL] {
+            note.isBookmarked = isBookmarked
+            disk[fileURL] = note
+        }
+    }
+    func deleteNote(_ metadata: NoteMetadata) throws {
+        deletedMetadata.append(metadata)
+        disk[metadata.fileURL] = nil
+    }
+    func renameNote(_ metadata: NoteMetadata, to newName: String) throws -> NoteMetadata {
         if shouldFailRename { throw NSError(domain: "test", code: 1) }
         renamedTo = newName
-        var updated = note
+        let newURL = metadata.fileURL.deletingLastPathComponent().appendingPathComponent("\(newName).md")
+        var updated = metadata
         updated.filename = newName
+        updated.fileURL = newURL
+        if var note = disk[metadata.fileURL] {
+            disk[metadata.fileURL] = nil
+            note.filename = newName
+            note.fileURL = newURL
+            disk[newURL] = note
+        }
         return updated
     }
 }
@@ -106,13 +147,13 @@ struct NoteStoreTests {
 
     @Test func selectedNoteReturnsMatchingNote() {
         let note = makeNote()
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         store.selectedNoteID = note.id
         #expect(store.selectedNote?.id == note.id)
     }
 
     @Test func selectedNoteReturnsNilWhenIDUnknown() {
-        store.notes = [makeNote()]
+        store.notes = [NoteMetadata(makeNote())]
         store.selectedNoteID = UUID()
         #expect(store.selectedNote == nil)
     }
@@ -126,8 +167,8 @@ struct NoteStoreTests {
 
     @Test func allTagsReturnsSortedUniqueValues() {
         store.notes = [
-            makeNote(tags: ["swift", "macOS"]),
-            makeNote(tags: ["swift", "swiftUI"]),
+            NoteMetadata(makeNote(tags: ["swift", "macOS"])),
+            NoteMetadata(makeNote(tags: ["swift", "swiftUI"])),
         ]
         #expect(store.allTags == ["macOS", "swift", "swiftUI"])
     }
@@ -137,7 +178,7 @@ struct NoteStoreTests {
     }
 
     @Test func allTagsDeduplicatesAcrossNotes() {
-        store.notes = [makeNote(tags: ["a"]), makeNote(tags: ["a"]), makeNote(tags: ["a"])]
+        store.notes = [makeNote(tags: ["a"]), makeNote(tags: ["a"]), makeNote(tags: ["a"])].map { NoteMetadata($0) }
         #expect(store.allTags == ["a"])
     }
 
@@ -145,39 +186,41 @@ struct NoteStoreTests {
 
     @Test func bookmarkedNotesFiltersCorrectly() throws {
         let bm = makeNote(isBookmarked: true)
-        store.notes = [bm, makeNote(isBookmarked: false)]
+        store.notes = [NoteMetadata(bm), NoteMetadata(makeNote(isBookmarked: false))]
         #expect(store.bookmarkedNotes.count == 1)
         let first = try #require(store.bookmarkedNotes.first)
         #expect(first.id == bm.id)
     }
 
     @Test func bookmarkedNotesEmptyWhenNoneBookmarked() {
-        store.notes = [makeNote(), makeNote()]
+        store.notes = [makeNote(), makeNote()].map { NoteMetadata($0) }
         #expect(store.bookmarkedNotes.isEmpty)
     }
 
     // MARK: updateNote
 
-    @Test func updateNoteUpdatesBodyInMemory() throws {
+    @Test func updateNotePersistsNewBody() async throws {
         var note = makeNote()
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         note.body = "Updated"
         store.updateNote(note)
-        let first = try #require(store.notes.first)
-        #expect(first.body == "Updated")
+        await Task.yield()
+        let saved = try #require(fs.savedNotes.first)
+        #expect(saved.body == "Updated")
     }
 
-    @Test func updateNoteUpdatesTags() throws {
+    @Test func updateNotePersistsNewTags() async throws {
         var note = makeNote(tags: ["old"])
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         note.tags = ["new"]
         store.updateNote(note)
-        let first = try #require(store.notes.first)
-        #expect(first.tags == ["new"])
+        await Task.yield()
+        let saved = try #require(fs.savedNotes.first)
+        #expect(saved.tags == ["new"])
     }
 
     @Test func updateNoteIgnoresUnknownID() throws {
-        store.notes = [makeNote(filename: "Real")]
+        store.notes = [NoteMetadata(makeNote(filename: "Real"))]
         store.updateNote(makeNote(filename: "Ghost"))
         #expect(store.notes.count == 1)
         let first = try #require(store.notes.first)
@@ -187,23 +230,23 @@ struct NoteStoreTests {
     // MARK: deleteNote
 
     @Test func deleteNoteRemovesFromArray() {
-        let note = makeNote()
-        store.notes = [note]
-        store.deleteNote(note)
+        let metadata = NoteMetadata(makeNote())
+        store.notes = [metadata]
+        store.deleteNote(metadata)
         #expect(store.notes.isEmpty)
     }
 
     @Test func deleteSelectedNoteNilsSelection() {
-        let note = makeNote()
-        store.notes = [note]
-        store.selectedNoteID = note.id
-        store.deleteNote(note)
+        let metadata = NoteMetadata(makeNote())
+        store.notes = [metadata]
+        store.selectedNoteID = metadata.id
+        store.deleteNote(metadata)
         #expect(store.selectedNoteID == nil)
     }
 
     @Test func deleteNoteSelectsFirstRemainingWhenSelected() {
-        let a = makeNote(filename: "A")
-        let b = makeNote(filename: "B")
+        let a = NoteMetadata(makeNote(filename: "A"))
+        let b = NoteMetadata(makeNote(filename: "B"))
         store.notes = [a, b]
         store.selectedNoteID = b.id
         store.deleteNote(b)
@@ -211,8 +254,8 @@ struct NoteStoreTests {
     }
 
     @Test func deleteNoteKeepsSelectionWhenDifferentNoteDeleted() {
-        let a = makeNote(filename: "A")
-        let b = makeNote(filename: "B")
+        let a = NoteMetadata(makeNote(filename: "A"))
+        let b = NoteMetadata(makeNote(filename: "B"))
         store.notes = [a, b]
         store.selectedNoteID = a.id
         store.deleteNote(b)
@@ -222,28 +265,38 @@ struct NoteStoreTests {
     // MARK: toggleBookmark
 
     @Test func toggleBookmarkFlipsFlagOn() throws {
-        let note = makeNote(isBookmarked: false)
-        store.notes = [note]
-        store.toggleBookmark(for: note.id)
+        let metadata = NoteMetadata(makeNote(isBookmarked: false))
+        store.notes = [metadata]
+        store.toggleBookmark(for: metadata.id)
         let first = try #require(store.notes.first)
         #expect(first.isBookmarked == true)
     }
 
     @Test func toggleBookmarkFlipsFlagOff() throws {
-        let note = makeNote(isBookmarked: true)
-        store.notes = [note]
-        store.toggleBookmark(for: note.id)
+        let metadata = NoteMetadata(makeNote(isBookmarked: true))
+        store.notes = [metadata]
+        store.toggleBookmark(for: metadata.id)
         let first = try #require(store.notes.first)
         #expect(first.isBookmarked == false)
     }
 
     @Test func toggleBookmarkRoundTrip() throws {
-        let note = makeNote(isBookmarked: false)
-        store.notes = [note]
-        store.toggleBookmark(for: note.id)
-        store.toggleBookmark(for: note.id)
+        let metadata = NoteMetadata(makeNote(isBookmarked: false))
+        store.notes = [metadata]
+        store.toggleBookmark(for: metadata.id)
+        store.toggleBookmark(for: metadata.id)
         let first = try #require(store.notes.first)
         #expect(first.isBookmarked == false)
+    }
+
+    @Test func toggleBookmarkCallsSetBookmarkedOnFileService() async throws {
+        let metadata = NoteMetadata(makeNote(isBookmarked: false))
+        store.notes = [metadata]
+        store.toggleBookmark(for: metadata.id)
+        await Task.yield()
+        let call = try #require(fs.bookmarkCalls.first)
+        #expect(call.fileURL == metadata.fileURL)
+        #expect(call.isBookmarked == true)
     }
 }
 
@@ -290,7 +343,7 @@ struct NoteStoreFileServiceTests {
 
     @Test func updateNoteCallsSaveOnFileService() async throws {
         var note = makeNote()
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         note.body = "Changed"
         store.updateNote(note)
         await Task.yield()
@@ -299,26 +352,26 @@ struct NoteStoreFileServiceTests {
     }
 
     @Test func deleteNoteCallsDeleteOnFileService() async throws {
-        let note = makeNote()
-        store.notes = [note]
-        store.deleteNote(note)
+        let metadata = NoteMetadata(makeNote())
+        store.notes = [metadata]
+        store.deleteNote(metadata)
         await Task.yield()
-        let deleted = try #require(fs.deletedNotes.first)
-        #expect(deleted.id == note.id)
+        let deleted = try #require(fs.deletedMetadata.first)
+        #expect(deleted.id == metadata.id)
     }
 
     @Test func renameNoteCallsRenameOnFileService() async {
-        let note = makeNote(filename: "Old")
-        store.notes = [note]
-        store.renameNote(note, to: "New")
+        let metadata = NoteMetadata(makeNote(filename: "Old"))
+        store.notes = [metadata]
+        store.renameNote(metadata, to: "New")
         await Task.yield()
         #expect(fs.renamedTo == "New")
     }
 
     @Test func renameNoteUpdatesFilenameInMemory() async throws {
-        let note = makeNote(filename: "Old")
-        store.notes = [note]
-        store.renameNote(note, to: "New")
+        let metadata = NoteMetadata(makeNote(filename: "Old"))
+        store.notes = [metadata]
+        store.renameNote(metadata, to: "New")
         await Task.yield()
         let first = try #require(store.notes.first)
         #expect(first.filename == "New")
@@ -377,7 +430,7 @@ struct NoteStoreIndexerTests {
 
     @Test func updateNoteCallsIndexNote() async throws {
         var note = makeNote()
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         note.body = "Updated"
         store.updateNote(note)
         await Task.yield()
@@ -387,7 +440,7 @@ struct NoteStoreIndexerTests {
 
     @Test func updateNotePassesUpdatedContent() async throws {
         var note = makeNote()
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         note.body = "New body"
         store.updateNote(note)
         await Task.yield()
@@ -397,7 +450,7 @@ struct NoteStoreIndexerTests {
 
     @Test func updateNotePassesUpdatedTags() async throws {
         var note = makeNote(tags: ["old"])
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         note.tags = ["new"]
         store.updateNote(note)
         await Task.yield()
@@ -406,25 +459,26 @@ struct NoteStoreIndexerTests {
     }
 
     @Test func updateNoteIgnoresUnknownIDDoesNotIndex() async {
-        store.notes = [makeNote(filename: "Real")]
+        store.notes = [NoteMetadata(makeNote(filename: "Real"))]
         store.updateNote(makeNote(filename: "Ghost"))
         await Task.yield()
         #expect(idx.indexNoteCalledWith.isEmpty)
     }
 
     @Test func deleteNoteCallsRemoveNote() async throws {
-        let note = makeNote()
-        store.notes = [note]
-        store.deleteNote(note)
+        let metadata = NoteMetadata(makeNote())
+        store.notes = [metadata]
+        store.deleteNote(metadata)
         await Task.yield()
         let removedID = try #require(idx.removeNoteCalledWith.first)
-        #expect(removedID == note.id)
+        #expect(removedID == metadata.id)
     }
 
     @Test func renameNoteCallsIndexNoteWithNewName() async throws {
         let note = makeNote(filename: "Old")
-        store.notes = [note]
-        store.renameNote(note, to: "New")
+        fs.stubbedNotes = [note]
+        store.notes = [NoteMetadata(note)]
+        store.renameNote(NoteMetadata(note), to: "New")
         // renameNote's outer Task enqueues the renamed note onto a separate indexWorkerTask —
         // poll instead of a fixed yield count (see yieldUntil).
         await yieldUntil { !idx.indexNoteIfChangedCalledWith.isEmpty }
@@ -445,14 +499,18 @@ struct NoteStoreIndexerTests {
     }
 
     @Test func reindexAllCallsResetAndClearIndex() async {
-        store.notes = [makeNote()]
+        let note = makeNote()
+        fs.stubbedNotes = [note]
+        store.notes = [NoteMetadata(note)]
         await store.reindexAll()
         await Task.yield()
         #expect(idx.resetAndClearIndexCalled)
     }
 
     @Test func reindexAllEnqueuesAllNotes() async {
-        store.notes = [makeNote()]
+        let note = makeNote()
+        fs.stubbedNotes = [note]
+        store.notes = [NoteMetadata(note)]
         await store.reindexAll()
         await Task.yield()
         #expect(idx.indexNoteIfChangedCalledWith.count == 1)
@@ -469,7 +527,9 @@ struct NoteStoreIndexerTests {
     }
 
     @Test func reindexAllTransitionsIndexingStateToReady() async {
-        store.notes = [makeNote()]
+        let note = makeNote()
+        fs.stubbedNotes = [note]
+        store.notes = [NoteMetadata(note)]
         await store.reindexAll()
         await Task.yield()
         guard case .ready = store.indexingState else {
@@ -525,7 +585,7 @@ struct NoteStoreExternalChangesTests {
     @Test func addsNoteAppearedOnDisk() async {
         let existing = makeNote(filename: "A")
         let added = makeNote(filename: "B")
-        store.notes = [existing]
+        store.notes = [NoteMetadata(existing)]
         fs.stubbedNotes = [existing, added]
         await store.reloadExternalChanges()
         #expect(store.notes.count == 2)
@@ -544,7 +604,7 @@ struct NoteStoreExternalChangesTests {
     @Test func removesNoteDeletedFromDisk() async {
         let kept = makeNote(filename: "A")
         let removed = makeNote(filename: "B")
-        store.notes = [kept, removed]
+        store.notes = [NoteMetadata(kept), NoteMetadata(removed)]
         fs.stubbedNotes = [kept]
         await store.reloadExternalChanges()
         #expect(store.notes.count == 1)
@@ -554,29 +614,31 @@ struct NoteStoreExternalChangesTests {
     @Test func removesNoteCallsRemoveNoteOnIndexer() async {
         let kept = makeNote(filename: "A")
         let removed = makeNote(filename: "B")
-        store.notes = [kept, removed]
+        store.notes = [NoteMetadata(kept), NoteMetadata(removed)]
         fs.stubbedNotes = [kept]
         await store.reloadExternalChanges()
         #expect(idx.removeNoteCalledWith.contains(removed.id))
         #expect(idx.indexNoteIfChangedCalledWith.isEmpty)
     }
 
-    @Test func updatesChangedNoteBody() async throws {
+    @Test func updatesChangedNoteUpdatesPreviewInMemory() async throws {
         let note = makeNote(filename: "A")
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         var updated = note
-        updated.body = "new body"
+        updated.body = "new body content"
+        updated.modifiedAt = note.modifiedAt.addingTimeInterval(1)
         fs.stubbedNotes = [updated]
         await store.reloadExternalChanges()
         let stored = try #require(store.notes.first { $0.id == note.id })
-        #expect(stored.body == "new body")
+        #expect(stored.preview.contains("new body content"))
     }
 
     @Test func updatesChangedNoteEnqueuesNoteWithNewContent() async throws {
         let note = makeNote(filename: "A")
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         var updated = note
         updated.body = "new body"
+        updated.modifiedAt = note.modifiedAt.addingTimeInterval(1)
         fs.stubbedNotes = [updated]
         await store.reloadExternalChanges()
         await Task.yield()
@@ -586,7 +648,7 @@ struct NoteStoreExternalChangesTests {
 
     @Test func updatesChangedNoteTags() async throws {
         let note = makeNote(filename: "A", tags: ["old"])
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         var updated = note
         updated.tags = ["new"]
         fs.stubbedNotes = [updated]
@@ -597,7 +659,7 @@ struct NoteStoreExternalChangesTests {
 
     @Test func noOpWhenNothingChanged() async {
         let note = makeNote(filename: "A")
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         fs.stubbedNotes = [note]
         await store.reloadExternalChanges()
         #expect(idx.indexNoteIfChangedCalledWith.isEmpty)
@@ -606,7 +668,7 @@ struct NoteStoreExternalChangesTests {
 
     @Test func updatesChangedNoteTagsEnqueuesNoteWithNewTags() async throws {
         let note = makeNote(filename: "A", tags: ["old"])
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         var updated = note
         updated.tags = ["new"]
         fs.stubbedNotes = [updated]
@@ -618,7 +680,7 @@ struct NoteStoreExternalChangesTests {
 
     @Test func updatesChangedNoteFilename() async throws {
         let note = makeNote(filename: "OldName")
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         var updated = note
         updated.filename = "NewName"
         fs.stubbedNotes = [updated]
@@ -631,7 +693,7 @@ struct NoteStoreExternalChangesTests {
         let a = makeNote(filename: "A")
         let c = makeNote(filename: "C")
         let b = makeNote(filename: "B")
-        store.notes = [a, c]
+        store.notes = [NoteMetadata(a), NoteMetadata(c)]
         fs.stubbedNotes = [a, c, b]
         await store.reloadExternalChanges()
         #expect(store.notes.map(\.filename) == ["A", "B", "C"])
@@ -640,7 +702,7 @@ struct NoteStoreExternalChangesTests {
     @Test func externalDeleteClearsSelectionWhenSelectedNoteRemoved() async {
         let a = makeNote(filename: "A")
         let b = makeNote(filename: "B")
-        store.notes = [a, b]
+        store.notes = [NoteMetadata(a), NoteMetadata(b)]
         store.selectedNoteID = b.id
         fs.stubbedNotes = [a]
         await store.reloadExternalChanges()
@@ -650,7 +712,7 @@ struct NoteStoreExternalChangesTests {
     @Test func externalDeleteKeepsSelectionWhenOtherNoteRemoved() async {
         let a = makeNote(filename: "A")
         let b = makeNote(filename: "B")
-        store.notes = [a, b]
+        store.notes = [NoteMetadata(a), NoteMetadata(b)]
         store.selectedNoteID = a.id
         fs.stubbedNotes = [a]
         await store.reloadExternalChanges()
@@ -660,7 +722,7 @@ struct NoteStoreExternalChangesTests {
     @Test func externalDeleteClearsNavHistoryEntry() async {
         let a = makeNote(filename: "A")
         let b = makeNote(filename: "B")
-        store.notes = [a, b]
+        store.notes = [NoteMetadata(a), NoteMetadata(b)]
         store.selectedNoteID = a.id
         store.selectedNoteID = b.id
         fs.stubbedNotes = [a]
@@ -672,7 +734,7 @@ struct NoteStoreExternalChangesTests {
     @Test func externalDeleteUpdatesCanNavigateState() async {
         let a = makeNote(filename: "A")
         let b = makeNote(filename: "B")
-        store.notes = [a, b]
+        store.notes = [NoteMetadata(a), NoteMetadata(b)]
         store.selectedNoteID = a.id
         store.selectedNoteID = b.id
         #expect(store.canNavigateBack == true)
@@ -697,7 +759,7 @@ struct NoteStoreTagGroupingTests {
     @Test func notesFilteredByTagMatchExpected() {
         let match = makeNote(tags: ["swift"])
         let other = makeNote(tags: ["python"])
-        store.notes = [match, other]
+        store.notes = [NoteMetadata(match), NoteMetadata(other)]
         let result = store.notes.filter { $0.tags.contains("swift") }
         #expect(result.count == 1)
         #expect(result.first?.id == match.id)
@@ -705,14 +767,14 @@ struct NoteStoreTagGroupingTests {
 
     @Test func noteWithMultipleTagsAppearsUnderEachTag() {
         let note = makeNote(tags: ["swift", "macOS"])
-        store.notes = [note]
+        store.notes = [NoteMetadata(note)]
         #expect(store.notes.filter { $0.tags.contains("swift") }.count == 1)
         #expect(store.notes.filter { $0.tags.contains("macOS") }.count == 1)
     }
 
     @Test func untaggedNoteDoesNotAppearInAnyTagGroup() {
         let untagged = makeNote(tags: [])
-        store.notes = [untagged]
+        store.notes = [NoteMetadata(untagged)]
         for tag in store.allTags {
             #expect(store.notes.filter { $0.tags.contains(tag) }.isEmpty)
         }
@@ -723,7 +785,7 @@ struct NoteStoreTagGroupingTests {
             makeNote(tags: ["swift", "macOS"]),
             makeNote(tags: ["swift"]),
             makeNote(tags: []),
-        ]
+        ].map { NoteMetadata($0) }
         #expect(store.allTags == ["macOS", "swift"])
         #expect(store.notes.filter { $0.tags.contains("swift") }.count == 2)
         #expect(store.notes.filter { $0.tags.contains("macOS") }.count == 1)
@@ -746,34 +808,37 @@ struct NoteStoreRenameWikilinkTests {
         store = NoteStore(fileService: fs, indexer: idx)
     }
 
-    @Test func updatesWikilinkInOtherNote() async {
+    @Test func updatesWikilinkInOtherNote() async throws {
         let renamed = makeNote(filename: "Old")
         var other = makeNote(filename: "Other")
         other.body = "See [[Old]] for details"
-        store.notes = [renamed, other]
-        store.renameNote(renamed, to: "New")
+        fs.stubbedNotes = [renamed, other]
+        store.notes = [NoteMetadata(renamed), NoteMetadata(other)]
+        store.renameNote(NoteMetadata(renamed), to: "New")
         await Task.yield()
-        let updatedOther = store.notes.first { $0.id == other.id }
-        #expect(updatedOther?.body == "See [[New]] for details")
+        let saved = try #require(fs.savedNotes.first { $0.id == other.id })
+        #expect(saved.body == "See [[New]] for details")
     }
 
-    @Test func updatesWikilinkCaseInsensitive() async {
+    @Test func updatesWikilinkCaseInsensitive() async throws {
         let renamed = makeNote(filename: "Old")
         var other = makeNote(filename: "Other")
         other.body = "See [[old]] for details"
-        store.notes = [renamed, other]
-        store.renameNote(renamed, to: "New")
+        fs.stubbedNotes = [renamed, other]
+        store.notes = [NoteMetadata(renamed), NoteMetadata(other)]
+        store.renameNote(NoteMetadata(renamed), to: "New")
         await Task.yield()
-        let updatedOther = store.notes.first { $0.id == other.id }
-        #expect(updatedOther?.body == "See [[New]] for details")
+        let saved = try #require(fs.savedNotes.first { $0.id == other.id })
+        #expect(saved.body == "See [[New]] for details")
     }
 
     @Test func doesNotModifyNoteWithoutMatchingWikilink() async {
         let renamed = makeNote(filename: "Old")
         var other = makeNote(filename: "Other")
         other.body = "No links here"
-        store.notes = [renamed, other]
-        store.renameNote(renamed, to: "New")
+        fs.stubbedNotes = [renamed, other]
+        store.notes = [NoteMetadata(renamed), NoteMetadata(other)]
+        store.renameNote(NoteMetadata(renamed), to: "New")
         await Task.yield()
         #expect(fs.savedNotes.filter { $0.id == other.id }.isEmpty)
     }
@@ -782,9 +847,10 @@ struct NoteStoreRenameWikilinkTests {
         let renamed = makeNote(filename: "Old")
         var other = makeNote(filename: "Other")
         other.body = "[[Old]]"
-        store.notes = [renamed, other]
+        fs.stubbedNotes = [renamed, other]
+        store.notes = [NoteMetadata(renamed), NoteMetadata(other)]
         var result: [String]?
-        store.renameNote(renamed, to: "New") { result = $0 }
+        store.renameNote(NoteMetadata(renamed), to: "New") { result = $0 }
         await Task.yield()
         #expect(result == ["Other"])
     }
@@ -792,9 +858,10 @@ struct NoteStoreRenameWikilinkTests {
     @Test func callsOnCompleteWithEmptyArrayWhenNoWikilinks() async {
         let renamed = makeNote(filename: "Old")
         let other = makeNote(filename: "Other")
-        store.notes = [renamed, other]
+        fs.stubbedNotes = [renamed, other]
+        store.notes = [NoteMetadata(renamed), NoteMetadata(other)]
         var result: [String]?
-        store.renameNote(renamed, to: "New") { result = $0 }
+        store.renameNote(NoteMetadata(renamed), to: "New") { result = $0 }
         await Task.yield()
         #expect(result == [])
     }
@@ -802,9 +869,9 @@ struct NoteStoreRenameWikilinkTests {
     @Test func callsOnCompleteWithEmptyArrayWhenFileServiceFails() async {
         fs.shouldFailRename = true
         let renamed = makeNote(filename: "Old")
-        store.notes = [renamed]
+        store.notes = [NoteMetadata(renamed)]
         var result: [String]?
-        store.renameNote(renamed, to: "New") { result = $0 }
+        store.renameNote(NoteMetadata(renamed), to: "New") { result = $0 }
         await Task.yield()
         #expect(result == [])
     }
@@ -815,22 +882,24 @@ struct NoteStoreRenameWikilinkTests {
         var b = makeNote(filename: "B")
         a.body = "[[Old]]"
         b.body = "[[Old]] and [[Old]] again"
-        store.notes = [renamed, a, b]
-        store.renameNote(renamed, to: "New")
+        fs.stubbedNotes = [renamed, a, b]
+        store.notes = [NoteMetadata(renamed), NoteMetadata(a), NoteMetadata(b)]
+        store.renameNote(NoteMetadata(renamed), to: "New")
         await Task.yield()
         let savedIDs = Set(fs.savedNotes.map(\.id))
         #expect(savedIDs.contains(a.id))
         #expect(savedIDs.contains(b.id))
     }
 
-    @Test func indexNoteCalledForRenamedNoteAndEachUpdatedNote() async {
+    @Test func indexNoteCalledForRenamedNoteAndEachUpdatedNote() async throws {
         let renamed = makeNote(filename: "Old")
         var a = makeNote(filename: "A")
         var b = makeNote(filename: "B")
         a.body = "[[Old]]"
         b.body = "[[Old]] and more"
-        store.notes = [renamed, a, b]
-        store.renameNote(renamed, to: "New")
+        fs.stubbedNotes = [renamed, a, b]
+        store.notes = [NoteMetadata(renamed), NoteMetadata(a), NoteMetadata(b)]
+        store.renameNote(NoteMetadata(renamed), to: "New")
         // renameNote's outer Task enqueues onto a separate indexWorkerTask —
         // poll instead of a fixed yield count (see yieldUntil).
         await yieldUntil { idx.indexNoteIfChangedCalledWith.count >= 3 }

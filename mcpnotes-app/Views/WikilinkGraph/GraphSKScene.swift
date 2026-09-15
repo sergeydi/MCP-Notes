@@ -64,7 +64,7 @@ final class GraphSKScene: SKScene {
         isolatedDotsVisible = true
     }
 
-    func load(notes: [Note], rawEdges: [(source: UUID, target: UUID)]) {
+    func load(notes: [NoteMetadata], rawEdges: [(source: UUID, target: UUID)]) {
         isPaused = false
         view?.isPaused = false
         simNodes.forEach { $0.sprite?.removeFromParent() }
@@ -138,7 +138,7 @@ final class GraphSKScene: SKScene {
         return String(prefix) + "…"
     }
 
-    private func makeSprite(_ note: Note) -> SKNode {
+    private func makeSprite(_ note: NoteMetadata) -> SKNode {
         let root = SKNode()
         root.name = note.id.uuidString
 

@@ -11,6 +11,8 @@ struct SidebarView: View {
     @State private var searchText: String = ""
     @State private var semanticResults: [(id: UUID, score: Float)] = []
     @State private var searchTask: Task<Void, Never>?
+    @State private var bodyMatches: [BodySearchMatch] = []
+    @State private var contentSearchTask: Task<Void, Never>?
     @State private var expandedTags: Set<String> = []
     @State private var noTagsExpanded: Bool = false
 
@@ -23,7 +25,7 @@ struct SidebarView: View {
         Dictionary(uniqueKeysWithValues: semanticResults.map { ($0.id, $0.score) })
     }
 
-    private var visibleNotes: [Note] {
+    private var visibleNotes: [NoteMetadata] {
         switch mode {
         case .all:
             return store.notes
@@ -52,6 +54,9 @@ struct SidebarView: View {
 #endif
                 .onChange(of: searchText) {
                     proxy.scrollTo("search-top", anchor: .top)
+                }
+                .onChange(of: searchText) { _, newValue in
+                    triggerContentSearch(newValue)
                 }
                 .onChange(of: store.bookmarkedNotes.map(\.id)) { oldIDs, newIDs in
                     // Bookmarked notes stay in the same alphabetical order as the main list,
@@ -85,6 +90,24 @@ struct SidebarView: View {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
             semanticResults = (try? await store.searchRanked(query: query)) ?? []
+        }
+    }
+
+    /// Debounced "Content" search: reads candidate notes' bodies from disk asynchronously
+    /// (see `NoteStore.searchNoteBodies`) instead of scanning `store.notes` in memory, since
+    /// notes no longer carry a body once loaded. Mirrors `triggerSemanticSearch`'s 300ms
+    /// debounce so a fast typist doesn't trigger a disk read per keystroke.
+    private func triggerContentSearch(_ query: String) {
+        contentSearchTask?.cancel()
+        guard !query.isEmpty else { bodyMatches = []; return }
+        let titleIDs = Set(textSearchTitleMatches.map(\.id))
+        let candidates = store.notes.filter { !titleIDs.contains($0.id) }
+        contentSearchTask = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            let result = await store.searchNoteBodies(query: query, in: candidates)
+            guard !Task.isCancelled else { return }
+            bodyMatches = result
         }
     }
 
@@ -124,18 +147,9 @@ struct SidebarView: View {
         }
     }
 
-    private var textSearchTitleMatches: [Note] {
+    private var textSearchTitleMatches: [NoteMetadata] {
         let q = searchText.lowercased()
         return store.notes.filter { $0.filename.lowercased().contains(q) }
-    }
-
-    private var textSearchBodyMatches: [Note] {
-        let q = searchText.lowercased()
-        let titleIDs = Set(textSearchTitleMatches.map { $0.id })
-        return store.notes.filter {
-            !titleIDs.contains($0.id) &&
-            ($0.body.lowercased().contains(q) || $0.tags.contains { $0.lowercased().contains(q) })
-        }
     }
 
     @ViewBuilder
@@ -157,7 +171,6 @@ struct SidebarView: View {
     @ViewBuilder
     private var textSearchContent: some View {
         let titleMatches = textSearchTitleMatches
-        let bodyMatches = textSearchBodyMatches
         let shownIDs = Set(titleMatches.map { $0.id } + bodyMatches.map { $0.id })
         let semanticMatches = semanticResults
             .filter { !shownIDs.contains($0.id) }
@@ -182,25 +195,25 @@ struct SidebarView: View {
             }
             if !bodyMatches.isEmpty {
                 Section("Content") {
-                    ForEach(bodyMatches) { note in
-                        let edges = rowSeparatorEdges(for: note.id, in: bodyIDs)
-                        NoteListItemView(note: note, searchQuery: searchText, isSelected: isRowSelected(note.id))
-                            .tag(note.id)
+                    ForEach(bodyMatches) { match in
+                        let edges = rowSeparatorEdges(for: match.id, in: bodyIDs)
+                        NoteListItemView(note: match.metadata, searchQuery: searchText, searchSnippet: match.match, isSelected: isRowSelected(match.id))
+                            .tag(match.id)
                             .listRowSeparator(edges.top, edges: .top)
                             .listRowSeparator(edges.bottom, edges: .bottom)
-                            .listRowBackground(rowBackground(for: note.id))
+                            .listRowBackground(rowBackground(for: match.id))
                     }
                 }
             }
         } else if !bodyMatches.isEmpty {
             Section {
-                ForEach(bodyMatches) { note in
-                    let edges = rowSeparatorEdges(for: note.id, in: bodyIDs)
-                    NoteListItemView(note: note, searchQuery: searchText, isSelected: isRowSelected(note.id))
-                        .tag(note.id)
+                ForEach(bodyMatches) { match in
+                    let edges = rowSeparatorEdges(for: match.id, in: bodyIDs)
+                    NoteListItemView(note: match.metadata, searchQuery: searchText, searchSnippet: match.match, isSelected: isRowSelected(match.id))
+                        .tag(match.id)
                         .listRowSeparator(edges.top, edges: .top)
                         .listRowSeparator(edges.bottom, edges: .bottom)
-                        .listRowBackground(rowBackground(for: note.id))
+                        .listRowBackground(rowBackground(for: match.id))
                 }
             } header: {
                 Text("Content").id("search-top")

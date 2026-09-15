@@ -1,9 +1,10 @@
 import SwiftUI
 
 struct NoteListItemView: View {
-    let note: Note
+    let note: NoteMetadata
     var score: Float? = nil
     var searchQuery: String? = nil
+    var searchSnippet: SnippetBuilder.Match? = nil
     var isSelected: Bool = false
 
     var body: some View {
@@ -37,13 +38,13 @@ struct NoteListItemView: View {
                 }
             }
 
-            if let snippet = bodySnippet {
-                Text(snippet)
+            if let searchSnippet {
+                Text(attributedSnippet(searchSnippet))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
-            } else if !note.body.isEmpty {
-                Text(bodyPreview)
+            } else if !note.preview.isEmpty {
+                Text(note.preview)
                     .font(.subheadline)
                     .foregroundStyle(.primary.opacity(0.5))
                     .lineLimit(1)
@@ -76,47 +77,14 @@ struct NoteListItemView: View {
             .background(.secondary.opacity(0.2), in: Capsule())
     }
 
-    private var bodySnippet: AttributedString? {
-        guard let query = searchQuery, !query.isEmpty else { return nil }
-        let stripped = MarkdownPatterns.stripMarkdown(note.body)
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
-
-        let lowerStripped = stripped.lowercased()
-        let lowerQuery = query.lowercased()
-        guard let matchRange = lowerStripped.range(of: lowerQuery) else { return nil }
-
-        let matchOffset = lowerStripped.distance(from: lowerStripped.startIndex, to: matchRange.lowerBound)
-        let matchLength = lowerQuery.count
-        let startOffset = max(0, matchOffset - 40)
-        let endOffset = min(stripped.count, startOffset + 120)
-
-        let startIndex = stripped.index(stripped.startIndex, offsetBy: startOffset)
-        let matchStart = stripped.index(stripped.startIndex, offsetBy: matchOffset)
-        let matchEnd = stripped.index(matchStart, offsetBy: matchLength)
-        let endIndex = stripped.index(stripped.startIndex, offsetBy: endOffset)
-
-        let before = (startOffset > 0 ? "…" : "") + String(stripped[startIndex..<matchStart])
-        let match = String(stripped[matchStart..<matchEnd])
-        let after = String(stripped[matchEnd..<endIndex]) + (endOffset < stripped.count ? "…" : "")
-
-        var result = AttributedString(before)
-        var highlighted = AttributedString(match)
+    private func attributedSnippet(_ snippet: SnippetBuilder.Match) -> AttributedString {
+        var result = AttributedString(snippet.before)
+        var highlighted = AttributedString(snippet.match)
         highlighted.font = Font.subheadline.bold()
         highlighted.foregroundColor = isSelected ? Color.white : Color.primary
         result += highlighted
-        result += AttributedString(after)
+        result += AttributedString(snippet.after)
         return result
-    }
-
-    private var bodyPreview: String {
-        MarkdownPatterns.stripMarkdown(note.body)
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
     }
 
     private var formattedDate: String {

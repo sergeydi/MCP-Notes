@@ -1,13 +1,13 @@
 import SwiftUI
 
 struct WikilinkPickerView: View {
-    let notes: [Note]
+    let notes: [NoteMetadata]
     let onSelect: (String) -> Void
 
     @State private var search = ""
     @FocusState private var isSearchFocused: Bool
 
-    private var filtered: [Note] {
+    private var filtered: [NoteMetadata] {
         let sorted = notes.sorted { $0.createdAt > $1.createdAt }
         if search.isEmpty { return sorted }
         let q = search.lowercased()

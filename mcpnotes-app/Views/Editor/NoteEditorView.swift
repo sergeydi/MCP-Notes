@@ -2,7 +2,7 @@ import SwiftUI
 
 struct NoteEditorView: View {
     @Environment(NoteStore.self) private var store
-    let note: Note
+    let noteMetadata: NoteMetadata
 
     @State private var viewModel = EditorViewModel()
     @State private var showDeleteConfirmation = false
@@ -26,24 +26,24 @@ struct NoteEditorView: View {
             notesDirectoryURL: FileService.notesDirectoryURL,
             formatProxy: formatProxy,
             header: FrontmatterView(
-                filename: note.filename,
+                filename: noteMetadata.filename,
                 draftFilename: $draftFilename,
                 isEditingFilename: $isEditingFilename,
                 isRenamingInProgress: isRenamingInProgress,
                 wikilinkRenameCount: wikilinkRenameCount,
-                otherFilenames: store.notes.filter { $0.id != note.id }.map(\.filename),
+                otherFilenames: store.notes.filter { $0.id != noteMetadata.id }.map(\.filename),
                 tags: $viewModel.tags,
                 allTags: store.allTags,
                 onTagsChanged: viewModel.scheduleAutosave,
                 onApplyRename: {
-                    let oldName = note.filename
+                    let oldName = noteMetadata.filename
                     let newName = draftFilename.trimmingCharacters(in: .whitespaces)
                     viewModel.flushAutosave()
                     renameMessageTask?.cancel()
                     renameMessageTask = nil
                     isRenamingInProgress = true
                     wikilinkRenameCount = nil
-                    store.renameNote(note, to: newName) { updatedFilenames in
+                    store.renameNote(noteMetadata, to: newName) { updatedFilenames in
                         isRenamingInProgress = false
                         wikilinkRenameCount = updatedFilenames.count
                         renameMessageTask = Task {
@@ -57,45 +57,43 @@ struct NoteEditorView: View {
             )
         )
         .toolbar { editorToolbar }
-        .onAppear {
-            viewModel.load(note: note)
-            draftFilename = note.filename
-            let noteID = note.id
+        .task(id: noteMetadata.id) {
+            let noteID = noteMetadata.id
+            guard let full = try? await store.loadFullNote(noteMetadata) else { return }
+            viewModel.load(note: full)
+            draftFilename = full.filename
+            // Looks up the note fresh from the store by id at save time (rather than closing
+            // over `noteMetadata`/`full`) so a rename that lands between now and the next
+            // autosave is reflected in the fileURL/filename we save to.
             viewModel.onSave = { [weak store] body, tags in
-                guard let store else { return }
-                guard let current = store.notes.first(where: { $0.id == noteID }) else { return }
-                var updated = current
-                updated.body = body
-                updated.tags = tags
+                guard let store, let current = store.notes.first(where: { $0.id == noteID }) else { return }
+                let updated = Note(
+                    id: current.id,
+                    filename: current.filename,
+                    tags: tags,
+                    body: body,
+                    fileURL: current.fileURL,
+                    isBookmarked: current.isBookmarked,
+                    modifiedAt: current.modifiedAt,
+                    createdAt: current.createdAt
+                )
                 store.updateNote(updated)
             }
         }
-        .onChange(of: note) { oldValue, newValue in
-            guard newValue.id != oldValue.id else {
-                // Same note, changed externally (e.g. iCloud sync from another device).
-                // Only pull in the fresh content if the user has no unsaved local edits —
-                // otherwise we'd clobber what they're currently typing.
-                guard !viewModel.isDirty else { return }
-                viewModel.load(note: newValue)
-                if !isEditingFilename {
-                    draftFilename = newValue.filename
-                }
-                return
+        .onChange(of: noteMetadata) { oldValue, newValue in
+            // View identity is `.id(note.id)` upstream, so a different note always gets a
+            // fresh NoteEditorView instance — this only ever fires for the same note changed
+            // externally (e.g. iCloud sync from another device, or the MCP server writing to
+            // it). Only pull in fresh content if the user has no unsaved local edits —
+            // otherwise we'd clobber what they're currently typing.
+            guard !viewModel.isDirty else { return }
+            guard newValue.modifiedAt != oldValue.modifiedAt || newValue.filename != oldValue.filename else { return }
+            Task {
+                guard let full = try? await store.loadFullNote(newValue) else { return }
+                viewModel.load(note: full)
             }
-            viewModel.flushAutosave()
-            viewModel.load(note: newValue)
-            draftFilename = newValue.filename
-            isEditingFilename = false
-            renameMessageTask?.cancel()
-            wikilinkRenameCount = nil
-            let noteID = newValue.id
-            viewModel.onSave = { [weak store] body, tags in
-                guard let store else { return }
-                guard let current = store.notes.first(where: { $0.id == noteID }) else { return }
-                var updated = current
-                updated.body = body
-                updated.tags = tags
-                store.updateNote(updated)
+            if !isEditingFilename {
+                draftFilename = newValue.filename
             }
         }
         .onDisappear {
@@ -160,7 +158,7 @@ struct NoteEditorView: View {
                 }
                 .help("Insert wikilink")
                 .popover(isPresented: $showWikilinkPicker, arrowEdge: .bottom) {
-                    WikilinkPickerView(notes: store.notes.filter { $0.id != note.id }) { wikilink in
+                    WikilinkPickerView(notes: store.notes.filter { $0.id != noteMetadata.id }) { wikilink in
                         formatProxy.insertText(wikilink)
                         showWikilinkPicker = false
                     }
@@ -173,26 +171,26 @@ struct NoteEditorView: View {
                 showDeleteConfirmation = true
             }
             .help("Delete note")
-            .confirmationDialog("Delete \"\(note.filename)\"?", isPresented: $showDeleteConfirmation) {
+            .confirmationDialog("Delete \"\(noteMetadata.filename)\"?", isPresented: $showDeleteConfirmation) {
                 Button("Delete", role: .destructive) {
                     viewModel.cancelAutosave()
-                    store.deleteNote(note)
+                    store.deleteNote(noteMetadata)
                 }
             } message: {
                 Text("This note will be permanently deleted.")
             }
 
             Button {
-                store.toggleBookmark(for: note.id)
+                store.toggleBookmark(for: noteMetadata.id)
             } label: {
                 Label(
-                    note.isBookmarked ? "Remove Bookmark" : "Add Bookmark",
-                    systemImage: note.isBookmarked ? "bookmark.fill" : "bookmark"
+                    noteMetadata.isBookmarked ? "Remove Bookmark" : "Add Bookmark",
+                    systemImage: noteMetadata.isBookmarked ? "bookmark.fill" : "bookmark"
                 )
-                .foregroundStyle(note.isBookmarked ? Color.accentColor : Color.primary)
+                .foregroundStyle(noteMetadata.isBookmarked ? Color.accentColor : Color.primary)
             }
-            .accessibilityLabel(note.isBookmarked ? "Remove bookmark" : "Add bookmark")
-            .help(note.isBookmarked ? "Remove bookmark" : "Add bookmark")
+            .accessibilityLabel(noteMetadata.isBookmarked ? "Remove bookmark" : "Add bookmark")
+            .help(noteMetadata.isBookmarked ? "Remove bookmark" : "Add bookmark")
 
             ShareLink(item: viewModel.body) {
                 Label("Share", systemImage: "square.and.arrow.up")
