@@ -80,7 +80,7 @@ struct EditorViewModelTests {
         vm.onSave = { _, _ in callCount += 1 }
         vm.body = "Content"
         vm.scheduleAutosave()
-        try await Task.sleep(for: .milliseconds(1300))
+        try await Task.sleep(for: .milliseconds(3300))
         #expect(callCount == 1)
     }
 
@@ -91,7 +91,7 @@ struct EditorViewModelTests {
         vm.scheduleAutosave()
         vm.scheduleAutosave()
         vm.scheduleAutosave()
-        try await Task.sleep(for: .milliseconds(1300))
+        try await Task.sleep(for: .milliseconds(3300))
         #expect(callCount == 1)
     }
 
@@ -101,7 +101,7 @@ struct EditorViewModelTests {
         vm.onSave = { _, _ in callCount += 1 }
         vm.scheduleAutosave()
         vm.load(note: makeNote())
-        try await Task.sleep(for: .milliseconds(1300))
+        try await Task.sleep(for: .milliseconds(3300))
         #expect(callCount == 0)
     }
 }

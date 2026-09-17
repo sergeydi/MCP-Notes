@@ -106,11 +106,19 @@ final class NoteStore {
     private var reloadTask: Task<Void, Never>?
     private var noteIndexQueue: [NoteMetadata] = []
     private var indexWorkerTask: Task<Void, Never>?
+    // Per-note debounce for handing an edited note off to the (expensive, ML-backed) indexer —
+    // separate from EditorViewModel's own 3s autosave-to-disk debounce. Without this, a note
+    // that keeps getting edited in bursts more than 1s apart would re-embed on every single
+    // pause; this only enqueues once edits actually stop for `indexDebounceDuration`.
+    private var indexDebounceTasks: [UUID: Task<Void, Never>] = [:]
+    private let indexDebounceDuration: Duration
 
     init(fileService: any FileServicing = FileService(),
-                indexer: any NoteIndexing) {
+                indexer: any NoteIndexing,
+                indexDebounceDuration: Duration = .seconds(300)) {
         self.fileService = fileService
         self.indexer = indexer
+        self.indexDebounceDuration = indexDebounceDuration
     }
 
     deinit {
@@ -118,6 +126,7 @@ final class NoteStore {
         // watcherFD is closed by setCancelHandler — do not close it here
         for source in fileWatchers.values { source.cancel() }
         reloadTask?.cancel()
+        for task in indexDebounceTasks.values { task.cancel() }
     }
 
     var selectedNote: NoteMetadata? {
@@ -226,18 +235,13 @@ final class NoteStore {
                 notes[idx].modifiedAt = mtime
             }
             watchFiles([notes[idx]])
-            // Indexing runs off the save path through the shared per-note queue (see
-            // enqueueNotes) instead of an inline `indexer.indexNote` call, so a burst of
-            // autosaves (or an autosave landing during a cold-start/rename reindex) is
-            // serialized through the same worker rather than racing separate direct calls.
-            let indexed = await indexer.indexedCount()
-            indexingState = .indexing(indexed: indexed, total: indexed + 1)
-            enqueueNotes([notes[idx]])
+            scheduleIndexing(for: notes[idx])
         }
     }
 
     func deleteNote(_ note: NoteMetadata) {
         stopWatchingFile(id: note.id)
+        indexDebounceTasks.removeValue(forKey: note.id)?.cancel()
         notes.removeAll { $0.id == note.id }
 
         navHistory.removeAll { $0 == note.id }
@@ -321,6 +325,8 @@ final class NoteStore {
         directoryWatcher?.cancel()
         directoryWatcher = nil
         stopWatchingAllFiles()
+        for task in indexDebounceTasks.values { task.cancel() }
+        indexDebounceTasks.removeAll()
         notes = []
         selectedNoteID = nil
         navHistory = []
@@ -394,6 +400,26 @@ final class NoteStore {
     }
 
     // MARK: - Private
+
+    /// Debounces handing an edited note to `enqueueNotes` by `indexDebounceDuration`, separate
+    /// from `EditorViewModel`'s own 3s autosave-to-disk debounce: the note is already saved to
+    /// disk by the time this runs, so cancelling and rescheduling here only delays the (costly)
+    /// ML embedding step, not the save itself. Rapid edits landing within the debounce window
+    /// each reset the timer, so a note only gets enqueued once edits actually stop.
+    private func scheduleIndexing(for metadata: NoteMetadata) {
+        indexDebounceTasks[metadata.id]?.cancel()
+        indexDebounceTasks[metadata.id] = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: self.indexDebounceDuration)
+            guard !Task.isCancelled else { return }
+            self.indexDebounceTasks[metadata.id] = nil
+            // Look up fresh in case the note was renamed/edited again while we were waiting.
+            guard let current = self.notes.first(where: { $0.id == metadata.id }) else { return }
+            let indexed = await self.indexer.indexedCount()
+            self.indexingState = .indexing(indexed: indexed, total: indexed + 1)
+            self.enqueueNotes([current])
+        }
+    }
 
     /// Appends notes to the per-note index queue, deduplicating by ID, and starts the
     /// worker task if it is not already running. The worker reads each note's body from disk

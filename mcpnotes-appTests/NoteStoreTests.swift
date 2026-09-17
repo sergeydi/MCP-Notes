@@ -140,7 +140,7 @@ struct NoteStoreTests {
     init() {
         fs = MockFileService()
         idx = MockNoteIndexer()
-        store = NoteStore(fileService: fs, indexer: idx)
+        store = NoteStore(fileService: fs, indexer: idx, indexDebounceDuration: .zero)
     }
 
     // MARK: selectedNote
@@ -316,7 +316,7 @@ struct NoteStoreFileServiceTests {
     init() {
         fs = MockFileService()
         idx = MockNoteIndexer()
-        store = NoteStore(fileService: fs, indexer: idx)
+        store = NoteStore(fileService: fs, indexer: idx, indexDebounceDuration: .zero)
     }
 
     @Test func loadPopulatesNotesFromFileService() async {
@@ -390,7 +390,7 @@ struct NoteStoreIndexerTests {
     init() {
         fs = MockFileService()
         idx = MockNoteIndexer()
-        store = NoteStore(fileService: fs, indexer: idx)
+        store = NoteStore(fileService: fs, indexer: idx, indexDebounceDuration: .zero)
     }
 
     @Test func loadCallsLoadFromDiskOnIndexer() async {
@@ -581,7 +581,7 @@ struct NoteStoreExternalChangesTests {
     init() {
         fs = MockFileService()
         idx = MockNoteIndexer()
-        store = NoteStore(fileService: fs, indexer: idx)
+        store = NoteStore(fileService: fs, indexer: idx, indexDebounceDuration: .zero)
     }
 
     @Test func addsNoteAppearedOnDisk() async {
@@ -755,7 +755,7 @@ struct NoteStoreTagGroupingTests {
     let store: NoteStore
 
     init() {
-        store = NoteStore(fileService: MockFileService(), indexer: MockNoteIndexer())
+        store = NoteStore(fileService: MockFileService(), indexer: MockNoteIndexer(), indexDebounceDuration: .zero)
     }
 
     @Test func notesFilteredByTagMatchExpected() {
@@ -807,7 +807,7 @@ struct NoteStoreRenameWikilinkTests {
     init() {
         fs = MockFileService()
         idx = MockNoteIndexer()
-        store = NoteStore(fileService: fs, indexer: idx)
+        store = NoteStore(fileService: fs, indexer: idx, indexDebounceDuration: .zero)
     }
 
     @Test func updatesWikilinkInOtherNote() async throws {

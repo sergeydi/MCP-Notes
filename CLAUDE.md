@@ -57,7 +57,7 @@ The project has three main code targets:
 
 ### Data flow
 
-`NoteStore` (injected as `@Environment`) is the single source of truth for all notes. Views read from it; `NoteEditorView` writes back through `NoteStore.updateNote(_:)` after a 1-second debounce managed by `EditorViewModel`.
+`NoteStore` (injected as `@Environment`) is the single source of truth for all notes. Views read from it; `NoteEditorView` writes back through `NoteStore.updateNote(_:)` after a 3-second debounce managed by `EditorViewModel`.
 
 ```
 ContentView (NavigationSplitView)
