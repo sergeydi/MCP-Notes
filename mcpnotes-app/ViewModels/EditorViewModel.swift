@@ -43,7 +43,7 @@ public final class EditorViewModel {
         autosaveTask?.cancel()
         guard isDirty else { return }
         autosaveTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(for: .seconds(1))
             guard let self, !Task.isCancelled else { return }
             onSave?(body, tags)
             _loadedHash = contentHash(body: body, tags: tags)

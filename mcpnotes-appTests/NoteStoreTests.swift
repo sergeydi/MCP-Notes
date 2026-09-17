@@ -402,7 +402,10 @@ struct NoteStoreIndexerTests {
         fs.stubbedNotes = [makeNote(filename: "A")]
         idx.stubbedCount = 0
         await store.load()
-        await Task.yield()
+        // load() now hands notes to the same per-note debounce as edits/renames/external
+        // changes, so indexing lands after that debounce task's own suspension — poll instead
+        // of a fixed yield count (see yieldUntil).
+        await yieldUntil { idx.indexNoteIfChangedCalledWith.count == fs.stubbedNotes.count }
         #expect(idx.indexNoteIfChangedCalledWith.count == fs.stubbedNotes.count)
     }
 
@@ -411,7 +414,7 @@ struct NoteStoreIndexerTests {
         fs.stubbedNotes = notes
         idx.stubbedCount = 2
         await store.load()
-        await Task.yield()
+        await yieldUntil { idx.indexNoteIfChangedCalledWith.count == fs.stubbedNotes.count }
         #expect(idx.indexNoteIfChangedCalledWith.count == fs.stubbedNotes.count)
     }
 
@@ -419,7 +422,7 @@ struct NoteStoreIndexerTests {
         fs.stubbedNotes = [makeNote(filename: "A"), makeNote(filename: "B"), makeNote(filename: "C")]
         idx.stubbedCount = 1
         await store.load()
-        await Task.yield()
+        await yieldUntil { idx.indexNoteIfChangedCalledWith.count == fs.stubbedNotes.count }
         #expect(idx.indexNoteIfChangedCalledWith.count == fs.stubbedNotes.count)
     }
 
@@ -521,7 +524,7 @@ struct NoteStoreIndexerTests {
     @Test func loadTransitionsIndexingStateToReady() async {
         fs.stubbedNotes = [makeNote(filename: "A")]
         await store.load()
-        await Task.yield()
+        await yieldUntil { if case .ready = store.indexingState { true } else { false } }
         guard case .ready = store.indexingState else {
             Issue.record("Expected .ready, got \(store.indexingState)")
             return
@@ -543,13 +546,12 @@ struct NoteStoreIndexerTests {
     @Test func loadSetsIndexingBeforeEnqueuing() async {
         fs.stubbedNotes = [makeNote(filename: "A"), makeNote(filename: "B")]
         idx.stubbedCount = 0
-        // indexingState must be .indexing immediately after load() returns,
-        // before the worker task has a chance to run.
+        // load() now schedules its notes through the same per-note debounce as edits/renames/
+        // external changes, so indexingState only moves off .idle once the debounce fires — poll
+        // for the eventual .ready rather than asserting an immediate .indexing.
         let loadTask = Task { await self.store.load() }
         await loadTask.value
-        // At this point the worker may or may not have run yet —
-        // but it must have moved to .ready by the time we yield.
-        await Task.yield()
+        await yieldUntil { if case .ready = store.indexingState { true } else { false } }
         guard case .ready = store.indexingState else {
             Issue.record("Expected .ready after worker finishes, got \(store.indexingState)")
             return
@@ -599,7 +601,9 @@ struct NoteStoreExternalChangesTests {
         store.notes = []
         fs.stubbedNotes = [added]
         await store.reloadExternalChanges()
-        await Task.yield()
+        // reloadExternalChanges now schedules through the same per-note debounce as edits —
+        // poll instead of a fixed yield count (see yieldUntil).
+        await yieldUntil { idx.indexNoteIfChangedCalledWith.contains { $0.id == added.id } }
         #expect(idx.indexNoteIfChangedCalledWith.contains { $0.id == added.id })
     }
 
@@ -643,7 +647,7 @@ struct NoteStoreExternalChangesTests {
         updated.modifiedAt = note.modifiedAt.addingTimeInterval(1)
         fs.stubbedNotes = [updated]
         await store.reloadExternalChanges()
-        await Task.yield()
+        await yieldUntil { idx.indexNoteIfChangedCalledWith.contains { $0.id == note.id } }
         let indexed = try #require(idx.indexNoteIfChangedCalledWith.first { $0.id == note.id })
         #expect(indexed.body == "new body")
     }
@@ -675,7 +679,7 @@ struct NoteStoreExternalChangesTests {
         updated.tags = ["new"]
         fs.stubbedNotes = [updated]
         await store.reloadExternalChanges()
-        await Task.yield()
+        await yieldUntil { idx.indexNoteIfChangedCalledWith.contains { $0.id == note.id } }
         let indexed = try #require(idx.indexNoteIfChangedCalledWith.first { $0.id == note.id })
         #expect(indexed.tags == ["new"])
     }

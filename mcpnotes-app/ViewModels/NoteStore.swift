@@ -107,7 +107,7 @@ final class NoteStore {
     private var noteIndexQueue: [NoteMetadata] = []
     private var indexWorkerTask: Task<Void, Never>?
     // Per-note debounce for handing an edited note off to the (expensive, ML-backed) indexer —
-    // separate from EditorViewModel's own 3s autosave-to-disk debounce. Without this, a note
+    // separate from EditorViewModel's own 1s autosave-to-disk debounce. Without this, a note
     // that keeps getting edited in bursts more than 1s apart would re-embed on every single
     // pause; this only enqueues once edits actually stop for `indexDebounceDuration`.
     private var indexDebounceTasks: [UUID: Task<Void, Never>] = [:]
@@ -169,10 +169,8 @@ final class NoteStore {
         let orphanedIDs = await indexer.allIndexedIDs().subtracting(loadedIDs)
         for id in orphanedIDs { await indexer.removeNote(id: id) }
 
-        let total = notes.count
-        if total > 0 {
-            indexingState = .indexing(indexed: await indexer.indexedCount(), total: total)
-            enqueueNotes(notes)
+        if !notes.isEmpty {
+            scheduleIndexing(for: notes)
         } else {
             indexingState = .ready(count: 0)
         }
@@ -308,13 +306,9 @@ final class NoteStore {
                 updatedFilenames.append(n.filename)
                 notesToEnqueue.append(updatedMetadata)
             }
-            // Indexing runs off the rename path in the background worker (see enqueueNotes)
-            // so the rename itself isn't blocked on ML embedding. Set .indexing up front so
-            // the settings-icon indicator lights up even for a single-note rename, where the
-            // worker itself would otherwise never report an intermediate state.
-            let indexed = await indexer.indexedCount()
-            indexingState = .indexing(indexed: indexed, total: indexed + notesToEnqueue.count)
-            enqueueNotes(notesToEnqueue)
+            // Indexing runs off the rename path through the same per-note debounce as edits
+            // (see scheduleIndexing) so the rename itself isn't blocked on ML embedding.
+            scheduleIndexing(for: notesToEnqueue)
             onComplete?(updatedFilenames)
         }
     }
@@ -401,11 +395,21 @@ final class NoteStore {
 
     // MARK: - Private
 
-    /// Debounces handing an edited note to `enqueueNotes` by `indexDebounceDuration`, separate
-    /// from `EditorViewModel`'s own 3s autosave-to-disk debounce: the note is already saved to
-    /// disk by the time this runs, so cancelling and rescheduling here only delays the (costly)
-    /// ML embedding step, not the save itself. Rapid edits landing within the debounce window
-    /// each reset the timer, so a note only gets enqueued once edits actually stop.
+    /// Debounces handing off a batch of notes to `scheduleIndexing(for: NoteMetadata)` — used by
+    /// cold-start load, the rename wikilink cascade, and external-change reloads, so none of
+    /// those paths bypass the per-note debounce below.
+    private func scheduleIndexing(for notesToSchedule: [NoteMetadata]) {
+        for note in notesToSchedule {
+            scheduleIndexing(for: note)
+        }
+    }
+
+    /// Debounces handing a note to `enqueueNotes` by `indexDebounceDuration` — separate from
+    /// `EditorViewModel`'s own 1s autosave-to-disk debounce: the note is already saved to disk
+    /// by the time this runs (or, for load/rename/external-change callers, was never dirty to
+    /// begin with), so cancelling and rescheduling here only delays the (costly) ML embedding
+    /// step. Rescheduling this same note (an edit, a rename, another external change) within the
+    /// debounce window resets the timer, so it only gets enqueued once things settle.
     private func scheduleIndexing(for metadata: NoteMetadata) {
         indexDebounceTasks[metadata.id]?.cancel()
         indexDebounceTasks[metadata.id] = Task(priority: .utility) { [weak self] in
@@ -591,12 +595,11 @@ final class NoteStore {
         // Remove deleted notes from the index directly (fast, no ML inference).
         for id in removedIDs { await indexer.removeNote(id: id) }
 
-        // Enqueue only added and changed notes; unchanged notes are skipped by indexNoteIfChanged.
+        // Debounce indexing added/changed notes; unchanged notes are skipped by indexNoteIfChanged
+        // once the debounce fires and hands them to enqueueNotes.
         let toIndex = addedIDs.compactMap { freshMap[$0] } + changedNotes
         if !toIndex.isEmpty {
-            let indexed = await indexer.indexedCount()
-            indexingState = .indexing(indexed: indexed, total: indexed + toIndex.count)
-            enqueueNotes(toIndex)
+            scheduleIndexing(for: toIndex)
         } else if !removedIDs.isEmpty {
             indexingState = .ready(count: await indexer.indexedCount())
         }
