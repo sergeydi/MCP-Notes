@@ -408,7 +408,7 @@ final class NoteStore {
     /// each reset the timer, so a note only gets enqueued once edits actually stop.
     private func scheduleIndexing(for metadata: NoteMetadata) {
         indexDebounceTasks[metadata.id]?.cancel()
-        indexDebounceTasks[metadata.id] = Task { [weak self] in
+        indexDebounceTasks[metadata.id] = Task(priority: .utility) { [weak self] in
             guard let self else { return }
             try? await Task.sleep(for: self.indexDebounceDuration)
             guard !Task.isCancelled else { return }
@@ -432,7 +432,9 @@ final class NoteStore {
             noteIndexQueue.append(note)
         }
         guard indexWorkerTask == nil else { return }
-        indexWorkerTask = Task { @MainActor [weak self] in
+        // .utility: visible progress (settings-icon indicator) but shouldn't compete with
+        // UI-critical work for scheduling.
+        indexWorkerTask = Task(priority: .utility) { @MainActor [weak self] in
             guard let self else { return }
             var processed = 0
             while !self.noteIndexQueue.isEmpty {
