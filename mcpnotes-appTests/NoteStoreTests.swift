@@ -428,13 +428,15 @@ struct NoteStoreIndexerTests {
         #expect(idx.indexNoteCalledWith.count == 1)
     }
 
-    @Test func updateNoteCallsIndexNote() async throws {
+    @Test func updateNoteCallsIndexNoteIfChanged() async throws {
         var note = makeNote()
         store.notes = [NoteMetadata(note)]
         note.body = "Updated"
         store.updateNote(note)
-        await Task.yield()
-        let indexed = try #require(idx.indexNoteCalledWith.first)
+        // updateNote's outer Task enqueues the saved note onto the shared indexWorkerTask —
+        // poll instead of a fixed yield count (see yieldUntil).
+        await yieldUntil { !idx.indexNoteIfChangedCalledWith.isEmpty }
+        let indexed = try #require(idx.indexNoteIfChangedCalledWith.first)
         #expect(indexed.id == note.id)
     }
 
@@ -443,8 +445,8 @@ struct NoteStoreIndexerTests {
         store.notes = [NoteMetadata(note)]
         note.body = "New body"
         store.updateNote(note)
-        await Task.yield()
-        let indexed = try #require(idx.indexNoteCalledWith.first)
+        await yieldUntil { !idx.indexNoteIfChangedCalledWith.isEmpty }
+        let indexed = try #require(idx.indexNoteIfChangedCalledWith.first)
         #expect(indexed.body == "New body")
     }
 
@@ -453,8 +455,8 @@ struct NoteStoreIndexerTests {
         store.notes = [NoteMetadata(note)]
         note.tags = ["new"]
         store.updateNote(note)
-        await Task.yield()
-        let indexed = try #require(idx.indexNoteCalledWith.first)
+        await yieldUntil { !idx.indexNoteIfChangedCalledWith.isEmpty }
+        let indexed = try #require(idx.indexNoteIfChangedCalledWith.first)
         #expect(indexed.tags == ["new"])
     }
 
@@ -462,7 +464,7 @@ struct NoteStoreIndexerTests {
         store.notes = [NoteMetadata(makeNote(filename: "Real"))]
         store.updateNote(makeNote(filename: "Ghost"))
         await Task.yield()
-        #expect(idx.indexNoteCalledWith.isEmpty)
+        #expect(idx.indexNoteIfChangedCalledWith.isEmpty)
     }
 
     @Test func deleteNoteCallsRemoveNote() async throws {

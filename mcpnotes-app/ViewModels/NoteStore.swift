@@ -219,16 +219,20 @@ final class NoteStore {
         Task {
             // TODO: surface errors to user
             try? fileService.saveNote(merged)
-            if let idx = notes.firstIndex(where: { $0.id == merged.id }) {
-                // Refresh modifiedAt from the file we just wrote so the next external-reload
-                // tick (mtime diff) doesn't mistake our own save for an external change.
-                if let mtime = try? merged.fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate {
-                    notes[idx].modifiedAt = mtime
-                }
-                watchFiles([notes[idx]])
+            guard let idx = notes.firstIndex(where: { $0.id == merged.id }) else { return }
+            // Refresh modifiedAt from the file we just wrote so the next external-reload
+            // tick (mtime diff) doesn't mistake our own save for an external change.
+            if let mtime = try? merged.fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate {
+                notes[idx].modifiedAt = mtime
             }
-            try? await indexer.indexNote(merged)
-            indexingState = .ready(count: await indexer.indexedCount())
+            watchFiles([notes[idx]])
+            // Indexing runs off the save path through the shared per-note queue (see
+            // enqueueNotes) instead of an inline `indexer.indexNote` call, so a burst of
+            // autosaves (or an autosave landing during a cold-start/rename reindex) is
+            // serialized through the same worker rather than racing separate direct calls.
+            let indexed = await indexer.indexedCount()
+            indexingState = .indexing(indexed: indexed, total: indexed + 1)
+            enqueueNotes([notes[idx]])
         }
     }
 
