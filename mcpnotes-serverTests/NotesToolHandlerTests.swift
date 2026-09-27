@@ -9,6 +9,11 @@ extension Tool.Content {
         if case .text(let t, _, _) = self { return t }
         return nil
     }
+
+    var imageValue: (data: String, mimeType: String)? {
+        if case .image(let data, let mimeType, _, _) = self { return (data, mimeType) }
+        return nil
+    }
 }
 
 extension CallTool.Result {
@@ -288,6 +293,40 @@ private func call(
     func returnsErrorForBadUID(_ uid: String) async throws {
         let result = try await call("get_note", args: ["uid": .string(uid)], fixture: fixture)
         #expect(result.isError == true)
+    }
+
+    @Test func includesEmbeddedImageAsImageContent() async throws {
+        let imageData = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        try imageData.write(to: fixture.dir.appendingPathComponent("Pasted image 1.png"))
+        let uid = try fixture.add(
+            filename: "With Image",
+            body: "before\n![[Pasted image 1.png]]\nafter"
+        )
+        let result = try await call("get_note", args: ["uid": .string(uid.uuidString)], fixture: fixture)
+        #expect(result.content.count == 2)
+        let image = try #require(result.content.last?.imageValue)
+        #expect(image.mimeType == "image/png")
+        #expect(image.data == imageData.base64EncodedString())
+    }
+
+    @Test func skipsMissingImageFile() async throws {
+        let uid = try fixture.add(
+            filename: "Broken Image",
+            body: "![[does-not-exist.png]]"
+        )
+        let result = try await call("get_note", args: ["uid": .string(uid.uuidString)], fixture: fixture)
+        #expect(result.content.count == 1)
+    }
+
+    @Test func dedupesRepeatedImageReference() async throws {
+        let imageData = Data([0x89, 0x50, 0x4E, 0x47])
+        try imageData.write(to: fixture.dir.appendingPathComponent("dup.png"))
+        let uid = try fixture.add(
+            filename: "Repeated Image",
+            body: "![[dup.png]]\n\n![[dup.png]]"
+        )
+        let result = try await call("get_note", args: ["uid": .string(uid.uuidString)], fixture: fixture)
+        #expect(result.content.count == 2)
     }
 }
 

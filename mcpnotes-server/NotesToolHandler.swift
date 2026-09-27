@@ -283,7 +283,9 @@ enum NotesToolHandler {
 
         \(note.body)
         """
-        return text(output)
+        var content: [Tool.Content] = [.text(text: output, annotations: nil, _meta: nil)]
+        content.append(contentsOf: imageAttachments(in: note.body, service: service))
+        return CallTool.Result(content: content)
     }
 
     private static func updateNote(_ args: [String: Value], service: NotesService) -> CallTool.Result {
@@ -393,5 +395,52 @@ enum NotesToolHandler {
             content: [.text(text: message, annotations: nil, _meta: nil)],
             isError: true
         )
+    }
+
+    // MARK: - Embedded images
+
+    // Matches the ![[Pasted image ...png]] wikilink syntax the app inserts on image paste.
+    private static let imageWikilinkRegex = try! NSRegularExpression(
+        pattern: #"!\[\[([^\]\n]+\.(?:png|jpg|jpeg|gif|webp|tiff|bmp))\]\]"#,
+        options: .caseInsensitive
+    )
+
+    // Keeps a single oversized image from blowing up the stdio response.
+    private static let maxImageAttachmentBytes = 10 * 1024 * 1024
+
+    private static func imageAttachments(in body: String, service: NotesService) -> [Tool.Content] {
+        let nsBody = body as NSString
+        let matches = imageWikilinkRegex.matches(in: body, range: NSRange(location: 0, length: nsBody.length))
+        var seenFilenames = Set<String>()
+        var attachments: [Tool.Content] = []
+        for match in matches {
+            guard match.numberOfRanges > 1 else { continue }
+            let filename = nsBody.substring(with: match.range(at: 1))
+            guard seenFilenames.insert(filename).inserted else { continue }
+            let url = service.directory.appendingPathComponent(filename)
+            guard
+                let data = try? Data(contentsOf: url),
+                data.count <= maxImageAttachmentBytes
+            else { continue }
+            attachments.append(.image(
+                data: data.base64EncodedString(),
+                mimeType: imageMimeType(forExtension: url.pathExtension),
+                annotations: nil,
+                _meta: nil
+            ))
+        }
+        return attachments
+    }
+
+    private static func imageMimeType(forExtension ext: String) -> String {
+        switch ext.lowercased() {
+        case "png": return "image/png"
+        case "jpg", "jpeg": return "image/jpeg"
+        case "gif": return "image/gif"
+        case "webp": return "image/webp"
+        case "tiff": return "image/tiff"
+        case "bmp": return "image/bmp"
+        default: return "application/octet-stream"
+        }
     }
 }
