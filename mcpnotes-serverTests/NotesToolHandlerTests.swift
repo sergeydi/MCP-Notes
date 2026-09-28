@@ -1,8 +1,34 @@
+import CoreGraphics
 import Foundation
+import ImageIO
 import MCP
 import Testing
+import UniformTypeIdentifiers
 
 // MARK: - Helpers
+
+/// Builds an uncompressible (random-noise) PNG so its encoded size stays close to
+/// width * height * 4 bytes, letting tests reliably exceed the server's downscale threshold.
+private func makeNoisePNG(width: Int, height: Int) -> Data {
+    var pixels = [UInt8](repeating: 0, count: width * height * 4)
+    for i in pixels.indices { pixels[i] = UInt8.random(in: 0...255) }
+    let colorSpace = CGColorSpaceCreateDeviceRGB()
+    let context = CGContext(
+        data: &pixels,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: width * 4,
+        space: colorSpace,
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    )!
+    let cgImage = context.makeImage()!
+    let mutableData = NSMutableData()
+    let destination = CGImageDestinationCreateWithData(mutableData, UTType.png.identifier as CFString, 1, nil)!
+    CGImageDestinationAddImage(destination, cgImage, nil)
+    CGImageDestinationFinalize(destination)
+    return mutableData as Data
+}
 
 extension Tool.Content {
     var textValue: String? {
@@ -327,6 +353,26 @@ private func call(
         )
         let result = try await call("get_note", args: ["uid": .string(uid.uuidString)], fixture: fixture)
         #expect(result.content.count == 2)
+    }
+
+    @Test func downscalesOversizedImageToJPEG() async throws {
+        let imageData = makeNoisePNG(width: 900, height: 900)
+        try #require(imageData.count > 650_000)
+        try imageData.write(to: fixture.dir.appendingPathComponent("big.png"))
+        let uid = try fixture.add(filename: "Big Image", body: "![[big.png]]")
+        let result = try await call("get_note", args: ["uid": .string(uid.uuidString)], fixture: fixture)
+        #expect(result.content.count == 2)
+        let image = try #require(result.content.last?.imageValue)
+        #expect(image.mimeType == "image/jpeg")
+        #expect(image.data.utf8.count <= 850_000)
+    }
+
+    @Test func skipsOversizedUnparsableFile() async throws {
+        let garbage = Data((0..<700_000).map { _ in UInt8.random(in: 0...255) })
+        try garbage.write(to: fixture.dir.appendingPathComponent("garbage.png"))
+        let uid = try fixture.add(filename: "Garbage Image", body: "![[garbage.png]]")
+        let result = try await call("get_note", args: ["uid": .string(uid.uuidString)], fixture: fixture)
+        #expect(result.content.count == 1)
     }
 }
 

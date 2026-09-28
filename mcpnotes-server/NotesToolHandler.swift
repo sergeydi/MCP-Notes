@@ -1,5 +1,7 @@
 import Foundation
 import MCP
+import ImageIO
+import UniformTypeIdentifiers
 
 enum NotesToolHandler {
 
@@ -54,7 +56,7 @@ enum NotesToolHandler {
         ),
         Tool(
             name: "get_note",
-            description: "Get the full content of a note by its UID.",
+            description: "Get the full content of a note by its UID. Any images embedded in the note (![[image.png]]) are returned alongside the text as separate image content blocks; large images are automatically downscaled and re-encoded as JPEG to stay within tool result size limits.",
             inputSchema: [
                 "type": "object",
                 "properties": [
@@ -405,31 +407,77 @@ enum NotesToolHandler {
         options: .caseInsensitive
     )
 
-    // Keeps a single oversized image from blowing up the stdio response.
-    private static let maxImageAttachmentBytes = 10 * 1024 * 1024
+    // Keeps a single oversized source file from being read into memory at all.
+    private static let maxSourceFileBytes = 10 * 1024 * 1024
+
+    // Files at or below this size are attached as-is (original format preserved).
+    private static let downscaleThresholdBytes = 650_000
+
+    // MCP clients (e.g. Claude Desktop) reject tool results above ~1MB; leave headroom
+    // for the text block and JSON/base64 overhead by capping the combined image payload.
+    private static let maxTotalImageBase64Bytes = 850_000
+
+    private static let thumbnailMaxDimensions: [CGFloat] = [1568, 1200, 900, 600, 400]
+    private static let jpegQualities: [CGFloat] = [0.7, 0.5, 0.35, 0.2]
 
     private static func imageAttachments(in body: String, service: NotesService) -> [Tool.Content] {
         let nsBody = body as NSString
         let matches = imageWikilinkRegex.matches(in: body, range: NSRange(location: 0, length: nsBody.length))
         var seenFilenames = Set<String>()
         var attachments: [Tool.Content] = []
+        var remainingBudget = maxTotalImageBase64Bytes
         for match in matches {
             guard match.numberOfRanges > 1 else { continue }
             let filename = nsBody.substring(with: match.range(at: 1))
             guard seenFilenames.insert(filename).inserted else { continue }
             let url = service.directory.appendingPathComponent(filename)
             guard
-                let data = try? Data(contentsOf: url),
-                data.count <= maxImageAttachmentBytes
+                let rawData = try? Data(contentsOf: url),
+                rawData.count <= maxSourceFileBytes,
+                let payload = attachmentPayload(for: rawData, fileExtension: url.pathExtension, budget: remainingBudget)
             else { continue }
-            attachments.append(.image(
-                data: data.base64EncodedString(),
-                mimeType: imageMimeType(forExtension: url.pathExtension),
-                annotations: nil,
-                _meta: nil
-            ))
+            remainingBudget -= payload.base64.utf8.count
+            attachments.append(.image(data: payload.base64, mimeType: payload.mimeType, annotations: nil, _meta: nil))
+            if remainingBudget <= 0 { break }
         }
         return attachments
+    }
+
+    // Returns base64 image data guaranteed to fit within `budget` UTF-8 bytes, downscaling
+    // and re-encoding as JPEG as needed. Returns nil if it couldn't be brought under budget.
+    private static func attachmentPayload(for rawData: Data, fileExtension: String, budget: Int) -> (base64: String, mimeType: String)? {
+        guard budget > 0 else { return nil }
+        if rawData.count <= downscaleThresholdBytes {
+            let base64 = rawData.base64EncodedString()
+            if base64.utf8.count <= budget {
+                return (base64, imageMimeType(forExtension: fileExtension))
+            }
+        }
+        for maxDimension in thumbnailMaxDimensions {
+            for quality in jpegQualities {
+                guard let jpegData = downscaledJPEGData(from: rawData, maxDimension: maxDimension, quality: quality) else { continue }
+                let base64 = jpegData.base64EncodedString()
+                if base64.utf8.count <= budget {
+                    return (base64, "image/jpeg")
+                }
+            }
+        }
+        return nil
+    }
+
+    private static func downscaledJPEGData(from data: Data, maxDimension: CGFloat, quality: CGFloat) -> Data? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let thumbnailOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxDimension,
+            kCGImageSourceCreateThumbnailWithTransform: true
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary) else { return nil }
+        let mutableData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(mutableData, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(destination, cgImage, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return mutableData as Data
     }
 
     private static func imageMimeType(forExtension ext: String) -> String {
