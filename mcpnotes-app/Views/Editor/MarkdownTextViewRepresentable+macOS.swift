@@ -184,6 +184,12 @@ private final class MarkdownTextView: NSTextView {
     private var imageViews: [NSImageView] = []
     private var lastLayoutWidth: CGFloat = 0
     private var minFrameHeight: CGFloat = 0
+    /// The real full-document height, captured once by `ensureFullLayout()`. TextKit 2 doesn't
+    /// durably remember that a full-document layout pass already happened: once normal scrolling
+    /// drives its own viewport layout controller, it re-estimates `usageBoundsForTextContainer`
+    /// from only what's currently prepared near the viewport, and NSTextView shrinks its frame to
+    /// match — which is exactly the "scroll thumb grows while scrolling" bug this floor fixes.
+    private var fullDocumentHeight: CGFloat = 0
 
     /// Height of the hosted frontmatter header, reserved at the top of the text container via
     /// an exclusion path so the first line of text lays out below it and the caret in an empty
@@ -208,6 +214,7 @@ private final class MarkdownTextView: NSTextView {
     override func setFrameSize(_ newSize: NSSize) {
         var s = newSize
         if minFrameHeight > 0 { s.height = max(s.height, minFrameHeight) }
+        if fullDocumentHeight > 0 { s.height = max(s.height, fullDocumentHeight) }
         super.setFrameSize(s)
     }
 
@@ -217,10 +224,47 @@ private final class MarkdownTextView: NSTextView {
         guard abs(w - lastLayoutWidth) > 1 else { return }
         lastLayoutWidth = w
         applyHeaderExclusion()
+        // Deferred a run-loop turn rather than called synchronously here: at this point bounds.width
+        // has only just changed, and AppKit/SwiftUI's own geometry settling for this pass isn't
+        // necessarily finished yet — calling ensureFullLayout() synchronously here was observed to
+        // sometimes lock in a premature, too-small width (one line of content) instead of the real one.
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            self.ensureFullLayout()
             self.updateImagePreviews()
             self.setNeedsDisplay(self.bounds)
+        }
+    }
+
+    /// Forces TextKit 2 to lay out the entire document once, so `usageBoundsForTextContainer`
+    /// (which `NSScrollView` reads to size its scroller thumb) reflects the real document height
+    /// right away. Without this, only the viewport that `drawBackground(in:)`/scrolling has
+    /// actually visited is laid out, so a freshly opened long note shows an oversized scroller
+    /// thumb (as if the document were much shorter) until something — e.g. placing the caret —
+    /// happens to force more layout. Called from `layout()` (below), not from `makeNSView`,
+    /// because the text container's real width isn't known until AppKit has laid the view out at
+    /// least once — calling this any earlier lays out against a stale/zero width that TextKit
+    /// then has to redo anyway. It's gated by the same width-change check as `layout()`'s other
+    /// work, so it runs once per open/resize, not per scroll frame.
+    func ensureFullLayout() {
+        guard let layoutManager = textLayoutManager,
+              let contentStorage = textContentStorage else { return }
+        layoutManager.enumerateTextLayoutFragments(
+            from: contentStorage.documentRange.location,
+            options: [.ensuresLayout]
+        ) { _ in true }
+        // usageBoundsForTextContainer is correct immediately after the enumeration above, but
+        // NSTextView's own frame isn't resynced to it — nothing does that until some unrelated
+        // event (e.g. placing the caret) happens to trigger NSTextView's internal resize sync, and
+        // sizeToFit() turned out to be a no-op here (it reads legacy NSLayoutManager state, which
+        // this TextKit-2-only text view doesn't have). Set the frame directly from the real bounds
+        // so NSScrollView recomputes its scroller knob against the actual document height.
+        let targetHeight = layoutManager.usageBoundsForTextContainer.height
+        if targetHeight > fullDocumentHeight {
+            fullDocumentHeight = targetHeight
+        }
+        if targetHeight > frame.height {
+            setFrameSize(NSSize(width: frame.width, height: targetHeight))
         }
     }
 
