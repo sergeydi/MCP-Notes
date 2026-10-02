@@ -226,6 +226,11 @@ private final class MarkdownTextView: NSTextView {
 
     // MARK: Code block background
 
+    /// Paints rounded-rect backgrounds behind fenced code blocks, scoped to `textViewportLayoutController.viewportRange`
+    /// — the range NSTextView's own viewport layout pass has already computed for the currently
+    /// visible area — rather than looping over every code block in the whole document and
+    /// force-laying-out each one on every single scroll-driven redraw, which used to be the
+    /// cause of very high CPU usage while scrolling notes with many code blocks.
     override func drawBackground(in rect: NSRect) {
         super.drawBackground(in: rect)
         if textStorage?.length == 0 {
@@ -233,40 +238,46 @@ private final class MarkdownTextView: NSTextView {
         }
         guard !codeBlockRanges.isEmpty,
               let layoutManager = textLayoutManager,
-              let contentStorage = textContentStorage else { return }
+              let contentStorage = textContentStorage,
+              let viewportRange = layoutManager.textViewportLayoutController.viewportRange else { return }
+
+        let origin = textContainerOrigin
+        let base = contentStorage.documentRange.location
+        var blockYRanges: [Int: (minY: CGFloat, maxY: CGFloat)] = [:]
+
+        layoutManager.enumerateTextLayoutFragments(from: viewportRange.location, options: []) { fragment in
+            let frame = fragment.layoutFragmentFrame.offsetBy(dx: origin.x, dy: origin.y)
+            guard frame.minY <= rect.maxY else { return false }
+
+            guard let elementRange = fragment.textElement?.elementRange,
+                  elementRange.location.compare(viewportRange.endLocation) == .orderedAscending else { return false }
+            let charIndex = contentStorage.offset(from: base, to: elementRange.location)
+            guard charIndex != NSNotFound,
+                  let blockIndex = codeBlockRanges.firstIndex(where: { NSLocationInRange(charIndex, $0) }) else {
+                return true
+            }
+            var entry = blockYRanges[blockIndex] ?? (minY: frame.minY, maxY: frame.maxY)
+            entry.minY = min(entry.minY, frame.minY)
+            entry.maxY = max(entry.maxY, frame.maxY)
+            blockYRanges[blockIndex] = entry
+            return true
+        }
+
+        guard !blockYRanges.isEmpty else { return }
 
         let bg = NSColor.systemGray.withAlphaComponent(0.10)
-        let origin = textContainerOrigin
         let topPad: CGFloat = 2
         let bottomPad: CGFloat = -6
         let leftMargin: CGFloat = 2
         let rightMargin: CGFloat = 10
         let cornerRadius: CGFloat = 6
 
-        for nsRange in codeBlockRanges {
-            let base = contentStorage.documentRange.location
-            guard let startLoc = contentStorage.location(base, offsetBy: nsRange.location),
-                  let endLoc = contentStorage.location(startLoc, offsetBy: nsRange.length) else { continue }
-
-            var minY: CGFloat = .greatestFiniteMagnitude
-            var maxY: CGFloat = -.greatestFiniteMagnitude
-
-            layoutManager.enumerateTextLayoutFragments(from: startLoc, options: [.ensuresLayout]) { fragment in
-                if let elemRange = fragment.textElement?.elementRange,
-                   elemRange.location.compare(endLoc) != .orderedAscending { return false }
-                let frame = fragment.layoutFragmentFrame.offsetBy(dx: origin.x, dy: origin.y)
-                minY = min(minY, frame.minY)
-                maxY = max(maxY, frame.maxY)
-                return true
-            }
-
-            guard minY < maxY else { continue }
-
+        for (_, yRange) in blockYRanges {
             let blockRect = CGRect(
                 x: bounds.minX + leftMargin,
-                y: minY - topPad,
+                y: yRange.minY - topPad,
                 width: bounds.width - leftMargin - rightMargin,
-                height: (maxY - minY) + topPad + bottomPad
+                height: (yRange.maxY - yRange.minY) + topPad + bottomPad
             )
             bg.setFill()
             NSBezierPath(roundedRect: blockRect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
@@ -484,6 +495,13 @@ private final class MarkdownTextView: NSTextView {
     // MARK: Cursor appearance
 
     override func updateTrackingAreas() {
+        // AppKit calls this on every geometry change — including on every scroll, since an
+        // `.inVisibleRect` tracking area must be re-evaluated as the visible rect moves. Without
+        // removing the previous one first, a tracking area accumulates on every single call for
+        // the life of the view: profiling traced a scroll freeze that got reproducibly worse the
+        // further into a long document you scrolled to exactly this — thousands of overlapping
+        // tracking areas each needing to be hit-tested on every `mouseMoved`.
+        trackingAreas.forEach(removeTrackingArea)
         super.updateTrackingAreas()
         addTrackingArea(NSTrackingArea(
             rect: .zero,
