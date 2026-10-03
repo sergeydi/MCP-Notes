@@ -63,6 +63,19 @@ struct MCPSettingsView: View {
         FileService.notesDirectoryURL.path(percentEncoded: false)
     }
 
+    /// Wraps a value in single quotes so paths with spaces (e.g. "MCP Notes.app") survive the shell as one argument.
+    private func shellQuoted(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    /// Double-quoted string literal valid in both JSON and TOML basic strings (escapes backslash and quote).
+    private func stringLiteral(_ value: String) -> String {
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"" + escaped + "\""
+    }
+
     private var snippet: String {
         switch selectedClient {
         case .claudeDesktop:
@@ -70,36 +83,37 @@ struct MCPSettingsView: View {
             {
               "mcpServers": {
                 "mcpnotes": {
-                  "command": "\(serverPath)",
+                  "command": \(stringLiteral(serverPath)),
                   "env": {
-                    "MCPNOTES_DIR": "\(notesPath)"
+                    "MCPNOTES_DIR": \(stringLiteral(notesPath))
                   }
                 }
               }
             }
             """
         case .claudeCode:
-            return "claude mcp add mcpnotes --env MCPNOTES_DIR=\"\(notesPath)\" -- \(serverPath)"
-        case .chatGPTDesktop, .codex:
+            return "claude mcp add -s user mcpnotes --env MCPNOTES_DIR=\(shellQuoted(notesPath)) -- \(shellQuoted(serverPath))"
+        case .chatGPTDesktop:
             return """
             [mcp_servers.mcpnotes]
-            command = "\(serverPath)"
+            command = \(stringLiteral(serverPath))
 
             [mcp_servers.mcpnotes.env]
-            MCPNOTES_DIR = "\(notesPath)"
+            MCPNOTES_DIR = \(stringLiteral(notesPath))
             """
+        case .codex:
+            return "codex mcp add mcpnotes --env MCPNOTES_DIR=\(shellQuoted(notesPath)) -- \(shellQuoted(serverPath))"
         case .openCode:
             return """
             {
               "$schema": "https://opencode.ai/config.json",
               "mcp": {
-                "servers": {
-                  "mcpnotes": {
-                    "type": "local",
-                    "command": ["\(serverPath)"],
-                    "environment": {
-                      "MCPNOTES_DIR": "\(notesPath)"
-                    }
+                "mcpnotes": {
+                  "type": "local",
+                  "command": [\(stringLiteral(serverPath))],
+                  "enabled": true,
+                  "environment": {
+                    "MCPNOTES_DIR": \(stringLiteral(notesPath))
                   }
                 }
               }
@@ -131,13 +145,13 @@ enum MCPClient: CaseIterable, Identifiable {
     var instructions: String {
         switch self {
         case .claudeDesktop:
-            "Add this to your Claude Desktop config file, then restart Claude Desktop:\n~/Library/Application Support/Claude/claude_desktop_config.json"
+            "Add the \"mcpnotes\" entry to the \"mcpServers\" object in your Claude Desktop config file (keep any servers already there; create the file if it doesn't exist), then restart Claude Desktop:\n~/Library/Application Support/Claude/claude_desktop_config.json"
         case .claudeCode:
-            "Run this command in your terminal to register the server:"
+            "Run this command in your terminal to register the server for all projects (user scope):"
         case .chatGPTDesktop:
-            "Enable Developer Mode (Settings → Security and login), then add a server via the gear menu → MCP servers → Add server (STDIO transport). ChatGPT Desktop shares its MCP configuration with Codex CLI, so you can also add this directly to ~/.codex/config.toml:"
+            "ChatGPT Desktop shares its MCP configuration with Codex. Add this to ~/.codex/config.toml (or pick Codex above for an equivalent terminal command), then restart ChatGPT Desktop:"
         case .codex:
-            "Add this to ~/.codex/config.toml:"
+            "Run this command in your terminal to register the server. It writes to ~/.codex/config.toml, which ChatGPT Desktop and the IDE extension share:"
         case .openCode:
             "Add this to opencode.json (project) or ~/.config/opencode/opencode.json (global):"
         }
