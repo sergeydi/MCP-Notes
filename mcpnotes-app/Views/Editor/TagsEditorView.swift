@@ -33,14 +33,13 @@ struct TagsEditorView: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
+        FlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
             ForEach(tags, id: \.self) { tag in
                 tagCapsule(tag)
             }
 
             TextField("Add tag…", text: $newTagText)
                 .textFieldStyle(.plain)
-                .frame(minWidth: 60)
                 .focused($isInputFocused)
                 .onChange(of: newTagText) {
                     highlightedIndex = nil
@@ -93,6 +92,9 @@ struct TagsEditorView: View {
                         .presentationCompactAdaptation(.popover)
                 }
                 #endif
+                // Must stay the outermost modifier: FlowLayout reads layout values off its
+                // direct subviews only.
+                .flowFillsRemainingWidth(minWidth: 120)
         }
     }
 
@@ -143,7 +145,9 @@ struct TagsEditorView: View {
 
     private func tagCapsule(_ tag: String) -> some View {
         HStack(spacing: 3) {
+            // A single tag wider than the whole row truncates instead of wrapping mid-word.
             Text(tag)
+                .lineLimit(1)
             Button {
                 removeTag(tag)
             } label: {
