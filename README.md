@@ -1,6 +1,6 @@
 # MCP Notes
 
-A native macOS/iPadOS Markdown note-taking app with built-in semantic search and an [MCP](https://modelcontextprotocol.io) server — so AI tools like Claude can read, search, and edit your notes directly.
+A native macOS/iPadOS/iOS Markdown note-taking app with built-in semantic search and an [MCP](https://modelcontextprotocol.io) server — so AI tools like Claude can read, search, and edit your notes directly.
 
 [![Download on the App Store](https://upload.wikimedia.org/wikipedia/commons/0/0e/Download_on_the_Mac_App_Store_Badge_US-UK_RGB_wht.svg)](https://apps.apple.com/app/mcp-notes/id6762989069) [![Download on the App Store](https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg)](https://apps.apple.com/app/mcp-notes/id6762989069)
 
@@ -12,7 +12,8 @@ A native macOS/iPadOS Markdown note-taking app with built-in semantic search and
 ## Features
 
 - **Plain Markdown files** — every note is a `.md` file with a YAML frontmatter block (`uid`, `tags`). No proprietary format, no lock-in.
-- **iCloud sync** — notes live in iCloud Drive and sync across your Mac devices automatically.
+- **Shortcuts and Intelligence support**
+- **iCloud sync** — notes live in iCloud Drive and sync across your Mac, iOS, iPadOS devices automatically.
 - **Wikilinks** — `[[Note Name]]` links between notes with one-click navigation and a force-directed graph view.
 - **Semantic search (RAG)** — powered by [multilingual-e5-small](https://huggingface.co/intfloat/multilingual-e5-small) embeddings + USearch vectors + SQLite FTS5 BM25. Works across languages.
 - **MCP server** — exposes your notes as MCP tools (`list_notes`, `search_notes`, `get_note`, `update_note`, `create_note`, `rag_search`, …) over stdio. Works with Claude Code and other MCP clients.
@@ -23,6 +24,7 @@ A native macOS/iPadOS Markdown note-taking app with built-in semantic search and
 
 - macOS 26 or later
 - iPadOS 26 or later
+- iOS 26 or later
 - Xcode 26+ (to build from source)
 
 ## MCP Server Setup
