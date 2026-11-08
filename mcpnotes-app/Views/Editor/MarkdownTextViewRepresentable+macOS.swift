@@ -413,6 +413,52 @@ private final class MarkdownTextView: NSTextView {
             .trimmingCharacters(in: .newlines)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(content, forType: .string)
+        animateCopyFeedback(on: sender)
+    }
+
+    private static func copyButtonImage(_ name: String) -> NSImage? {
+        let symConfig = NSImage.SymbolConfiguration(pointSize: 11, weight: .regular)
+        return NSImage(systemSymbolName: name, accessibilityDescription: "Copy code")?
+            .withSymbolConfiguration(symConfig)
+    }
+
+    /// Press-down bounce plus a checkmark swap, mirroring the iOS copy feedback.
+    private func animateCopyFeedback(on button: NSButton) {
+        guard let layer = button.layer else { return }
+
+        // Scale around the button's center (NSView layers use a (0,0) anchor point).
+        let cx = layer.bounds.midX + layer.bounds.minX
+        let cy = layer.bounds.midY + layer.bounds.minY
+        func scaled(_ k: CGFloat) -> CATransform3D {
+            var t = CATransform3DMakeTranslation(cx, cy, 0)
+            t = CATransform3DScale(t, k, k, 1)
+            return CATransform3DTranslate(t, -cx, -cy, 0)
+        }
+        let bounce = CAKeyframeAnimation(keyPath: "transform")
+        bounce.values = [scaled(1), scaled(0.8), scaled(1)].map { NSValue(caTransform3D: $0) }
+        bounce.keyTimes = [0, 0.4, 1]
+        bounce.duration = 0.25
+        layer.add(bounce, forKey: "copyBounce")
+
+        func swap(to symbol: String, tint: NSColor?) {
+            let fade = CATransition()
+            fade.type = .fade
+            fade.duration = 0.15
+            layer.add(fade, forKey: "copySwap")
+            button.image = Self.copyButtonImage(symbol)
+            button.contentTintColor = tint
+        }
+
+        swap(to: "checkmark", tint: .systemGreen)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak button] in
+            guard let button, let layer = button.layer else { return }
+            let fade = CATransition()
+            fade.type = .fade
+            fade.duration = 0.15
+            layer.add(fade, forKey: "copySwap")
+            button.image = Self.copyButtonImage("doc.on.doc")
+            button.contentTintColor = nil
+        }
     }
 
     // MARK: Image previews
