@@ -1,0 +1,248 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Add to a note in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Zu einer Notiz in ${applicationName} hinzufügen",
+              "An eine Notiz in ${applicationName} anhängen"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Add to a note in ${applicationName}",
+              "Append to a note in ${applicationName}"
+            ]
+          }
+        },
+        "ru" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Добавить в заметку в ${applicationName}",
+              "Дописать в заметку в ${applicationName}"
+            ]
+          }
+        },
+        "uk" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Додати до нотатки в ${applicationName}",
+              "Дописати в нотатку в ${applicationName}"
+            ]
+          }
+        }
+      }
+    },
+    "Bookmark a note in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Notiz in ${applicationName} mit Lesezeichen versehen",
+              "Lesezeichen in ${applicationName} umschalten"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Bookmark a note in ${applicationName}",
+              "Toggle bookmark in ${applicationName}"
+            ]
+          }
+        },
+        "ru" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Добавить заметку в закладки в ${applicationName}",
+              "Переключить закладку в ${applicationName}"
+            ]
+          }
+        },
+        "uk" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Додати нотатку в закладки в ${applicationName}",
+              "Перемкнути закладку в ${applicationName}"
+            ]
+          }
+        }
+      }
+    },
+    "Create a note in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Notiz in ${applicationName} erstellen",
+              "Neue Notiz zu ${applicationName} hinzufügen"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Create a note in ${applicationName}",
+              "Add a new note to ${applicationName}"
+            ]
+          }
+        },
+        "ru" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Создать заметку в ${applicationName}",
+              "Добавить новую заметку в ${applicationName}"
+            ]
+          }
+        },
+        "uk" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Створити нотатку в ${applicationName}",
+              "Додати нову нотатку в ${applicationName}"
+            ]
+          }
+        }
+      }
+    },
+    "List bookmarked notes in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Notizen mit Lesezeichen in ${applicationName} auflisten",
+              "Lesezeichen in ${applicationName} zeigen"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "List bookmarked notes in ${applicationName}",
+              "Show bookmarks in ${applicationName}"
+            ]
+          }
+        },
+        "ru" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Показать заметки с закладками в ${applicationName}",
+              "Показать закладки в ${applicationName}"
+            ]
+          }
+        },
+        "uk" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Показати нотатки із закладками в ${applicationName}",
+              "Показати закладки в ${applicationName}"
+            ]
+          }
+        }
+      }
+    },
+    "Open a note in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Notiz in ${applicationName} öffnen"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Open a note in ${applicationName}"
+            ]
+          }
+        },
+        "ru" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Открыть заметку в ${applicationName}"
+            ]
+          }
+        },
+        "uk" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Відкрити нотатку в ${applicationName}"
+            ]
+          }
+        }
+      }
+    },
+    "Search notes in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Notizen in ${applicationName} durchsuchen",
+              "Notiz in ${applicationName} finden"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Search notes in ${applicationName}",
+              "Find a note in ${applicationName}"
+            ]
+          }
+        },
+        "ru" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Найти заметки в ${applicationName}",
+              "Найти заметку в ${applicationName}"
+            ]
+          }
+        },
+        "uk" : {
+          "stringSet" : {
+            "state" : "machine_translated",
+            "values" : [
+              "Шукати нотатки в ${applicationName}",
+              "Знайти нотатку в ${applicationName}"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.3"
+}
