@@ -14,12 +14,19 @@ struct NoteListItemView: View {
                     .font(.headline)
                     .fontWeight(.semibold)
                     .lineLimit(1)
+                if score != nil || note.isBookmarked {
+                    Spacer(minLength: 4)
+                }
                 if let score {
-                    Spacer()
                     Text(String(format: "%.0f%%", score * 100))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .monospacedDigit()
+                }
+                if note.isBookmarked {
+                    Image(systemName: "bookmark.fill")
+                        .font(.caption)
+                        .foregroundStyle(isSelected ? Color.white : Color.orange)
                 }
             }
 
@@ -92,9 +99,9 @@ struct NoteListItemView: View {
     }
 
     private var accessibilityDescription: String {
-        if note.tags.isEmpty {
-            return note.filename
-        }
-        return String(localized: "\(note.filename), tags: \(note.tags.joined(separator: ", "))")
+        let base = note.tags.isEmpty
+            ? note.filename
+            : String(localized: "\(note.filename), tags: \(note.tags.joined(separator: ", "))")
+        return note.isBookmarked ? "\(base), \(String(localized: "Favorite"))" : base
     }
 }
