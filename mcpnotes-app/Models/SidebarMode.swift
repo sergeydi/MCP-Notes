@@ -8,7 +8,7 @@ public enum SidebarMode: Int, CaseIterable, Hashable {
 
     public var symbolName: String {
         switch self {
-        case .all:       "note.text"
+        case .all:       "text.page"
         case .byTag:     "tag"
         case .favorites: "bookmark"
         }

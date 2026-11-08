@@ -322,7 +322,8 @@ struct SidebarView: View {
                     Button {
                         mode = m
                     } label: {
-                        Label(m.label, systemImage: m.symbolName)
+                        // Explicit ".fill" name: ControlGroup in the iOS toolbar ignores `.symbolVariant`.
+                        Label(m.label, systemImage: mode == m ? m.symbolName + ".fill" : m.symbolName)
                     }
                     .tint(mode == m ? Color.accentColor : nil)
                 }
@@ -352,18 +353,16 @@ struct SidebarView: View {
         }
 
         ToolbarItem {
-            Menu {
+            Picker("Mode", selection: $mode) {
                 ForEach(SidebarMode.allCases, id: \.self) { m in
-                    Button {
-                        mode = m
-                    } label: {
-                        Label(m.label, systemImage: m.symbolName)
-                    }
+                    Label(m.label, systemImage: m.symbolName)
+                        .labelStyle(.iconOnly)
+                        .symbolVariant(mode == m ? .fill : .none)
+                        .help(m.label)
+                        .tag(m)
                 }
-            } label: {
-                Image(systemName: mode.symbolName)
             }
-            .help(mode.label)
+            .pickerStyle(.segmented)
             .accessibilityLabel(mode.label)
         }
 
