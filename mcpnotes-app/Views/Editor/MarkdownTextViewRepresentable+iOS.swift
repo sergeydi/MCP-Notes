@@ -83,6 +83,14 @@ struct MarkdownTextViewRepresentable: UIViewRepresentable {
                 let sel = tv.selectedRange
                 let nsStr = (tv.text ?? "") as NSString
                 let lineRange = nsStr.lineRange(for: sel)
+                // Empty line, no selection: insert the marker right away and put the caret after it.
+                if sel.length == 0,
+                   nsStr.substring(with: lineRange).trimmingCharacters(in: .newlines).isEmpty {
+                    tv.replaceText(in: NSRange(location: lineRange.location, length: 0), with: prefix)
+                    let cursor = lineRange.location + (prefix as NSString).length
+                    tv.selectedRange = NSRange(location: cursor, length: 0)
+                    return
+                }
                 let parts = nsStr.substring(with: lineRange).components(separatedBy: "\n")
                 let prefixed = parts.map { $0.isEmpty ? $0 : prefix + $0 }.joined(separator: "\n")
                 tv.replaceText(in: lineRange, with: prefixed)
