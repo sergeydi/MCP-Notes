@@ -256,8 +256,40 @@ final class NoteStore {
             // TODO: surface errors to user
             try? fileService.deleteNote(note)
             await indexer.removeNote(id: note.id)
+            await unlinkWikilinks(to: note.filename)
             indexingState = .ready(count: await indexer.indexedCount())
         }
+    }
+
+    /// Removes `[[filename]]` entirely from every other note so deleted
+    /// notes don't leave dead links behind. `![[...]]` embeds are left alone. Like the
+    /// rename cascade, loads/rewrites one note at a time.
+    private func unlinkWikilinks(to filename: String) async {
+        let pattern = /(!?)\[\[([^\]\n]+)\]\]/
+        let target = filename.lowercased()
+        var changed: [NoteMetadata] = []
+        for metadata in notes {
+            guard var n = try? await fileService.loadNote(at: metadata.fileURL) else { continue }
+            var mutated = false
+            let newBody = n.body.replacing(pattern) { match in
+                let inner = match.output.2.trimmingCharacters(in: .whitespaces)
+                guard match.output.1.isEmpty, inner.lowercased() == target else {
+                    return String(match.output.0)
+                }
+                mutated = true
+                return ""
+            }
+            guard mutated else { continue }
+            n.body = newBody
+            try? fileService.saveNote(n)
+            let updated = NoteMetadata(n)
+            if let idx = notes.firstIndex(where: { $0.id == n.id }) {
+                notes[idx] = updated
+            }
+            watchFiles([updated])
+            changed.append(updated)
+        }
+        if !changed.isEmpty { scheduleIndexing(for: changed) }
     }
 
     func renameNote(_ note: NoteMetadata, to newName: String, onComplete: (@MainActor (_ updatedNoteFilenames: [String]) -> Void)? = nil) {

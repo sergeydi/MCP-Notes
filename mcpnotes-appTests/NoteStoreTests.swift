@@ -915,3 +915,82 @@ struct NoteStoreRenameWikilinkTests {
         #expect(indexedIDs.contains(b.id))
     }
 }
+
+// MARK: - Delete wikilink cascade
+
+@Suite("NoteStore – delete wikilink cascade")
+@MainActor
+struct NoteStoreDeleteWikilinkTests {
+    let store: NoteStore
+    let fs: MockFileService
+    let idx: MockNoteIndexer
+
+    init() {
+        fs = MockFileService()
+        idx = MockNoteIndexer()
+        store = NoteStore(fileService: fs, indexer: idx, indexDebounceDuration: .zero)
+    }
+
+    /// Deletes `deleted` and waits until the cascade has saved `sentinel` (a note that is
+    /// known to contain a link to `deleted`), so assertions on other notes aren't racy.
+    private func delete(_ deleted: Note, waitingFor sentinel: Note) async {
+        store.deleteNote(NoteMetadata(deleted))
+        await yieldUntil { fs.savedNotes.contains { $0.id == sentinel.id } }
+    }
+
+    @Test func removesWikilinkEntirelyFromOtherNote() async throws {
+        let deleted = makeNote(filename: "Gone")
+        var other = makeNote(filename: "Other")
+        other.body = "See [[Gone]]"
+        fs.stubbedNotes = [deleted, other]
+        store.notes = [NoteMetadata(deleted), NoteMetadata(other)]
+        await delete(deleted, waitingFor: other)
+        let saved = try #require(fs.savedNotes.first { $0.id == other.id })
+        #expect(saved.body == "See ")
+    }
+
+    @Test func removesWikilinkCaseInsensitiveAndTrimmed() async throws {
+        let deleted = makeNote(filename: "Gone")
+        var other = makeNote(filename: "Other")
+        other.body = "A [[ gone ]] B"
+        fs.stubbedNotes = [deleted, other]
+        store.notes = [NoteMetadata(deleted), NoteMetadata(other)]
+        await delete(deleted, waitingFor: other)
+        let saved = try #require(fs.savedNotes.first { $0.id == other.id })
+        #expect(saved.body == "A  B")
+    }
+
+    @Test func removesEveryOccurrenceAndKeepsLinksToOtherNotes() async throws {
+        let deleted = makeNote(filename: "Gone")
+        var other = makeNote(filename: "Other")
+        other.body = "[[Gone]] and [[Keep]] and [[Gone]]"
+        fs.stubbedNotes = [deleted, other]
+        store.notes = [NoteMetadata(deleted), NoteMetadata(other)]
+        await delete(deleted, waitingFor: other)
+        let saved = try #require(fs.savedNotes.first { $0.id == other.id })
+        #expect(saved.body == " and [[Keep]] and ")
+    }
+
+    @Test func leavesEmbedsUntouched() async throws {
+        let deleted = makeNote(filename: "Gone")
+        var other = makeNote(filename: "Other")
+        other.body = "![[Gone]] and [[Gone]]"
+        fs.stubbedNotes = [deleted, other]
+        store.notes = [NoteMetadata(deleted), NoteMetadata(other)]
+        await delete(deleted, waitingFor: other)
+        let saved = try #require(fs.savedNotes.first { $0.id == other.id })
+        #expect(saved.body == "![[Gone]] and ")
+    }
+
+    @Test func doesNotSaveNotesWithoutLinkToDeletedNote() async {
+        let deleted = makeNote(filename: "Gone")
+        var linked = makeNote(filename: "Linked")
+        linked.body = "[[Gone]]"
+        var unrelated = makeNote(filename: "Unrelated")
+        unrelated.body = "No links, but [[Elsewhere]]"
+        fs.stubbedNotes = [deleted, linked, unrelated]
+        store.notes = [NoteMetadata(deleted), NoteMetadata(linked), NoteMetadata(unrelated)]
+        await delete(deleted, waitingFor: linked)
+        #expect(fs.savedNotes.filter { $0.id == unrelated.id }.isEmpty)
+    }
+}
