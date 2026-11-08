@@ -601,9 +601,40 @@ private final class MarkdownTextView: NSTextView {
         ))
     }
 
+    private func isTextInputView(_ view: NSView?) -> Bool {
+        var v = view
+        while let current = v, current !== self {
+            if current is NSTextField || current is NSText { return true }
+            v = current.superview
+        }
+        return false
+    }
+
+    // NSTextView's own cursorUpdate would otherwise re-apply the I-beam over the header.
+    override func cursorUpdate(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if let header = subviews.first(where: { $0 is NSHostingView<FrontmatterView> }),
+           header.frame.contains(point) {
+            if !isTextInputView(hitTest(superview?.convert(event.locationInWindow, from: nil) ?? point)) {
+                NSCursor.arrow.set()
+            }
+            return
+        }
+        super.cursorUpdate(with: event)
+    }
+
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
         let point = convert(event.locationInWindow, from: nil)
+        if let header = subviews.first(where: { $0 is NSHostingView<FrontmatterView> }),
+           header.frame.contains(point) {
+            // Over the hosted frontmatter header the text view must not force its I-beam:
+            // real text fields there keep their own cursor, everything else gets an arrow.
+            if !isTextInputView(hitTest(superview?.convert(event.locationInWindow, from: nil) ?? point)) {
+                NSCursor.arrow.set()
+            }
+            return
+        }
         if copyButtons.contains(where: { $0.frame.contains(point) }) {
             NSCursor.arrow.set()
         } else if linkRects.contains(where: { $0.contains(point) }) {
