@@ -398,6 +398,29 @@
         }
       }
     },
+    "Add to Favorites" : {
+      "comment" : "Sidebar swipe action (iOS) / context menu item (macOS) that adds a note to Favorites",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Favorites"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добавить в избранное"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати до вибраного"
+          }
+        }
+      }
+    },
     "Add Bookmark" : {
       "localizations" : {
         "en" : {
@@ -1875,6 +1898,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Схожі"
+          }
+        }
+      }
+    },
+    "Remove from Favorites" : {
+      "comment" : "Sidebar swipe action (iOS) / context menu item (macOS) that removes a note from Favorites",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from Favorites"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Убрать из избранного"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прибрати з вибраного"
           }
         }
       }

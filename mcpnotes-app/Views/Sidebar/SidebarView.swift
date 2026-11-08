@@ -147,6 +147,11 @@ struct SidebarView: View {
         }
     }
 
+    /// Explicit `LocalizedStringKey` — a ternary of string literals would otherwise infer `String` and skip localization.
+    private func favoriteTitle(_ isBookmarked: Bool) -> LocalizedStringKey {
+        isBookmarked ? "Remove from Favorites" : "Add to Favorites"
+    }
+
     /// Common list-row chrome: selection tag, shared-separator hiding and selection background.
     /// `ids` is the ordered list of rows in the same section, used to hide separators next to the selection.
     private func listRow<Row: View>(_ row: Row, id: UUID, in ids: [UUID]) -> some View {
@@ -162,13 +167,28 @@ struct SidebarView: View {
             Button {
                 store.toggleBookmark(for: id)
             } label: {
-                Label(isBookmarked ? "Remove from Favorites" : "Add to Favorites",
+                Label(favoriteTitle(isBookmarked),
                       systemImage: isBookmarked ? "bookmark.slash" : "bookmark")
             }
             .tint(.orange)
         }
 #else
-        return base
+        let note = store.notes.first { $0.id == id }
+        return base.contextMenu {
+            if let note {
+                Button("Open in New Window", systemImage: "macwindow.badge.plus") {
+                    openWindow(value: note.id)
+                }
+                Button(favoriteTitle(note.isBookmarked),
+                       systemImage: note.isBookmarked ? "bookmark.slash" : "bookmark") {
+                    store.toggleBookmark(for: note.id)
+                }
+                Divider()
+                Button("Delete", systemImage: "trash", role: .destructive) {
+                    store.deleteNote(note)
+                }
+            }
+        }
 #endif
     }
 
