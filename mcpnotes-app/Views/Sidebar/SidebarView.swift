@@ -151,11 +151,25 @@ struct SidebarView: View {
     /// `ids` is the ordered list of rows in the same section, used to hide separators next to the selection.
     private func listRow<Row: View>(_ row: Row, id: UUID, in ids: [UUID]) -> some View {
         let edges = rowSeparatorEdges(for: id, in: ids)
-        return row
+        let base = row
             .tag(id)
             .listRowSeparator(edges.top, edges: .top)
             .listRowSeparator(edges.bottom, edges: .bottom)
             .listRowBackground(rowBackground(for: id))
+#if os(iOS)
+        let isBookmarked = store.notes.first { $0.id == id }?.isBookmarked ?? false
+        return base.swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button {
+                store.toggleBookmark(for: id)
+            } label: {
+                Label(isBookmarked ? "Remove from Favorites" : "Add to Favorites",
+                      systemImage: isBookmarked ? "bookmark.slash" : "bookmark")
+            }
+            .tint(.orange)
+        }
+#else
+        return base
+#endif
     }
 
     private var textSearchTitleMatches: [NoteMetadata] {
