@@ -147,6 +147,17 @@ struct SidebarView: View {
         }
     }
 
+    /// Common list-row chrome: selection tag, shared-separator hiding and selection background.
+    /// `ids` is the ordered list of rows in the same section, used to hide separators next to the selection.
+    private func listRow<Row: View>(_ row: Row, id: UUID, in ids: [UUID]) -> some View {
+        let edges = rowSeparatorEdges(for: id, in: ids)
+        return row
+            .tag(id)
+            .listRowSeparator(edges.top, edges: .top)
+            .listRowSeparator(edges.bottom, edges: .bottom)
+            .listRowBackground(rowBackground(for: id))
+    }
+
     private var textSearchTitleMatches: [NoteMetadata] {
         let q = searchText.lowercased()
         return store.notes.filter { $0.filename.lowercased().contains(q) }
@@ -156,12 +167,7 @@ struct SidebarView: View {
     private var flatContent: some View {
         let ids = visibleNotes.map(\.id)
         ForEach(visibleNotes) { note in
-            let edges = rowSeparatorEdges(for: note.id, in: ids)
-            NoteListItemView(note: note, isSelected: isRowSelected(note.id))
-                .tag(note.id)
-                .listRowSeparator(edges.top, edges: .top)
-                .listRowSeparator(edges.bottom, edges: .bottom)
-                .listRowBackground(rowBackground(for: note.id))
+            listRow(NoteListItemView(note: note, isSelected: isRowSelected(note.id)), id: note.id, in: ids)
         }
         .onDelete { offsets in
             offsets.forEach { store.deleteNote(visibleNotes[$0]) }
@@ -183,12 +189,7 @@ struct SidebarView: View {
         if !titleMatches.isEmpty {
             Section {
                 ForEach(titleMatches) { note in
-                    let edges = rowSeparatorEdges(for: note.id, in: titleIDs)
-                    NoteListItemView(note: note, searchQuery: searchText, isSelected: isRowSelected(note.id))
-                        .tag(note.id)
-                        .listRowSeparator(edges.top, edges: .top)
-                        .listRowSeparator(edges.bottom, edges: .bottom)
-                        .listRowBackground(rowBackground(for: note.id))
+                    listRow(NoteListItemView(note: note, searchQuery: searchText, isSelected: isRowSelected(note.id)), id: note.id, in: titleIDs)
                 }
             } header: {
                 Text("Title").id("search-top")
@@ -196,24 +197,14 @@ struct SidebarView: View {
             if !bodyMatches.isEmpty {
                 Section("Content") {
                     ForEach(bodyMatches) { match in
-                        let edges = rowSeparatorEdges(for: match.id, in: bodyIDs)
-                        NoteListItemView(note: match.metadata, searchQuery: searchText, searchSnippet: match.match, isSelected: isRowSelected(match.id))
-                            .tag(match.id)
-                            .listRowSeparator(edges.top, edges: .top)
-                            .listRowSeparator(edges.bottom, edges: .bottom)
-                            .listRowBackground(rowBackground(for: match.id))
+                        listRow(NoteListItemView(note: match.metadata, searchQuery: searchText, searchSnippet: match.match, isSelected: isRowSelected(match.id)), id: match.id, in: bodyIDs)
                     }
                 }
             }
         } else if !bodyMatches.isEmpty {
             Section {
                 ForEach(bodyMatches) { match in
-                    let edges = rowSeparatorEdges(for: match.id, in: bodyIDs)
-                    NoteListItemView(note: match.metadata, searchQuery: searchText, searchSnippet: match.match, isSelected: isRowSelected(match.id))
-                        .tag(match.id)
-                        .listRowSeparator(edges.top, edges: .top)
-                        .listRowSeparator(edges.bottom, edges: .bottom)
-                        .listRowBackground(rowBackground(for: match.id))
+                    listRow(NoteListItemView(note: match.metadata, searchQuery: searchText, searchSnippet: match.match, isSelected: isRowSelected(match.id)), id: match.id, in: bodyIDs)
                 }
             } header: {
                 Text("Content").id("search-top")
@@ -223,12 +214,7 @@ struct SidebarView: View {
         if !semanticMatches.isEmpty {
             Section("Related") {
                 ForEach(semanticMatches, id: \.0.id) { note, score in
-                    let edges = rowSeparatorEdges(for: note.id, in: semanticIDs)
-                    NoteListItemView(note: note, score: score, isSelected: isRowSelected(note.id))
-                        .tag(note.id)
-                        .listRowSeparator(edges.top, edges: .top)
-                        .listRowSeparator(edges.bottom, edges: .bottom)
-                        .listRowBackground(rowBackground(for: note.id))
+                    listRow(NoteListItemView(note: note, score: score, isSelected: isRowSelected(note.id)), id: note.id, in: semanticIDs)
                 }
             }
         }
@@ -266,12 +252,7 @@ struct SidebarView: View {
             let ids = tagNotes.map(\.id)
             DisclosureGroup(isExpanded: tagDisclosureBinding(for: tag)) {
                 ForEach(tagNotes) { note in
-                    let edges = rowSeparatorEdges(for: note.id, in: ids)
-                    NoteListItemView(note: note, isSelected: isRowSelected(note.id))
-                        .tag(note.id)
-                        .listRowSeparator(edges.top, edges: .top)
-                        .listRowSeparator(edges.bottom, edges: .bottom)
-                        .listRowBackground(rowBackground(for: note.id))
+                    listRow(NoteListItemView(note: note, isSelected: isRowSelected(note.id)), id: note.id, in: ids)
                 }
             } label: {
                 tagDisclosureLabel(tag, count: tagNotes.count)
@@ -282,12 +263,7 @@ struct SidebarView: View {
             let ids = untagged.map(\.id)
             DisclosureGroup(isExpanded: $noTagsExpanded) {
                 ForEach(untagged) { note in
-                    let edges = rowSeparatorEdges(for: note.id, in: ids)
-                    NoteListItemView(note: note, isSelected: isRowSelected(note.id))
-                        .tag(note.id)
-                        .listRowSeparator(edges.top, edges: .top)
-                        .listRowSeparator(edges.bottom, edges: .bottom)
-                        .listRowBackground(rowBackground(for: note.id))
+                    listRow(NoteListItemView(note: note, isSelected: isRowSelected(note.id)), id: note.id, in: ids)
                 }
             } label: {
                 tagDisclosureLabel("No Tags", count: untagged.count)
