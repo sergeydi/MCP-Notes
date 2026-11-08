@@ -727,8 +727,13 @@ private final class MarkdownTextView: UITextView, UIGestureRecognizerDelegate {
     }
 
     @objc fileprivate func handleTap(_ gesture: UITapGestureRecognizer) {
-        guard gesture.state == .ended,
-              let position = closestPosition(to: gesture.location(in: self)) else { return }
+        guard gesture.state == .ended else { return }
+        let point = gesture.location(in: self)
+        // Taps on the header (filename/tags) also reach this recognizer since the header is a
+        // subview of the text view; `closestPosition` would then resolve to offset 0 and trigger
+        // a link on the first line of the body.
+        if let headerHostingView, headerHostingView.frame.contains(point) { return }
+        guard let position = closestPosition(to: point) else { return }
         let charIdx = offset(from: beginningOfDocument, to: position)
         let str = text ?? ""
         let nsStr = str as NSString
